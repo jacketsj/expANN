@@ -19,15 +19,13 @@ set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -mavx -g ${OpenMP_CXX_FLAGS}")
 #list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 #list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-CPMAddPackage("gh:fmtlib/fmt#9.1.0")  # fmt for nice strings
+#CPMAddPackage("gh:fmtlib/fmt#9.1.0")  # fmt for nice strings
 
 find_package(Threads)
-find_package(CGAL REQUIRED COMPONENTS Core)
-
-add_definitions("-DCGAL_USE_BASIC_VIEWER")
 
 file(GLOB SOURCES ${SRC}/*.cpp)
 
 add_executable(expann ${SOURCES})
 
-target_link_libraries(simple PUBLIC fmt::fmt)
+#target_link_libraries(expann PUBLIC fmt::fmt)
+target_link_libraries(expann PUBLIC)
