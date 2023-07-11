@@ -27,7 +27,7 @@ public:
 		return res;
 	}
 
-	typedef std::vector<vec<T>>::const_iterator const_iterator;
+	typedef typename std::vector<vec<T>>::const_iterator const_iterator;
 	const_iterator begin() const { return internal.const_container.begin(); }
 	const_iterator end() const { return internal.const_container.end(); }
 };
