@@ -10,6 +10,7 @@ public:
 	vec() = default;
 	vec(size_t dim) : internal(dim) {}
 	size_t dim() const { return internal.size(); }
+	T& operator[](size_t i) { return internal[i]; }
 	void operator+=(const vec<T>& oth) {
 		assert(dim() == oth.dim());
 		for (size_t i = 0; i < internal.size(); ++i)
