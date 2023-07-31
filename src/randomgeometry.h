@@ -28,11 +28,12 @@ template <typename T> struct vec_generator {
 	std::mt19937 gen;
 	std::normal_distribution<> d;
 	T eps;
+	size_t dim;
 
-	vec_generator() : rd(), gen(rd()), d(0, 1), eps(1e-7) {}
+	vec_generator() : rd(), gen(rd()), d(0, 1), eps(1e-7), dim(10) {}
 
 	vec<T> random_vec() {
-		vec<T> res;
+		vec<T> res(dim);
 		do {
 			for (size_t i = 0; i < res.size(); ++i)
 				res[i] = d(gen);
@@ -48,6 +49,9 @@ template <typename T> class arragement_generator : public vec_generator<T> {
 
 public:
 	arragement_generator() {} //  : rd(), gen(rd()), d(0, 1), eps(1e-7) {}
+	arragement_generator(size_t _dim) {
+		this->dim = _dim;
+	} //  : rd(), gen(rd()), d(0, 1), eps(1e-7) {}
 
 	arrangement<T> operator()(const vecset<T>& vs) {
 		arrangement<T> res;

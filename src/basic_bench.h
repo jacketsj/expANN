@@ -13,6 +13,12 @@ template <typename T> struct basic_bench {
 	basic_bench();
 	void gen_dataset();
 	template <class Engine> void perform_benchmark(ann_engine<T, Engine>& eng) {
+		// store all vectors in the engine
+		for (const auto& v : dataset)
+			eng.store_vector(v);
+		// build the engine
+		eng.build();
+		// run the queries
 		double avg_dist = 0, avg_dist2 = 0;
 		auto time_begin = std::chrono::high_resolution_clock::now();
 		for (const auto& q : query_vecs) {
@@ -39,7 +45,7 @@ template <typename T> struct basic_bench {
 
 template <typename T> void basic_bench<T>::gen_dataset() {
 	vec_generator<T> vg;
-	for (int i = 0; i < 100; ++i) {
+	for (int i = 0; i < 500; ++i) {
 		dataset.push_back(vg.random_vec());
 	}
 	for (int i = 0; i < 10; ++i) {

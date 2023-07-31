@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <string>
 #include <vector>
 
 template <typename T> class vec {
@@ -12,6 +13,12 @@ public:
 	vec(size_t dim) : internal(dim) {}
 	size_t size() const { return internal.size(); }
 	size_t dim() const { return internal.size(); }
+	std::string to_string() const {
+		std::string ret;
+		for (const auto& val : internal)
+			ret += std::to_string(val) + ' ';
+		return ret;
+	}
 	T& operator[](size_t i) { return internal[i]; }
 	void operator+=(const vec<T>& oth) {
 		assert(dim() == oth.dim());
