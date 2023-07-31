@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <cmath>
 #include <vector>
 
@@ -9,6 +10,7 @@ template <typename T> class vec {
 public:
 	vec() = default;
 	vec(size_t dim) : internal(dim) {}
+	size_t size() const { return internal.size(); }
 	size_t dim() const { return internal.size(); }
 	T& operator[](size_t i) { return internal[i]; }
 	void operator+=(const vec<T>& oth) {
@@ -47,7 +49,7 @@ public:
 	}
 	T norm2() const {
 		T ans = 0;
-		for (T& val : internal)
+		for (const T& val : internal)
 			ans += val * val;
 		return ans;
 	}
