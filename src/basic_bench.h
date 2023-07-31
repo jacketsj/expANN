@@ -45,10 +45,10 @@ template <typename T> struct basic_bench {
 
 template <typename T> void basic_bench<T>::gen_dataset() {
 	vec_generator<T> vg;
-	for (int i = 0; i < 500; ++i) {
+	for (int i = 0; i < 50000; ++i) {
 		dataset.push_back(vg.random_vec());
 	}
-	for (int i = 0; i < 10; ++i) {
+	for (int i = 0; i < 400; ++i) {
 		query_vecs.push_back(vg.random_vec());
 	}
 }
