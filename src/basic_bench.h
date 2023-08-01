@@ -12,7 +12,9 @@ template <typename T> struct basic_bench {
 	std::vector<vec<T>> query_vecs;
 	basic_bench();
 	void gen_dataset();
-	template <class Engine> void perform_benchmark(ann_engine<T, Engine>& eng) {
+	template <class Engine>
+	void perform_benchmark(ann_engine<T, Engine>& eng,
+												 bool print_basics = false) {
 		// store all vectors in the engine
 		for (const auto& v : dataset)
 			eng.store_vector(v);
@@ -30,16 +32,18 @@ template <typename T> struct basic_bench {
 		auto time_end = std::chrono::high_resolution_clock::now();
 		avg_dist /= query_vecs.size();
 		avg_dist2 /= query_vecs.size();
-
-		std::cout << "Benchmarking " << eng.name() << '\n';
-		std::cout << "\taverage distance: " << avg_dist << '\n';
-		std::cout << "\taverage squared distance: " << avg_dist2 << '\n';
-		std::cout << "\taverage query time: "
-							<< std::chrono::duration_cast<std::chrono::nanoseconds>(
-										 time_end - time_begin)
-												 .count() /
-										 query_vecs.size()
-							<< "ns" << std::endl;
+		auto duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+													 time_end - time_begin)
+													 .count();
+		if (print_basics) {
+			std::cout << avg_dist << "," << avg_dist2 << "," << duration_ns;
+		} else {
+			std::cout << "Benchmarking " << eng.name() << '\n';
+			std::cout << "\taverage distance: " << avg_dist << '\n';
+			std::cout << "\taverage squared distance: " << avg_dist2 << '\n';
+			std::cout << "\taverage query time: " << duration_ns / query_vecs.size()
+								<< "ns" << std::endl;
+		}
 	}
 };
 

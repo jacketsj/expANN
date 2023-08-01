@@ -7,8 +7,24 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
+void plotter() {
+	// benchmarkers
+	basic_bench<float> basic_benchmarker;
+
+	for (size_t k = 4; k <= 100; k += 8) {
+		for (int p2 = 1; p2 <= 8; ++p2) {
+			std::cout << k << ',' << p2 << ',';
+			hnsw_engine<float, false> engine_hnsw(50, k, 0.5 * p2);
+			basic_benchmarker.perform_benchmark(engine_hnsw, true);
+			std::cout << '\n';
+		}
+	}
+}
+
 int main() {
-	// arragement_generator<float> ag;
+
+	plotter();
+	return 0;
 
 	// ANN engines
 	brute_force_engine<float> engine_bf;
