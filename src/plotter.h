@@ -10,6 +10,7 @@
 #include "arrangement_engine.h"
 #include "brute_force_engine.h"
 #include "hnsw_engine.h"
+#include "hnsw_engine_2.h"
 
 namespace plt = matplotlibcpp;
 
@@ -53,19 +54,29 @@ std::vector<bench_data> perform_benchmarks() {
 	benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine_bf));
 	// use_engine(engine_bf);
 
-	for (size_t k = 10; k <= 70; k += 10) {
-		for (int p2 = 2; p2 < 14; ++p2) {
+	{
+		hnsw_engine_2<float> engine2(40, 1);
+		benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine2));
+		std::cerr << "Completed hnsw2(main)" << std::endl;
+	}
+
+	for (size_t k = 100; k <= 200; k += 40) {
+		for (int p2 = 15; p2 < 18; ++p2) {
 			if (p2 > 4)
 				p2 += 2;
 			// for (int p2 = 1; p2 <= 8; ++p2) {
 			hnsw_engine<float, false> engine(50, k, 0.5 * p2);
 			benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine));
-			std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")" << std::endl;
+			hnsw_engine_2<float> engine2(k, 0.5 * p2);
+			benchmark_dataset.push_back(
+					basic_benchmarker.get_benchmark_data(engine2));
+			std::cerr << "Completed hnsw+2(k=" << k << ",p2=" << p2 << ")"
+								<< std::endl;
 			// use_engine(engine_hnsw);
 		}
 	}
 
-	hnsw_engine<float, false> big_hnsw_engine(100, 40, 15);
+	hnsw_engine<float, false> big_hnsw_engine(200, 200, 15);
 	benchmark_dataset.push_back(
 			basic_benchmarker.get_benchmark_data(big_hnsw_engine));
 	std::cerr << "Completed big hnsw" << std::endl;
