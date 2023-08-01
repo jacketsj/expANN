@@ -7,11 +7,81 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
+struct bench_data {
+	double time_per_query_ns;
+	double time_to_build_ns;
+	double average_distance;
+	double average_squared_distance;
+	double recall;
+	std::string engine_name;
+};
+
+const double TOLERANCE = 1e-7;
+
 template <typename T> struct basic_bench {
 	std::vector<vec<T>> dataset;
 	std::vector<vec<T>> query_vecs;
+	std::vector<vec<T>> query_ans;
 	basic_bench();
 	void gen_dataset();
+	template <class Engine> void populate_ans(ann_engine<T, Engine>& eng) {
+		query_ans.clear(); // in case of repeat calls to this function
+
+		// assume eng is an optimal solver
+
+		for (const auto& v : dataset)
+			eng.store_vector(v);
+		eng.build();
+
+		for (const auto& q : query_vecs) {
+			const auto& ans = eng.query(q);
+			query_ans.push_back(ans);
+		}
+	}
+	template <class Engine>
+	bench_data get_benchmark_data(ann_engine<T, Engine>& eng) const {
+		// record the store and build timespan
+		auto time_begin_build = std::chrono::high_resolution_clock::now();
+		// store all vectors in the engine
+		for (const auto& v : dataset)
+			eng.store_vector(v);
+		// build the engine
+		eng.build();
+		auto time_end_build = std::chrono::high_resolution_clock::now();
+
+		// run the queries
+		double avg_dist = 0, avg_dist2 = 0;
+		size_t num_best_found = 0;
+		size_t i = 0;
+		auto time_begin = std::chrono::high_resolution_clock::now();
+		for (const auto& q : query_vecs) {
+			const auto& ans = eng.query(q);
+			T d = dist(q, ans), d2 = dist2(q, ans);
+			avg_dist += d;
+			avg_dist2 += d2;
+			if (!query_ans.empty() && d <= dist(q, query_ans[i++]) + TOLERANCE)
+				++num_best_found;
+		}
+		auto time_end = std::chrono::high_resolution_clock::now();
+
+		bench_data ret;
+		ret.time_per_query_ns =
+				double(std::chrono::duration_cast<std::chrono::nanoseconds>(time_end -
+																																		time_begin)
+									 .count()) /
+				query_vecs.size();
+		ret.time_to_build_ns =
+				double(std::chrono::duration_cast<std::chrono::nanoseconds>(
+									 time_end_build - time_begin_build)
+									 .count());
+		ret.average_distance = double(avg_dist) / query_vecs.size();
+		ret.average_squared_distance = double(avg_dist2) / query_vecs.size();
+		ret.recall = double(num_best_found) / query_vecs.size();
+
+		ret.engine_name = eng.name();
+
+		return ret;
+	}
 	template <class Engine>
 	void perform_benchmark(ann_engine<T, Engine>& eng,
 												 bool print_basics = false) const {

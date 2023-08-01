@@ -26,7 +26,8 @@ struct hnsw_engine : public ann_engine<T, hnsw_engine<T, TAKE_FIRST>> {
 	void _store_vector(const vec<T>& v);
 	void _build();
 	const vec<T>& _query(const vec<T>& v);
-	const std::string _name() {
+	const std::string _name() { return "HNSW Engine"; }
+	const std::string _name_long() {
 		return "HNSW Engine (p=" + std::to_string(coinflip_p) +
 					 ",max_depth=" + std::to_string(max_depth) +
 					 ",edge_count_mult=" + std::to_string(edge_count_mult) + ")";

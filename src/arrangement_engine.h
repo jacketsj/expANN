@@ -20,7 +20,8 @@ struct arrangement_engine : public ann_engine<T, arrangement_engine<T>> {
 	void _store_vector(const vec<T>& v);
 	void _build();
 	const vec<T>& _query(const vec<T>& v);
-	const std::string _name() {
+	const std::string _name() { return "Arrangement Engine"; }
+	const std::string _name_long() {
 		return "Arrangement Engine (num_orientations=" +
 					 std::to_string(num_orientations) +
 					 ",affine_copies=" + std::to_string(affine_copies) + ")";

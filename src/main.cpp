@@ -4,25 +4,30 @@
 #include "basic_bench.h"
 #include "brute_force_engine.h"
 #include "hnsw_engine.h"
+#include "matplotlibcpp.h"
+#include "plotter.h"
 #include "randomgeometry.h"
 #include "vec.h"
 
-void plotter(const basic_bench<float>& basic_benchmarker) {
-	for (size_t k = 4; k <= 100; k += 8) {
-		for (int p2 = 1; p2 <= 8; ++p2) {
-			std::cout << k << '\t' << p2 << '\t';
-			hnsw_engine<float, false> engine_hnsw(50, k, 0.5 * p2);
-			basic_benchmarker.perform_benchmark(engine_hnsw, true);
-			std::cout << '\n';
-		}
-	}
-}
+// void plotter(const basic_bench<float>& basic_benchmarker) {
+// 	for (size_t k = 4; k <= 200; k += 1) {
+// 		for (int p2 = 2; p2 < 3; ++p2) {
+// 			// for (int p2 = 1; p2 <= 8; ++p2) {
+// 			std::cout << k << '\t' << p2 << '\t';
+// 			hnsw_engine<float, false> engine_hnsw(50, k, 0.5 * p2);
+// 			basic_benchmarker.perform_benchmark(engine_hnsw, true);
+// 			std::cout << '\n';
+// 		}
+// 	}
+// }
 
 int main() {
+	make_plots(perform_benchmarks());
+	return 0;
 	// benchmarkers
 	basic_bench<float> basic_benchmarker;
 
-	plotter(basic_benchmarker);
+	// plotter(basic_benchmarker);
 
 	// ANN engines
 	brute_force_engine<float> engine_bf;

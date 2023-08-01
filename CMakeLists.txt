@@ -27,5 +27,10 @@ file(GLOB SOURCES ${SRC}/*.cpp)
 
 add_executable(expann ${SOURCES})
 
+find_package(PythonLibs REQUIRED)
+include_directories(${PYTHON_INCLUDE_DIRS})
+add_library(plt INTERFACE)
+target_include_directories(plt INTERFACE plt)
+
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC)
+target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES})

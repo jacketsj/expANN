@@ -7,6 +7,7 @@
 template <typename T, class Derived> struct ann_engine {
 	ann_engine() = default;
 	std::string name() { return static_cast<Derived*>(this)->_name(); }
+	std::string long_name() { return static_cast<Derived*>(this)->_long_name(); }
 	void store_vector(const vec<T>& v) {
 		static_cast<Derived*>(this)->_store_vector(v);
 	}
