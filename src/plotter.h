@@ -35,7 +35,7 @@ void make_plots(const std::vector<bench_data>& dataset) {
 	// plt::xscale("log");
 	plt::yscale("log");
 	plt::legend();
-	plt::title("recall-querytime");
+	plt::title("recall-querytime for 1-NN");
 	plt::save("./plots/all.png");
 }
 
@@ -53,8 +53,8 @@ std::vector<bench_data> perform_benchmarks() {
 	benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine_bf));
 	// use_engine(engine_bf);
 
-	for (size_t k = 10; k <= 60; k += 10) {
-		for (int p2 = 2; p2 < 12; ++p2) {
+	for (size_t k = 10; k <= 70; k += 10) {
+		for (int p2 = 2; p2 < 14; ++p2) {
 			if (p2 > 4)
 				p2 += 2;
 			// for (int p2 = 1; p2 <= 8; ++p2) {
@@ -64,9 +64,12 @@ std::vector<bench_data> perform_benchmarks() {
 			// use_engine(engine_hnsw);
 		}
 	}
+
 	hnsw_engine<float, false> big_hnsw_engine(100, 40, 15);
 	benchmark_dataset.push_back(
 			basic_benchmarker.get_benchmark_data(big_hnsw_engine));
+	std::cerr << "Completed big hnsw" << std::endl;
+
 	for (size_t k = 1; k < 4; ++k) {
 		for (size_t n = 4; n <= 256; n *= 2) {
 			arrangement_engine<float> engine(k, n);
