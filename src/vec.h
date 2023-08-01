@@ -53,6 +53,7 @@ public:
 		T ans = 0;
 		for (size_t i = 0; i < internal.size(); ++i)
 			ans += internal[i] * oth.internal[i];
+		return ans;
 	}
 	T norm2() const {
 		T ans = 0;
@@ -62,6 +63,11 @@ public:
 	}
 	T norm() const { return sqrt(norm2()); }
 	void normalize() { (*this) /= norm(); }
+	vec<T> normalized() const {
+		vec<T> ret = (*this);
+		ret.normalize();
+		return ret;
+	}
 	friend T dist2(const vec<T>& a, const vec<T>& b) { return (a - b).norm2(); }
 	friend T dist(const vec<T>& a, const vec<T>& b) { return sqrt(dist2(a, b)); }
 	friend T dot(const vec<T>& a, const vec<T>& b) { return a.dot(b); }

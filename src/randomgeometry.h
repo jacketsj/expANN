@@ -44,16 +44,19 @@ template <typename T> struct vec_generator {
 
 template <typename T> class arragement_generator : public vec_generator<T> {
 	using vec_generator<T>::random_vec;
-	size_t affine_copies = 4;
-	size_t num_orientations = 64;
+	size_t affine_copies = 2;
+	size_t num_orientations = 10;
 
 public:
-	arragement_generator() {} //  : rd(), gen(rd()), d(0, 1), eps(1e-7) {}
-	arragement_generator(size_t _dim) {
+	arragement_generator() {}
+	arragement_generator(size_t _dim) { this->dim = _dim; }
+	arragement_generator(size_t _dim, size_t _affine_copies,
+											 size_t _num_orientations)
+			: affine_copies(_affine_copies), num_orientations(_num_orientations) {
 		this->dim = _dim;
-	} //  : rd(), gen(rd()), d(0, 1), eps(1e-7) {}
+	}
 
-	arrangement<T> operator()(const vecset<T>& vs) {
+	arrangement<T> operator()(vecset<T>& vs) {
 		arrangement<T> res;
 		for (size_t i = 0; i < num_orientations; ++i) {
 			auto orientation = hyperplane(random_vec());

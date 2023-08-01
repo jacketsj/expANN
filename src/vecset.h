@@ -15,7 +15,7 @@ template <typename T> class vecset {
 public:
 	// vecset() : rd(), gen(rd()), d(0, 0), internal({0}) {}
 	vecset(const std::vector<vec<T>>& _internal)
-			: rd(), gen(rd),
+			: rd(), gen(rd()),
 				// d(0, _internal.size() - 1),
 				internal(_internal) {}
 

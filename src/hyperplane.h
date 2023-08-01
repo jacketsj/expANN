@@ -7,7 +7,7 @@ template <typename T> class hyperplane {
 
 public:
 	hyperplane() = default;
-	hyperplane(const vec<T>& _normvec) : normvec(_normvec.normalize()) {}
+	hyperplane(const vec<T>& _normvec) : normvec(_normvec.normalized()) {}
 
 	T signeddist(const vec<T>& test) const { return dot(normvec, test); }
 	// bool side(const vec<T>& test) const { return signeddist2(test) > 0; }
