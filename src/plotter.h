@@ -65,18 +65,24 @@ std::vector<bench_data> perform_benchmarks() {
 			if (p2 > 4)
 				p2 += 2;
 			// for (int p2 = 1; p2 <= 8; ++p2) {
-			std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
-								<< std::endl;
-			hnsw_engine<float, false> engine(50, k, 0.5 * p2);
-			benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine));
-			std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")" << std::endl;
-			std::cerr << "About to start hnsw2(k=" << k << ",p2=" << p2 << ")"
-								<< std::endl;
-			hnsw_engine_2<float> engine2(100, k, 0.5 * p2);
-			benchmark_dataset.push_back(
-					basic_benchmarker.get_benchmark_data(engine2));
-			std::cerr << "Completed hnsw2(k=" << k << ",p2=" << p2 << ")"
-								<< std::endl;
+			{
+				std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
+									<< std::endl;
+				hnsw_engine<float, false> engine(50, k, 0.5 * p2);
+				benchmark_dataset.push_back(
+						basic_benchmarker.get_benchmark_data(engine));
+				std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")"
+									<< std::endl;
+			}
+			{
+				std::cerr << "About to start hnsw2(k=" << k << ",p2=" << p2 << ")"
+									<< std::endl;
+				hnsw_engine_2<float> engine2(100, k, 0.5 * p2);
+				benchmark_dataset.push_back(
+						basic_benchmarker.get_benchmark_data(engine2));
+				std::cerr << "Completed hnsw2(k=" << k << ",p2=" << p2 << ")"
+									<< std::endl;
+			}
 		}
 	}
 
