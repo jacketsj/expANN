@@ -14,7 +14,7 @@ template <typename T> struct basic_bench {
 	void gen_dataset();
 	template <class Engine>
 	void perform_benchmark(ann_engine<T, Engine>& eng,
-												 bool print_basics = false) {
+												 bool print_basics = false) const {
 		// store all vectors in the engine
 		for (const auto& v : dataset)
 			eng.store_vector(v);
@@ -36,7 +36,7 @@ template <typename T> struct basic_bench {
 													 time_end - time_begin)
 													 .count();
 		if (print_basics) {
-			std::cout << avg_dist << "," << avg_dist2 << "," << duration_ns;
+			std::cout << avg_dist << "\t" << avg_dist2 << "\t" << duration_ns;
 		} else {
 			std::cout << "Benchmarking " << eng.name() << '\n';
 			std::cout << "\taverage distance: " << avg_dist << '\n';
