@@ -18,6 +18,7 @@ void make_plots(const std::vector<bench_data>& dataset) {
 	for (const auto& bd : dataset) {
 		entries_by_name[bd.engine_name].push_back(bd);
 	}
+	plt::figure_size(1280, 720);
 	for (const auto& [name, bdv] : entries_by_name) {
 		std::vector<double> tpq, recall;
 		for (const auto& bd : bdv) {
@@ -25,14 +26,17 @@ void make_plots(const std::vector<bench_data>& dataset) {
 			recall.push_back(bd.recall);
 		}
 		// plt::clear();
-		plt::figure_size(1280, 720);
-		plt::scatter(tpq, recall);
-		plt::xlabel("querytime");
-		plt::ylabel("recall");
-		plt::title(name + "_querytime-recall");
-		// plt::legend();
-		plt::save("./plots/" + name + ".png");
+		plt::scatter(recall, tpq, 1.0, {{"label", name}});
+		// plt::title(name + "_recall-querytime");
+		// plt::save("./plots/" + name + ".png");
 	}
+	plt::xlabel("recall");
+	plt::ylabel("querytime(ns)");
+	// plt::set_xscale("log");
+	plt::set_yscale("log");
+	plt::legend();
+	plt::title("recall-querytime");
+	plt::save("./plots/all.png");
 }
 
 std::vector<bench_data> perform_benchmarks() {
@@ -50,13 +54,18 @@ std::vector<bench_data> perform_benchmarks() {
 	// use_engine(engine_bf);
 
 	for (size_t k = 10; k <= 200; k += 10) {
-		for (int p2 = 2; p2 < 3; ++p2) {
+		for (int p2 = 2; p2 < 12; ++p2) {
+			if (p2 > 4)
+				p2 += 2;
 			// for (int p2 = 1; p2 <= 8; ++p2) {
 			hnsw_engine<float, false> engine(50, k, 0.5 * p2);
 			benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine));
 			// use_engine(engine_hnsw);
 		}
 	}
+	// hnsw_engine<float, false> big_hnsw_engine(100, 40, 20);
+	// benchmark_dataset.push_back(
+	// 		basic_benchmarker.get_benchmark_data(big_hnsw_engine));
 	for (size_t k = 1; k < 4; ++k) {
 		for (size_t n = 4; n <= 256; n *= 2) {
 			arrangement_engine<float> engine(k, n);
