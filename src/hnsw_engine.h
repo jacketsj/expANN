@@ -36,6 +36,11 @@ struct hnsw_engine : public ann_engine<T, hnsw_engine<T, TAKE_FIRST>> {
 template <typename T, bool TAKE_FIRST>
 void hnsw_engine<T, TAKE_FIRST>::_store_vector(const vec<T>& v) {
 	all_entries.push_back(v);
+	// size_t pri = 0;
+	// while (std::uniform_int_distribution<>(0, 1)(gen) && pri <= max_depth) {
+	// 	++pri;
+	// }
+	// priority.push_back(pri);
 	priority.push_back(std::min(max_depth, size_t(d(gen))));
 }
 
@@ -50,7 +55,7 @@ void hnsw_engine<T, TAKE_FIRST>::_build() {
 				vertices.push_back(i);
 		}
 		// if none, terminate
-		if (vertices.empty())
+		if (vertices.size() <= 1)
 			break;
 		// for n vertices, build a graph with edge_count_mult*n random edges
 		// (good+sparse expander in expectation)
@@ -79,31 +84,24 @@ const vec<T>& hnsw_engine<T, TAKE_FIRST>::_query(const vec<T>& v) {
 		bool improvement_found = false;
 		do {
 			improvement_found = false;
-			// if TAKE_FIRST is active, take the improving first edge seen at each
-			// step
-			if constexpr (TAKE_FIRST) {
-				T cur_dist2 = dist2(all_entries[cur], v);
-				for (size_t adj_vert : hadj[layer][cur]) {
-					if (dist2(all_entries[adj_vert], v) < cur_dist2) {
-						improvement_found = true;
-						cur = adj_vert;
+			// otherwise look at all incident edges first
+			T best_dist2 = dist2(all_entries[cur], v);
+			size_t best = cur;
+			for (size_t adj_vert : hadj[layer][cur]) {
+				T next_dist2 = dist2(all_entries[adj_vert], v);
+				if (next_dist2 < best_dist2) {
+					improvement_found = true;
+					best = adj_vert;
+					// if TAKE_FIRST is active, take the improving first edge seen at each
+					// step
+					if constexpr (TAKE_FIRST) {
 						break;
-					}
-				}
-			} else {
-				// otherwise look at all incident edges first
-				T best_dist2 = dist2(all_entries[cur], v);
-				for (size_t adj_vert : hadj[layer][cur]) {
-					best_dist2 = std::min(best_dist2, dist2(all_entries[adj_vert], v));
-				}
-				for (size_t adj_vert : hadj[layer][cur]) {
-					if (dist2(all_entries[adj_vert], v) == best_dist2) {
-						improvement_found = true;
-						cur = adj_vert;
-						break;
+					} else {
+						best_dist2 = next_dist2;
 					}
 				}
 			}
+			cur = best;
 		} while (improvement_found);
 	}
 	return all_entries[cur];
