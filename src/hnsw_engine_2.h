@@ -19,11 +19,10 @@ struct hnsw_engine_2 : public ann_engine<T, hnsw_engine_2<T>> {
 	size_t edge_count_mult;
 	double coinflip_p;
 	size_t starting_vertex;
-	hnsw_engine_2(size_t _edge_count_mult, double _coinflip_p)
-			: rd(), gen(rd()), d(_coinflip_p), max_depth(0),
+	hnsw_engine_2(size_t _max_depth, size_t _edge_count_mult, double _coinflip_p)
+			: rd(), gen(rd()), d(_coinflip_p), max_depth(_max_depth),
 				edge_count_mult(_edge_count_mult), coinflip_p(_coinflip_p) {}
 	std::vector<vec<T>> all_entries;
-	std::vector<size_t> priority;
 	std::vector<robin_hood::unordered_flat_map<size_t, std::vector<size_t>>> hadj;
 	void _store_vector(const vec<T>& v);
 	void _build();
@@ -40,7 +39,6 @@ struct hnsw_engine_2 : public ann_engine<T, hnsw_engine_2<T>> {
 
 template <typename T> void hnsw_engine_2<T>::_store_vector(const vec<T>& v) {
 	all_entries.push_back(v);
-	priority.push_back(std::min(max_depth, size_t(d(gen))));
 }
 
 template <typename T> void hnsw_engine_2<T>::_build() {
@@ -57,7 +55,7 @@ template <typename T> void hnsw_engine_2<T>::_build() {
 		std::vector<std::vector<size_t>> kNN =
 				_query_k(all_entries[i], edge_count_mult, true);
 		// get the layer this entry will go up to
-		size_t cur_layer = d(gen);
+		size_t cur_layer = std::min(size_t(d(gen)), max_depth);
 		// if it is a new layer, add a layer
 		if (cur_layer >= hadj.size())
 			add_layer(i);
