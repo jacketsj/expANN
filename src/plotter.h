@@ -71,11 +71,11 @@ std::vector<bench_data> perform_benchmarks() {
 	benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine_bf));
 	// use_engine(engine_bf);
 
-	{
-		hnsw_engine_2<float> engine2(100, 60, 0.5);
-		benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine2));
-		std::cerr << "Completed hnsw2(60,0.5)" << std::endl;
-	}
+	//{
+	//	hnsw_engine_2<float> engine2(100, 60, 0.5);
+	//	benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine2));
+	//	std::cerr << "Completed hnsw2(60,0.5)" << std::endl;
+	//}
 
 	for (size_t k = 100; k <= 140; k += 40) {
 		for (int p2 = 15; p2 < 18; ++p2) {
@@ -88,9 +88,7 @@ std::vector<bench_data> perform_benchmarks() {
 			std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")" << std::endl;
 		}
 	}
-	for (size_t k = 40; k <= 1000; k += 40) {
-		if (k >= 160)
-			k *= 2;
+	for (size_t k = 40; k <= 60; k += 10) {
 		double p = 1 / log(double(k));
 		std::cerr << "About to start hnsw2(k=" << k << ",p=" << p << ")"
 							<< std::endl;

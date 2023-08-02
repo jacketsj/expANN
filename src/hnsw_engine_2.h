@@ -1,8 +1,8 @@
 #pragma once
 
 #include <algorithm>
-#include <map>
 #include <queue>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -23,9 +23,15 @@ struct hnsw_engine_2 : public ann_engine<T, hnsw_engine_2<T>> {
 			: rd(), gen(rd()), d(_coinflip_p), max_depth(_max_depth),
 				edge_count_mult(_edge_count_mult), coinflip_p(_coinflip_p) {}
 	std::vector<vec<T>> all_entries;
-	std::vector<robin_hood::unordered_flat_map<size_t, std::vector<size_t>>> hadj;
+	std::vector<
+			robin_hood::unordered_flat_map<size_t, std::set<std::pair<T, size_t>>>>
+			hadj;
 	void _store_vector(const vec<T>& v);
 	void _build();
+	const std::vector<size_t> _query_k_at_layer(const vec<T>& v, size_t k,
+																							size_t starting_point,
+																							size_t layer);
+	void add_edge(size_t layer, size_t i, size_t j);
 	const std::vector<std::vector<size_t>> _query_k(const vec<T>& v, size_t k,
 																									bool fill_all_layers = false);
 	const vec<T>& _query(const vec<T>& v);
@@ -41,16 +47,31 @@ template <typename T> void hnsw_engine_2<T>::_store_vector(const vec<T>& v) {
 	all_entries.push_back(v);
 }
 
+template <typename T>
+void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
+	T d = dist(all_entries[i], all_entries[j]);
+	hadj[layer][i].emplace(-d, j);
+	hadj[layer][j].emplace(-d, i);
+	if (hadj[layer][i].size() > edge_count_mult)
+		hadj[layer][i].erase(hadj[layer][i].begin());
+	if (hadj[layer][j].size() > edge_count_mult)
+		hadj[layer][j].erase(hadj[layer][j].begin());
+}
+
 template <typename T> void hnsw_engine_2<T>::_build() {
 	assert(all_entries.size() > 0);
 	auto add_layer = [&](size_t v) {
 		hadj.emplace_back();
-		hadj.back()[v] = std::vector<size_t>();
+		hadj.back()[v] = std::set<std::pair<T, size_t>>();
 		starting_vertex = v;
 	};
 	// add one layer to start, with first vertex
 	add_layer(0);
 	for (size_t i = 1; i < all_entries.size(); ++i) {
+		if (i % 1000 == 0) {
+			std::cout << "adding entry no. " << i << "/" << all_entries.size()
+								<< std::endl;
+		}
 		// get kNN at each layer
 		std::vector<std::vector<size_t>> kNN =
 				_query_k(all_entries[i], edge_count_mult, true);
@@ -62,61 +83,65 @@ template <typename T> void hnsw_engine_2<T>::_build() {
 		// add all the neighbours as edges
 		for (size_t layer = 0; layer <= cur_layer && layer < kNN.size(); ++layer)
 			for (size_t j : kNN[layer]) {
-				hadj[layer][i].push_back(j);
-				hadj[layer][j].push_back(i);
+				add_edge(layer, i, j);
 			}
 	}
+}
+template <typename T>
+const std::vector<size_t>
+hnsw_engine_2<T>::_query_k_at_layer(const vec<T>& v, size_t k,
+																		size_t starting_point, size_t layer) {
+	std::priority_queue<std::pair<T, size_t>> top_k;
+	std::priority_queue<std::pair<T, size_t>> to_visit;
+	robin_hood::unordered_flat_set<size_t> visited;
+	auto visit = [&](T d, size_t u) {
+		bool is_good =
+				!visited.contains(u) && (top_k.size() < k || top_k.top().first < d);
+		visited.insert(u);
+		if (is_good) {
+			top_k.emplace(d, u);		 // top_k is a max heap
+			to_visit.emplace(-d, u); // to_visit is a min heap
+		}
+		if (top_k.size() > k)
+			top_k.pop();
+		return is_good;
+	};
+	visit(dist(v, all_entries[starting_point]), starting_point);
+	while (!to_visit.empty()) {
+		T nd;
+		size_t cur;
+		std::tie(nd, cur) = to_visit.top();
+		if (-nd > top_k.top().first)
+			// everything neighbouring current best set is already evaluated
+			break;
+		to_visit.pop();
+		for (auto& [_, u] : hadj[layer][cur]) {
+			T d_next = dist(v, all_entries[u]);
+			visit(d_next, u);
+		}
+	}
+	std::vector<size_t> ret;
+	while (!top_k.empty()) {
+		ret.push_back(top_k.top().second);
+		top_k.pop();
+	}
+	return ret;
 }
 
 template <typename T>
 const std::vector<std::vector<size_t>>
 hnsw_engine_2<T>::_query_k(const vec<T>& v, size_t k, bool fill_all_layers) {
-	size_t cur = starting_vertex;
+	auto current = starting_vertex;
 	std::priority_queue<std::pair<T, size_t>> top_k;
-	std::vector<std::vector<size_t>> ret(1);
-	if (fill_all_layers)
-		ret.resize(hadj.size());
-	auto visit = [&](size_t item) {
-		T d = dist(all_entries[item], v);
-		if (top_k.size() < k) {
-			top_k.emplace(d, item);
-		}
-		if (d < top_k.top().first) {
-			top_k.pop();
-			top_k.emplace(d, item);
-		}
-	};
+	std::vector<std::vector<size_t>> ret;
 	// for each layer, in decreasing depth
 	for (int layer = hadj.size() - 1; layer >= 0; --layer) {
-		// find the best vertex in the current layer by local search
-		bool improvement_found = false;
-		do {
-			improvement_found = false;
-			// otherwise look at all incident edges first
-			T best_dist2 = dist2(all_entries[cur], v);
-			size_t best = cur;
-			visit(cur);
-			for (size_t adj_vert : hadj[layer][cur]) {
-				visit(adj_vert);
-				T next_dist2 = dist2(all_entries[adj_vert], v);
-				if (next_dist2 < best_dist2) {
-					improvement_found = true;
-					best = adj_vert;
-					best_dist2 = next_dist2;
-				}
-			}
-			cur = best;
-		} while (improvement_found);
-		// push best k vertices at this layer into ret, if it is the last layer or
-		// fill_all_layers is active
-		if (layer == 0 || fill_all_layers) {
-			auto top_k_dupe = top_k;
-			while (!top_k_dupe.empty()) {
-				ret[layer].push_back(top_k_dupe.top().second);
-				top_k_dupe.pop();
-			}
-		}
+		ret.push_back(_query_k_at_layer(v, k, current, layer));
+		current = ret.back().front();
 	}
+	reverse(ret.begin(), ret.end());
+	if (!fill_all_layers)
+		ret.resize(1);
 	return ret;
 }
 
