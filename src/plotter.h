@@ -37,7 +37,24 @@ void make_plots(const std::vector<bench_data>& dataset) {
 	plt::yscale("log");
 	plt::legend();
 	plt::title("recall-querytime for 1-NN");
-	plt::save("./plots/all.png");
+	plt::save("./plots/time-recall.png");
+
+	plt::figure_size(1280, 720);
+	for (const auto& [name, bdv] : entries_by_name) {
+		std::vector<double> tpq, avgdist;
+		for (const auto& bd : bdv) {
+			tpq.push_back(bd.time_per_query_ns);
+			avgdist.push_back(bd.average_distance);
+		}
+		plt::scatter(avgdist, tpq, 1.0, {{"label", name}});
+	}
+	plt::xlabel("avgdist");
+	plt::ylabel("querytime(ns)");
+	// plt::xscale("log");
+	plt::yscale("log");
+	plt::legend();
+	plt::title("avgdist-querytime for 1-NN");
+	plt::save("./plots/time-avgdist.png");
 }
 
 std::vector<bench_data> perform_benchmarks() {
@@ -57,33 +74,29 @@ std::vector<bench_data> perform_benchmarks() {
 	{
 		hnsw_engine_2<float> engine2(100, 60, 0.5);
 		benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine2));
-		std::cerr << "Completed hnsw2(main)" << std::endl;
+		std::cerr << "Completed hnsw2(60,0.5)" << std::endl;
 	}
 
-	for (size_t k = 100; k <= 200; k += 40) {
+	for (size_t k = 100; k <= 140; k += 40) {
 		for (int p2 = 15; p2 < 18; ++p2) {
 			if (p2 > 4)
 				p2 += 2;
-			// for (int p2 = 1; p2 <= 8; ++p2) {
-			{
-				std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
-									<< std::endl;
-				hnsw_engine<float, false> engine(50, k, 0.5 * p2);
-				benchmark_dataset.push_back(
-						basic_benchmarker.get_benchmark_data(engine));
-				std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")"
-									<< std::endl;
-			}
-			{
-				std::cerr << "About to start hnsw2(k=" << k << ",p2=" << p2 << ")"
-									<< std::endl;
-				hnsw_engine_2<float> engine2(100, k, 0.5 * p2);
-				benchmark_dataset.push_back(
-						basic_benchmarker.get_benchmark_data(engine2));
-				std::cerr << "Completed hnsw2(k=" << k << ",p2=" << p2 << ")"
-									<< std::endl;
-			}
+			std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
+								<< std::endl;
+			hnsw_engine<float, false> engine(50, k, 0.5 * p2);
+			benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine));
+			std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")" << std::endl;
 		}
+	}
+	for (size_t k = 40; k <= 1000; k += 40) {
+		if (k >= 160)
+			k *= 2;
+		double p = 1 / log(double(k));
+		std::cerr << "About to start hnsw2(k=" << k << ",p=" << p << ")"
+							<< std::endl;
+		hnsw_engine_2<float> engine2(100, k, p);
+		benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine2));
+		std::cerr << "Completed hnsw2(k=" << k << ",p=" << p << ")" << std::endl;
 	}
 
 	// hnsw_engine<float, false> big_hnsw_engine(200, 200, 15);
