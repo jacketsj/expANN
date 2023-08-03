@@ -92,18 +92,7 @@ bench_data_manager perform_benchmarks() {
 	brute_force_engine<float> engine_bf;
 	basic_benchmarker.populate_ans(engine_bf);
 
-	// auto use_engine = [&]<typename Eng>(Eng engine) {
-	//	benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine));
-	// };
-
 	bdm.add(basic_benchmarker.get_benchmark_data(engine_bf));
-	// use_engine(engine_bf);
-
-	//{
-	//	hnsw_engine_2<float> engine2(100, 60);
-	//	bdm.add(basic_benchmarker.get_benchmark_data(engine2));
-	//	std::cerr << "Completed hnsw2(60,0.5)" << std::endl;
-	//}
 
 	for (size_t k = 100; k <= 140; k += 40) {
 		for (int p2 = 15; p2 < 18; ++p2) {
@@ -136,11 +125,6 @@ bench_data_manager perform_benchmarks() {
 		}
 	}
 
-	// hnsw_engine<float, false> big_hnsw_engine(200, 200, 15);
-	// bdm.add(
-	//		basic_benchmarker.get_benchmark_data(big_hnsw_engine));
-	// std::cerr << "Completed big hnsw" << std::endl;
-
 	for (size_t k = 1; k < 4; ++k) {
 		for (size_t n = 4; n <= 256; n *= 2) {
 			for (size_t m = 1; m <= 64; m *= 4) {
@@ -150,7 +134,6 @@ bench_data_manager perform_benchmarks() {
 				bdm.add(basic_benchmarker.get_benchmark_data(engine));
 				std::cerr << "Completed arrangement(k=" << k << ",n=" << n << ",m=" << m
 									<< ")" << std::endl;
-				// use_engine(engine_arrange);
 			}
 		}
 	}
@@ -164,7 +147,6 @@ bench_data_manager perform_benchmarks() {
 				bdm.add(basic_benchmarker.get_benchmark_data(engine));
 				std::cerr << "Completed hier arrangement(na=" << na
 									<< ",levels=" << levels << ",sc=" << sc << ")" << std::endl;
-				// use_engine(engine_arrange);
 			}
 		}
 	}

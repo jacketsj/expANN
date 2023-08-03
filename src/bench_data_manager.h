@@ -86,7 +86,7 @@ struct bench_data_manager {
 		return copy;
 	}
 	std::vector<bench_data> get_all() {
-		return deserializeJsonToVector<bench_data>(bd_all_filename);
+		return deserialize_json_to_vector<bench_data>(bd_all_filename);
 	}
 	void add(bench_data bd) { latest.push_back(bd); }
 };
