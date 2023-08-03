@@ -24,6 +24,7 @@
 int main() {
 	make_plots(perform_benchmarks());
 	return 0;
+	/*
 	// benchmarkers
 	basic_bench<float> basic_benchmarker;
 
@@ -45,4 +46,5 @@ int main() {
 	basic_benchmarker.perform_benchmark(engine_arrange_5);
 	basic_benchmarker.perform_benchmark(engine_hnsw_1);
 	basic_benchmarker.perform_benchmark(engine_hnsw_2);
+	*/
 }

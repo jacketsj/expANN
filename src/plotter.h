@@ -20,6 +20,8 @@ void make_plots(const std::vector<bench_data>& dataset) {
 		entries_by_name[bd.engine_name].push_back(bd);
 	}
 
+	double pointsize = 10.0;
+
 	// querytime-recall
 	plt::figure_size(1280, 720);
 	for (const auto& [name, bdv] : entries_by_name) {
@@ -29,7 +31,7 @@ void make_plots(const std::vector<bench_data>& dataset) {
 			recall.push_back(bd.recall);
 		}
 		// plt::clear();
-		plt::scatter(recall, tpq, 4.0, {{"label", name}});
+		plt::scatter(recall, tpq, pointsize, {{"label", name}});
 		// plt::title(name + "_recall-querytime");
 		// plt::save("./plots/" + name + ".png");
 	}
@@ -49,7 +51,7 @@ void make_plots(const std::vector<bench_data>& dataset) {
 			tpq.push_back(bd.time_per_query_ns);
 			avgdist.push_back(bd.average_distance);
 		}
-		plt::scatter(avgdist, tpq, 4.0, {{"label", name}});
+		plt::scatter(avgdist, tpq, pointsize, {{"label", name}});
 	}
 	plt::xlabel("avgdist");
 	plt::ylabel("querytime(ns)");
@@ -67,7 +69,7 @@ void make_plots(const std::vector<bench_data>& dataset) {
 			x.push_back(bd.time_to_build_ns);
 			y.push_back(bd.recall);
 		}
-		plt::scatter(x, y, 4.0, {{"label", name}});
+		plt::scatter(x, y, pointsize, {{"label", name}});
 	}
 	plt::xlabel("time_to_build(ns)");
 	plt::ylabel("recall");
@@ -98,20 +100,19 @@ std::vector<bench_data> perform_benchmarks() {
 	//	std::cerr << "Completed hnsw2(60,0.5)" << std::endl;
 	//}
 
-	// for (size_t k = 100; k <= 140; k += 40) {
-	//	for (int p2 = 15; p2 < 18; ++p2) {
-	//		if (p2 > 4)
-	//			p2 += 2;
-	//		std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
-	//							<< std::endl;
-	//		hnsw_engine<float, false> engine(50, k, 0.5 * p2);
-	//		benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine));
-	//		std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")" <<
-	// std::endl;
-	//	}
-	// }
-	for (size_t k = 2; k <= 60; k += 6) {
-		for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 2) {
+	for (size_t k = 100; k <= 140; k += 40) {
+		for (int p2 = 15; p2 < 18; ++p2) {
+			if (p2 > 4)
+				p2 += 2;
+			std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
+								<< std::endl;
+			hnsw_engine<float, false> engine(50, k, 0.5 * p2);
+			benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine));
+			std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")" << std::endl;
+		}
+	}
+	for (size_t k = 2; k <= 60; k += 12) {
+		for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
 			std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
 								<< ")" << std::endl;
 			hnsw_engine_2<float> engine2(100, k, num_for_1nn);
@@ -126,13 +127,16 @@ std::vector<bench_data> perform_benchmarks() {
 	//		basic_benchmarker.get_benchmark_data(big_hnsw_engine));
 	// std::cerr << "Completed big hnsw" << std::endl;
 
-	for (size_t k = 1; k < 16; ++k) {
+	for (size_t k = 1; k < 4; ++k) {
 		for (size_t n = 4; n <= 256; n *= 2) {
-			arrangement_engine<float> engine(k, n);
-			benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine));
-			std::cerr << "Completed arrangement(k=" << k << ",n=" << n << ")"
-								<< std::endl;
-			// use_engine(engine_arrange);
+			for (size_t m = 1; m <= 64; m *= 4) {
+				arrangement_engine<float> engine(k, n, m);
+				benchmark_dataset.push_back(
+						basic_benchmarker.get_benchmark_data(engine));
+				std::cerr << "Completed arrangement(k=" << k << ",n=" << n << ",m=" << m
+									<< ")" << std::endl;
+				// use_engine(engine_arrange);
+			}
 		}
 	}
 

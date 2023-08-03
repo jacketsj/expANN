@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <random>
 #include <vector>
 
@@ -25,18 +26,23 @@ template <typename T> struct arrangement {
 
 template <typename T> struct vec_generator {
 	std::random_device rd;
-	std::mt19937 gen;
+	std::shared_ptr<std::mt19937> gen;
 	std::normal_distribution<> d;
 	T eps;
 	size_t dim;
 
-	vec_generator() : rd(), gen(rd()), d(0, 1), eps(1e-7), dim(10) {}
+	vec_generator()
+			: rd(), gen(std::make_shared<std::mt19937>(rd())), d(0, 1), eps(1e-7),
+				dim(10) {}
+
+	vec_generator(std::shared_ptr<std::mt19937> _gen)
+			: rd(), gen(_gen), d(0, 1), eps(1e-7), dim(10) {}
 
 	vec<T> random_vec() {
 		vec<T> res(dim);
 		do {
 			for (size_t i = 0; i < res.size(); ++i)
-				res[i] = d(gen);
+				res[i] = d(*gen);
 		} while (res.norm2() < eps);
 		return res;
 	}
@@ -53,6 +59,13 @@ public:
 	arragement_generator(size_t _dim, size_t _affine_copies,
 											 size_t _num_orientations)
 			: affine_copies(_affine_copies), num_orientations(_num_orientations) {
+		this->dim = _dim;
+	}
+	arragement_generator(size_t _dim, size_t _affine_copies,
+											 size_t _num_orientations,
+											 std::shared_ptr<std::mt19937> _gen)
+			: vec_generator<T>(_gen), affine_copies(_affine_copies),
+				num_orientations(_num_orientations) {
 		this->dim = _dim;
 	}
 
