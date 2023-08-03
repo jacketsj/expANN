@@ -9,6 +9,7 @@
 
 #include "arrangement_engine.h"
 #include "brute_force_engine.h"
+#include "hier_arrangement_engine.h"
 #include "hnsw_engine.h"
 #include "hnsw_engine_2.h"
 
@@ -37,7 +38,7 @@ void make_plots(const std::vector<bench_data>& dataset) {
 	}
 	plt::xlabel("recall");
 	plt::ylabel("querytime(ns)");
-	// plt::xscale("log");
+	plt::xscale("log");
 	plt::yscale("log");
 	plt::legend();
 	plt::title("recall-querytime for 1-NN");
@@ -55,7 +56,7 @@ void make_plots(const std::vector<bench_data>& dataset) {
 	}
 	plt::xlabel("avgdist");
 	plt::ylabel("querytime(ns)");
-	// plt::xscale("log");
+	plt::xscale("log");
 	plt::yscale("log");
 	plt::legend();
 	plt::title("avgdist-querytime for 1-NN");
@@ -100,41 +101,62 @@ std::vector<bench_data> perform_benchmarks() {
 	//	std::cerr << "Completed hnsw2(60,0.5)" << std::endl;
 	//}
 
-	for (size_t k = 100; k <= 140; k += 40) {
-		for (int p2 = 15; p2 < 18; ++p2) {
-			if (p2 > 4)
-				p2 += 2;
-			std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
-								<< std::endl;
-			hnsw_engine<float, false> engine(50, k, 0.5 * p2);
-			benchmark_dataset.push_back(basic_benchmarker.get_benchmark_data(engine));
-			std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")" << std::endl;
-		}
-	}
-	for (size_t k = 2; k <= 60; k += 12) {
-		for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
-			std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
-								<< ")" << std::endl;
-			hnsw_engine_2<float> engine2(100, k, num_for_1nn);
-			benchmark_dataset.push_back(
-					basic_benchmarker.get_benchmark_data(engine2));
-			std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
-		}
-	}
-
-	// hnsw_engine<float, false> big_hnsw_engine(200, 200, 15);
-	// benchmark_dataset.push_back(
-	//		basic_benchmarker.get_benchmark_data(big_hnsw_engine));
-	// std::cerr << "Completed big hnsw" << std::endl;
-
-	for (size_t k = 1; k < 4; ++k) {
-		for (size_t n = 4; n <= 256; n *= 2) {
-			for (size_t m = 1; m <= 64; m *= 4) {
-				arrangement_engine<float> engine(k, n, m);
+	if (false) {
+		for (size_t k = 100; k <= 140; k += 40) {
+			for (int p2 = 15; p2 < 18; ++p2) {
+				if (p2 > 4)
+					p2 += 2;
+				std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
+									<< std::endl;
+				hnsw_engine<float, false> engine(50, k, 0.5 * p2);
 				benchmark_dataset.push_back(
 						basic_benchmarker.get_benchmark_data(engine));
-				std::cerr << "Completed arrangement(k=" << k << ",n=" << n << ",m=" << m
+				std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")"
+									<< std::endl;
+			}
+		}
+		for (size_t k = 2; k <= 60; k += 12) {
+			for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
+				std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
 									<< ")" << std::endl;
+				hnsw_engine_2<float> engine2(100, k, num_for_1nn);
+				benchmark_dataset.push_back(
+						basic_benchmarker.get_benchmark_data(engine2));
+				std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
+			}
+		}
+
+		// hnsw_engine<float, false> big_hnsw_engine(200, 200, 15);
+		// benchmark_dataset.push_back(
+		//		basic_benchmarker.get_benchmark_data(big_hnsw_engine));
+		// std::cerr << "Completed big hnsw" << std::endl;
+
+		for (size_t k = 1; k < 4; ++k) {
+			for (size_t n = 4; n <= 256; n *= 2) {
+				for (size_t m = 1; m <= 64; m *= 4) {
+					std::cerr << "Starting arrangement(k=" << k << ",n=" << n
+										<< ",m=" << m << ")" << std::endl;
+					arrangement_engine<float> engine(k, n, m);
+					benchmark_dataset.push_back(
+							basic_benchmarker.get_benchmark_data(engine));
+					std::cerr << "Completed arrangement(k=" << k << ",n=" << n
+										<< ",m=" << m << ")" << std::endl;
+					// use_engine(engine_arrange);
+				}
+			}
+		}
+	}
+
+	for (size_t na = 1; na <= 64; na *= 4) {
+		for (size_t levels = 1; levels < 40; ++levels) {
+			for (size_t sc = 32; sc <= 9000; sc *= 2) {
+				std::cerr << "Starting hier arrangement(na=" << na
+									<< ",levels=" << levels << ",sc=" << sc << ")" << std::endl;
+				hier_arrangement_engine<float> engine(na, levels, sc);
+				benchmark_dataset.push_back(
+						basic_benchmarker.get_benchmark_data(engine));
+				std::cerr << "Completed hier arrangement(na=" << na
+									<< ",levels=" << levels << ",sc=" << sc << ")" << std::endl;
 				// use_engine(engine_arrange);
 			}
 		}
