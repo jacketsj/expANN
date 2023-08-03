@@ -78,11 +78,11 @@ const vec<T>& hier_arrangement_engine<T>::_query(const vec<T>& v) {
 				}
 			}
 			visited += arrange.size();
+			// TODO figure out if I should put this further in? How to avoid simd
+			// problems though...
+			if (visited >= search_count)
+				break;
 		}
-		// TODO figure out if I should put this further in? How to avoid simd
-		// problems though...
-		if (visited >= search_count)
-			break;
 	}
 	return ret;
 }

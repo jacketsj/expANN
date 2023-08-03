@@ -13,15 +13,16 @@ include_directories("${SRC}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -mavx -fopenmp -g -fsanitize=address")
 set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -mavx -g ${OpenMP_CXX_FLAGS}")
 
-#include(./cmake/CPM.cmake)  # Package manager for simple requirements.
+include(./cmake/CPM.cmake)  # Package manager for simple requirements.
 
 # run `conan install .. --build=missing` in `./cmake`
-#list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
-#list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 #CPMAddPackage("gh:fmtlib/fmt#9.1.0")  # fmt for nice strings
 
 find_package(Threads)
+find_package(nlohmann_json)
 
 file(GLOB SOURCES ${SRC}/*.cpp)
 
@@ -33,4 +34,4 @@ add_library(plt INTERFACE)
 target_include_directories(plt INTERFACE plt)
 
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES})
+target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json)

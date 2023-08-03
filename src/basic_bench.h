@@ -4,17 +4,9 @@
 #include <vector>
 
 #include "ann_engine.h"
+#include "bench_data.h"
 #include "randomgeometry.h"
 #include "vec.h"
-
-struct bench_data {
-	double time_per_query_ns;
-	double time_to_build_ns;
-	double average_distance;
-	double average_squared_distance;
-	double recall;
-	std::string engine_name;
-};
 
 const double TOLERANCE = 1e-7;
 
