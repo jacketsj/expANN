@@ -68,10 +68,6 @@ template <typename T> void hnsw_engine_2<T>::_build() {
 	// add one layer to start, with first vertex
 	add_layer(0);
 	for (size_t i = 1; i < all_entries.size(); ++i) {
-		// if (i % 1000 == 0) {
-		// 	std::cout << "adding entry no. " << i << "/" << all_entries.size()
-		// 						<< std::endl;
-		// }
 		// get kNN at each layer
 		std::vector<std::vector<size_t>> kNN =
 				_query_k(all_entries[i], edge_count_mult, true);

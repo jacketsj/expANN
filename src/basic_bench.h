@@ -111,10 +111,10 @@ template <typename T> struct basic_bench {
 
 template <typename T> void basic_bench<T>::gen_dataset(size_t n, size_t m) {
 	vec_generator<T> vg;
-	for (int i = 0; i < 50000; ++i) {
+	for (size_t i = 0; i < n; ++i) {
 		dataset.push_back(vg.random_vec());
 	}
-	for (int i = 0; i < 400; ++i) {
+	for (size_t i = 0; i < m; ++i) {
 		query_vecs.push_back(vg.random_vec());
 	}
 }

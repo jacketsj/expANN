@@ -13,7 +13,7 @@
 int main() {
 	for (size_t n = 50000; n <= 50000 * 100; n *= 10) {
 		size_t m = 400 * (n / 50000);
-		auto bdm = perform_benchmarks(50000, 400);
+		auto bdm = perform_benchmarks(n, m);
 		std::string size_name = "n" + std::to_string(n) + "_m" + std::to_string(m);
 		std::string data_prefix = "./data/" + size_name + "/";
 		bdm.save(data_prefix);
