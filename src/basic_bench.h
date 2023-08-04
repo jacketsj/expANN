@@ -14,8 +14,8 @@ template <typename T> struct basic_bench {
 	std::vector<vec<T>> dataset;
 	std::vector<vec<T>> query_vecs;
 	std::vector<vec<T>> query_ans;
-	basic_bench();
-	void gen_dataset();
+	basic_bench(size_t n, size_t m);
+	void gen_dataset(size_t n, size_t m);
 	template <class Engine> void populate_ans(ann_engine<T, Engine>& eng) {
 		query_ans.clear(); // in case of repeat calls to this function
 
@@ -109,7 +109,7 @@ template <typename T> struct basic_bench {
 	}
 };
 
-template <typename T> void basic_bench<T>::gen_dataset() {
+template <typename T> void basic_bench<T>::gen_dataset(size_t n, size_t m) {
 	vec_generator<T> vg;
 	for (int i = 0; i < 50000; ++i) {
 		dataset.push_back(vg.random_vec());
@@ -119,4 +119,6 @@ template <typename T> void basic_bench<T>::gen_dataset() {
 	}
 }
 
-template <typename T> basic_bench<T>::basic_bench() { gen_dataset(); }
+template <typename T> basic_bench<T>::basic_bench(size_t n, size_t m) {
+	gen_dataset(n, m);
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -47,6 +48,10 @@ void serialize_vector_to_json(const std::vector<T>& data,
 		j.emplace_back(item);
 	}
 
+	// Ensure the directories exist before writing the file
+	std::filesystem::create_directories(
+			std::filesystem::path(filename).parent_path());
+
 	// Write the updated data to the file
 	std::ofstream outputFile(filename);
 	outputFile << j.dump(4); // Pretty print with indentation of 4 spaces
@@ -76,17 +81,17 @@ struct bench_data_manager {
 	std::string bd_all_filename = "data/all.json";
 	std::string bd_latest_filename = "data/latest.json";
 	std::vector<bench_data> latest;
-	void save() {
-		serialize_vector_to_json(latest, bd_latest_filename, false);
-		serialize_vector_to_json(latest, bd_all_filename, true);
+	void save(std::string prefix = "") {
+		serialize_vector_to_json(latest, prefix + bd_latest_filename, false);
+		serialize_vector_to_json(latest, prefix + bd_all_filename, true);
 	}
-	std::vector<bench_data> get_latest() {
+	std::vector<bench_data> get_latest(std::string _prefix = "") {
 		auto copy = latest;
 		// latest.clear();
 		return copy;
 	}
-	std::vector<bench_data> get_all() {
-		return deserialize_json_to_vector<bench_data>(bd_all_filename);
+	std::vector<bench_data> get_all(std::string prefix = "") {
+		return deserialize_json_to_vector<bench_data>(prefix + bd_all_filename);
 	}
 	void add(bench_data bd) { latest.push_back(bd); }
 };
