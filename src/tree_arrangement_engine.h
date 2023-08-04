@@ -1,0 +1,147 @@
+#pragma once
+
+#include <functional>
+#include <map>
+#include <memory>
+#include <stack>
+#include <string>
+#include <vector>
+
+#include "ann_engine.h"
+#include "randomgeometry.h"
+#include "vecset.h"
+
+// idea: create a tree of arrangements. Each cell with too many points becomes a
+// child.
+// should have multiple copies of the tree (with different seeds) to avoid edge
+// problems
+// this is similar to using random quadtrees
+template <typename T>
+struct tree_arrangement_engine
+		: public ann_engine<T, tree_arrangement_engine<T>> {
+	size_t tree_copies, max_leaf_size, search_count_per_copy, affine_copies,
+			num_orientations, max_depth;
+	tree_arrangement_engine(size_t _tree_copies, size_t _max_leaf_size,
+													size_t _search_count_per_copy,
+													size_t _affine_copies = 3,
+													size_t _num_orientations = 8, size_t _max_depth = 40)
+			: tree_copies(_tree_copies), max_leaf_size(_max_leaf_size),
+				search_count_per_copy(_search_count_per_copy),
+				affine_copies(_affine_copies), num_orientations(_num_orientations),
+				max_depth(_max_depth) {}
+	std::vector<vec<T>> all_entries;
+	struct tree_node {
+		arrangement<T> arrange;
+		struct VectorHasher {
+			int operator()(const std::vector<unsigned short>& V) const {
+				int hash = V.size();
+				for (auto& i : V) {
+					hash ^= i + 0x9e3779b9 + (int(hash) << 6) + (int(hash) >> 2);
+				}
+				return hash;
+			}
+		};
+		std::unordered_map<std::vector<unsigned short>, std::vector<size_t>,
+											 VectorHasher>
+				tables;
+		std::unordered_map<std::vector<unsigned short>, size_t, VectorHasher>
+				subtree_tables;
+	};
+	struct tree {
+		std::vector<tree_node> nodes;
+	};
+	std::vector<tree> trees;
+	void _store_vector(const vec<T>& v);
+	void _build();
+	const vec<T>& _query(const vec<T>& v);
+	const std::string _name() { return "Tree Arrangement Engine"; }
+	const std::string _name_long() { return "Tree Arrangement Engine"; }
+};
+
+template <typename T>
+void tree_arrangement_engine<T>::_store_vector(const vec<T>& v) {
+	all_entries.push_back(v);
+}
+
+template <typename T> void tree_arrangement_engine<T>::_build() {
+	assert(all_entries.size() > 0);
+	std::random_device rd;
+	std::shared_ptr<std::mt19937> gen = std::make_shared<std::mt19937>(rd());
+	for (size_t copy = 0; copy < tree_copies; ++copy) {
+		trees.emplace_back();
+		auto& t = trees.back();
+		t.nodes.emplace_back();
+		std::vector<size_t> all_indices;
+		for (size_t i = 0; i < all_entries.size(); ++i)
+			all_indices.push_back(i);
+		struct buildable {
+			size_t node_i;
+			const std::vector<size_t> ivals;
+			size_t depth;
+			buildable(size_t _node_i, const std::vector<size_t> _ivals, size_t _depth)
+					: node_i(_node_i), ivals(_ivals), depth(_depth) {}
+		};
+		std::stack<buildable> to_build;
+		to_build.emplace(t.nodes.size() - 1, all_indices, 0);
+		while (!to_build.empty()) {
+			auto b = to_build.top();
+			to_build.pop();
+
+			arragement_generator<T> arrange_gen(all_entries[0].size(), affine_copies,
+																					num_orientations, gen);
+			std::vector<vec<T>> entries;
+			for (auto& i : b.ivals)
+				entries.push_back(all_entries[i]);
+			vecset vs(entries);
+			t.nodes[b.node_i].arrange = arrange_gen(vs);
+			std::vector<std::vector<unsigned short>> to_be_children;
+			for (auto& i : b.ivals) {
+				auto mi = t.nodes[b.node_i].arrange.compute_multiindex(all_entries[i]);
+				auto& table = t.nodes[b.node_i].tables[mi];
+				table.push_back(i);
+				if (table.size() == max_leaf_size + 1)
+					to_be_children.push_back(mi); // triggers at most once per table
+			}
+			if (b.depth < max_depth)
+				for (auto mi : to_be_children) {
+					t.nodes.emplace_back();
+					t.nodes[b.node_i].subtree_tables[mi] = t.nodes.size() - 1;
+					to_build.emplace(t.nodes.size() - 1, t.nodes[b.node_i].tables[mi],
+													 b.depth + 1);
+				}
+		}
+	}
+}
+template <typename T>
+const vec<T>& tree_arrangement_engine<T>::_query(const vec<T>& v) {
+	vec<T>& ret = all_entries[0];
+	for (auto& t : trees) {
+		size_t visited = 0;
+		std::vector<std::reference_wrapper<std::vector<size_t>>> tables_to_check;
+		// populate all nodes to check
+		{
+			size_t cur = 0;
+			auto mi = t.nodes[cur].arrange.compute_multiindex(v);
+			tables_to_check.push_back(t.nodes[cur].tables[mi]);
+			while (t.nodes[cur].subtree_tables.count(mi) > 0) {
+				if (t.nodes[cur].subtree_tables.count(mi) == 0)
+					break;
+				cur = t.nodes[cur].subtree_tables[mi];
+				mi = t.nodes[cur].arrange.compute_multiindex(v);
+				tables_to_check.push_back(t.nodes[cur].tables[mi]);
+			}
+			reverse(tables_to_check.begin(), tables_to_check.end());
+			for (auto& table : tables_to_check) {
+				for (size_t iu : table.get()) {
+					if (dist2(v, all_entries[iu]) < dist2(v, ret)) {
+						ret = all_entries[iu];
+					}
+				}
+				visited += table.get().size();
+				if (visited >= search_count_per_copy)
+					break;
+			}
+		}
+	}
+	return ret;
+}
