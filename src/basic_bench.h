@@ -24,8 +24,8 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 			const std::chrono::duration<Rep, Period>& timeout_duration) const {
 		std::stop_source ssource;
 
-		// TODO remove this debug code
-		return get_benchmark_data_no_timeout(eng, ssource.get_token());
+		// uncommenting the following runs without a separate thread or timeout
+		// return get_benchmark_data_no_timeout(eng, ssource.get_token());
 
 		std::packaged_task<bench_data()> task([&]() {
 			return get_benchmark_data_no_timeout(eng, ssource.get_token());
