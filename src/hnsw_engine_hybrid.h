@@ -37,9 +37,12 @@ struct hnsw_engine_hybrid : public ann_engine<T, hnsw_engine_hybrid<T>> {
 																									bool fill_all_layers = false);
 	const vec<T>& _query(const vec<T>& v);
 	const std::string _name() { return "HNSW Hybrid Engine"; }
-	const std::string _name_long() {
-		return "HNSW Hybrid Engine (edge_count_mult=" +
-					 std::to_string(edge_count_mult) + ")";
+	const param_list_t _param_list() {
+		param_list_t pl;
+		add_param(pl, max_depth);
+		add_param(pl, edge_count_mult);
+		add_param(pl, num_for_1nn);
+		return pl;
 	}
 };
 

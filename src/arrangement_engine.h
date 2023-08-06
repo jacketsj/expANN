@@ -25,10 +25,12 @@ struct arrangement_engine : public ann_engine<T, arrangement_engine<T>> {
 	void _build();
 	const vec<T>& _query(const vec<T>& v);
 	const std::string _name() { return "Arrangement Engine"; }
-	const std::string _name_long() {
-		return "Arrangement Engine (num_orientations=" +
-					 std::to_string(num_orientations) +
-					 ",affine_copies=" + std::to_string(affine_copies) + ")";
+	const param_list_t _param_list() {
+		param_list_t pl;
+		add_param(pl, num_orientations);
+		add_param(pl, affine_copies);
+		add_param(pl, num_arranges);
+		return pl;
 	}
 };
 

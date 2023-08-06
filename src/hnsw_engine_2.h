@@ -37,9 +37,12 @@ struct hnsw_engine_2 : public ann_engine<T, hnsw_engine_2<T>> {
 	const vec<T>& _query(const vec<T>& v);
 	// const std::string _name() { return "HNSW Engine"; }
 	const std::string _name() { return "HNSW Engine 2"; }
-	const std::string _name_long() {
-		return "HNSW Engine 2 (edge_count_mult=" + std::to_string(edge_count_mult) +
-					 ")";
+	const param_list_t _param_list() {
+		param_list_t pl;
+		add_param(pl, max_depth);
+		add_param(pl, edge_count_mult);
+		add_param(pl, num_for_1nn);
+		return pl;
 	}
 };
 

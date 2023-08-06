@@ -12,7 +12,7 @@ struct brute_force_engine : public ann_engine<T, brute_force_engine<T>> {
 	void _build();
 	const vec<T>& _query(const vec<T>& v);
 	const std::string _name() { return "Brute-Force Engine"; }
-	const std::string _name_long() { return "Brute-Force Engine"; }
+	const param_list_t _param_list() { return param_list_t(); }
 };
 
 template <typename T>

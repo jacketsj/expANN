@@ -34,7 +34,16 @@ struct hier_arrangement_engine
 	void _build();
 	const vec<T>& _query(const vec<T>& v);
 	const std::string _name() { return "Hierarchical Arrangement Engine"; }
-	const std::string _name_long() { return "Hierarchical Arrangement Engine"; }
+	const param_list_t _param_list() {
+		param_list_t pl;
+		add_param(pl, num_arranges);
+		add_param(pl, num_levels);
+		add_param(pl, search_count);
+		add_param(pl, affine_copies);
+		add_param(pl, level_mult);
+		add_param(pl, starting_orientations);
+		return pl;
+	}
 };
 
 template <typename T>

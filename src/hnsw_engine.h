@@ -28,7 +28,13 @@ struct hnsw_engine : public ann_engine<T, hnsw_engine<T, TAKE_FIRST>> {
 	const vec<T>& _query(const vec<T>& v);
 	// const std::string _name() { return "HNSW Engine"; }
 	const std::string _name() { return "HNSW Engine (Random Expanders)"; }
-	const std::string _name_long() { return "HNSW Engine (Random Expanders)"; }
+	const param_list_t _param_list() {
+		param_list_t pl;
+		add_param(pl, max_depth);
+		add_param(pl, edge_count_mult);
+		add_param(pl, coinflip_p);
+		return pl;
+	}
 };
 
 template <typename T, bool TAKE_FIRST>

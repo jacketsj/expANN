@@ -55,7 +55,16 @@ struct tree_arrangement_engine
 	void _build();
 	const vec<T>& _query(const vec<T>& v);
 	const std::string _name() { return "Tree Arrangement Engine"; }
-	const std::string _name_long() { return "Tree Arrangement Engine"; }
+	const param_list_t _param_list() {
+		param_list_t pl;
+		add_param(pl, tree_copies);
+		add_param(pl, max_leaf_size);
+		add_param(pl, search_count_per_copy);
+		add_param(pl, affine_copies);
+		add_param(pl, num_orientations);
+		add_param(pl, max_depth);
+		return pl;
+	}
 };
 
 template <typename T>
