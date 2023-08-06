@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(expann LANGUAGES CXX C)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_STANDARD_REQUIRED true)
 
@@ -34,4 +34,4 @@ add_library(plt INTERFACE)
 target_include_directories(plt INTERFACE plt)
 
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json)
+target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads)

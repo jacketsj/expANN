@@ -12,7 +12,7 @@
 #include "vec.h"
 
 int main() {
-	for (size_t n = 50000; n <= 50000 * 100; n *= 10) {
+	for (size_t n = 50000; n <= 50000 * 1; n *= 10) {
 		size_t m = 400 * (n / 50000);
 		auto bdm = perform_benchmarks(n, m);
 		std::string size_name = "n" + std::to_string(n) + "_m" + std::to_string(m);

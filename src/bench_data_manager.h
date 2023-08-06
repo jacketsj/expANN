@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <variant>
 #include <vector>
 
 #include "bench_data.h"
@@ -76,5 +77,11 @@ struct bench_data_manager {
 	std::vector<bench_data> get_all(std::string prefix = "") {
 		return deserialize_json_to_vector<bench_data>(prefix + bd_all_filename);
 	}
-	void add(bench_data bd) { latest.push_back(bd); }
+	void add(std::variant<bench_data, std::string> bdv) {
+		if (std::holds_alternative<bench_data>(bdv))
+			latest.push_back(std::get<bench_data>(bdv));
+		else
+			std::cerr << "Got bench error: " << std::get<std::string>(bdv)
+								<< std::endl;
+	}
 };
