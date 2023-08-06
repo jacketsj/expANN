@@ -19,10 +19,10 @@ int main() {
 		size_t d = 16;
 		auto bdm = perform_benchmarks(
 				dsl.load_synethetic_uniform_sphere_points(n, m, 1, d));
-		std::string size_name = "n" + std::to_string(n) + "_m" + std::to_string(m);
-		std::string data_prefix = "./data/" + size_name + "/";
+		auto ds_name = bdm.dataset_name;
+		std::string data_prefix = "./data/" + ds_name + "/";
 		bdm.save(data_prefix);
-		std::string plot_prefix = "./plots/" + size_name + "/";
+		std::string plot_prefix = "./plots/" + ds_name + "/";
 		make_plots(bdm.get_latest(data_prefix), plot_prefix + "latest_");
 		make_plots(bdm.get_all(data_prefix), plot_prefix + "/all_");
 	}

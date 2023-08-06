@@ -38,7 +38,7 @@ void serialize_vector_to_json(const std::vector<T>& data,
 
 	// Write the updated data to the file
 	std::ofstream outputFile(filename);
-	outputFile << j.dump(4); // Pretty print with indentation of 4 spaces
+	outputFile << j.dump(4);
 }
 
 // Deserialize a JSON file to a vector of any type T
@@ -65,6 +65,8 @@ struct bench_data_manager {
 	std::string bd_all_filename = "data/all.json";
 	std::string bd_latest_filename = "data/latest.json";
 	std::vector<bench_data> latest;
+	std::string dataset_name;
+	bench_data_manager(std::string _dataset_name) : dataset_name(_dataset_name) {}
 	void save(std::string prefix = "") {
 		serialize_vector_to_json(latest, prefix + bd_latest_filename, false);
 		serialize_vector_to_json(latest, prefix + bd_all_filename, true);

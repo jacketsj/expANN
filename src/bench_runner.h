@@ -19,7 +19,7 @@
 template <typename test_dataset_t>
 bench_data_manager perform_benchmarks(test_dataset_t ds) {
 	basic_bench<float, test_dataset_t> basic_benchmarker(ds);
-	bench_data_manager bdm;
+	bench_data_manager bdm(ds.name);
 
 	// TODO implement a way to disable the timeout in get_benchmark_data (e.g. if
 	// it's 0, or at least a way to make it super long)

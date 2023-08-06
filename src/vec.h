@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -77,5 +78,11 @@ public:
 	}
 	friend T cosinedist(const vec<T>& a, const vec<T>& b) {
 		return sqrt(cosinedist2(a, b));
+	}
+	friend void to_json(nlohmann::json& j, const vec<T>& v) {
+		j = nlohmann::json(v.internal);
+	}
+	friend void from_json(const nlohmann::json& j, vec<T>& v) {
+		v.internal = j.get<std::vector<T>>();
 	}
 };

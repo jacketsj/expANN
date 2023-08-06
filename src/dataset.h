@@ -9,6 +9,7 @@
 template <typename T, class Derived> struct dataset {
 	size_t dim;
 	size_t n; // number of vectors
+	std::string name;
 	vec<T> get_vec(size_t i) const {
 		return static_cast<const Derived*>(this)->_get_vec(i);
 	}
