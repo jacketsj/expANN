@@ -8,25 +8,27 @@
 
 #include "arrangement_engine.h"
 #include "brute_force_engine.h"
+#include "dataset.h"
+#include "dataset_loader.h"
 #include "hier_arrangement_engine.h"
 #include "hnsw_engine.h"
 #include "hnsw_engine_2.h"
 #include "hnsw_engine_hybrid.h"
 #include "tree_arrangement_engine.h"
 
-bench_data_manager perform_benchmarks(size_t bench_n, size_t bench_m) {
-	basic_bench<float> basic_benchmarker(bench_n, bench_m);
+template <typename test_dataset_t>
+bench_data_manager perform_benchmarks(test_dataset_t ds) {
+	basic_bench<float, test_dataset_t> basic_benchmarker(ds);
 	bench_data_manager bdm;
 
-	std::cerr << "About to run brute force to get best solutions." << std::endl;
-	brute_force_engine<float> engine_bf;
-	basic_benchmarker.populate_ans(engine_bf);
-	std::cerr << "Finished running brute force." << std::endl;
-
-	// bdm.add(basic_benchmarker.get_benchmark_data(engine_bf));
+	// TODO implement a way to disable the timeout in get_benchmark_data (e.g. if
+	// it's 0, or at least a way to make it super long)
+	std::cerr << "Running benchmarks with a 10s timeout" << std::endl;
 
 	using namespace std::chrono_literals;
-	auto default_timeout = 3s;
+	auto default_timeout = 10s;
+
+	// bdm.add(basic_benchmarker.get_benchmark_data(engine_bf, default_timeout));
 
 	for (size_t k = 100; k <= 140; k += 40) {
 		for (int p2 = 15; p2 < 18; ++p2) {

@@ -31,12 +31,12 @@ template <typename T> struct vec_generator {
 	T eps;
 	size_t dim;
 
-	vec_generator()
+	vec_generator(size_t _dim)
 			: rd(), gen(std::make_shared<std::mt19937>(rd())), d(0, 1), eps(1e-7),
-				dim(10) {}
+				dim(_dim) {}
 
-	vec_generator(std::shared_ptr<std::mt19937> _gen)
-			: rd(), gen(_gen), d(0, 1), eps(1e-7), dim(10) {}
+	vec_generator(size_t _dim, std::shared_ptr<std::mt19937> _gen)
+			: rd(), gen(_gen), d(0, 1), eps(1e-7), dim(_dim) {}
 
 	vec<T> random_vec() {
 		vec<T> res(dim);
@@ -54,17 +54,18 @@ template <typename T> class arragement_generator : public vec_generator<T> {
 	size_t num_orientations = 10;
 
 public:
-	arragement_generator() {}
-	arragement_generator(size_t _dim) { this->dim = _dim; }
+	// arragement_generator() {}
+	arragement_generator(size_t _dim) : vec_generator<T>(_dim) {}
 	arragement_generator(size_t _dim, size_t _affine_copies,
 											 size_t _num_orientations)
-			: affine_copies(_affine_copies), num_orientations(_num_orientations) {
+			: vec_generator<T>(_dim), affine_copies(_affine_copies),
+				num_orientations(_num_orientations) {
 		this->dim = _dim;
 	}
 	arragement_generator(size_t _dim, size_t _affine_copies,
 											 size_t _num_orientations,
 											 std::shared_ptr<std::mt19937> _gen)
-			: vec_generator<T>(_gen), affine_copies(_affine_copies),
+			: vec_generator<T>(_dim, _gen), affine_copies(_affine_copies),
 				num_orientations(_num_orientations) {
 		this->dim = _dim;
 	}

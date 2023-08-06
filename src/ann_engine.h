@@ -18,6 +18,7 @@ template <typename T, class Derived> struct ann_engine {
 		static_cast<Derived*>(this)->_store_vector(v);
 	}
 	void build() { static_cast<Derived*>(this)->_build(); }
+	// TODO add query_k and make the return values size_t and std::vector<size_t>
 	const vec<T>& query(const vec<T>& v) {
 		return static_cast<Derived*>(this)->_query(v);
 	}

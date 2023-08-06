@@ -5,6 +5,7 @@
 #include "basic_bench.h"
 #include "bench_runner.h"
 #include "brute_force_engine.h"
+#include "dataset_loader.h"
 #include "hnsw_engine.h"
 #include "matplotlibcpp.h"
 #include "plotter.h"
@@ -12,9 +13,12 @@
 #include "vec.h"
 
 int main() {
+	dataset_loader<float> dsl;
 	for (size_t n = 50000; n <= 50000 * 1; n *= 10) {
 		size_t m = 400 * (n / 50000);
-		auto bdm = perform_benchmarks(n, m);
+		size_t d = 16;
+		auto bdm = perform_benchmarks(
+				dsl.load_synethetic_uniform_sphere_points(n, m, 1, d));
 		std::string size_name = "n" + std::to_string(n) + "_m" + std::to_string(m);
 		std::string data_prefix = "./data/" + size_name + "/";
 		bdm.save(data_prefix);
