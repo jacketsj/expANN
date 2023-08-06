@@ -30,59 +30,65 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 
 	// bdm.add(basic_benchmarker.get_benchmark_data(engine_bf, default_timeout));
 
-	for (size_t k = 100; k <= 140; k += 40) {
-		for (int p2 = 15; p2 < 18; ++p2) {
-			if (p2 > 4)
-				p2 += 2;
-			std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
-								<< std::endl;
-			hnsw_engine<float, false> engine(50, k, 0.5 * p2);
-			bdm.add(basic_benchmarker.get_benchmark_data(engine, default_timeout));
-			std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")" << std::endl;
-		}
-	}
-	for (size_t k = 2; k <= 60; k += 12) {
-		for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
-			std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
-								<< ")" << std::endl;
-			hnsw_engine_2<float> engine2(100, k, num_for_1nn);
-			bdm.add(basic_benchmarker.get_benchmark_data(engine2, default_timeout));
-			std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
-		}
-	}
-	for (size_t k = 2; k <= 60; k += 12) {
-		for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
-			std::cerr << "About to start hnsw_hybrid(k=" << k
-								<< ",n4nn=" << num_for_1nn << ")" << std::endl;
-			hnsw_engine_hybrid<float> engine(100, k, num_for_1nn);
-			bdm.add(basic_benchmarker.get_benchmark_data(engine, default_timeout));
-			std::cerr << "Completed hnsw_hybrid(k=" << k << ",n4nn=" << num_for_1nn
-								<< ")" << std::endl;
-		}
-	}
-
-	for (size_t k = 1; k < 4; ++k) {
-		for (size_t n = 4; n <= 256; n *= 2) {
-			for (size_t m = 1; m <= 64; m *= 4) {
-				std::cerr << "Starting arrangement(k=" << k << ",n=" << n << ",m=" << m
-									<< ")" << std::endl;
-				arrangement_engine<float> engine(k, n, m);
+	if (false) {
+		for (size_t k = 100; k <= 140; k += 40) {
+			for (int p2 = 15; p2 < 18; ++p2) {
+				if (p2 > 4)
+					p2 += 2;
+				std::cerr << "About to start hnsw(k=" << k << ",p2=" << p2 << ")"
+									<< std::endl;
+				hnsw_engine<float, false> engine(50, k, 0.5 * p2);
 				bdm.add(basic_benchmarker.get_benchmark_data(engine, default_timeout));
-				std::cerr << "Completed arrangement(k=" << k << ",n=" << n << ",m=" << m
+				std::cerr << "Completed hnsw(k=" << k << ",p2=" << p2 << ")"
+									<< std::endl;
+			}
+		}
+		for (size_t k = 2; k <= 60; k += 12) {
+			for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
+				std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
+									<< ")" << std::endl;
+				hnsw_engine_2<float> engine2(100, k, num_for_1nn);
+				bdm.add(basic_benchmarker.get_benchmark_data(engine2, default_timeout));
+				std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
+			}
+		}
+		for (size_t k = 2; k <= 60; k += 12) {
+			for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
+				std::cerr << "About to start hnsw_hybrid(k=" << k
+									<< ",n4nn=" << num_for_1nn << ")" << std::endl;
+				hnsw_engine_hybrid<float> engine(100, k, num_for_1nn);
+				bdm.add(basic_benchmarker.get_benchmark_data(engine, default_timeout));
+				std::cerr << "Completed hnsw_hybrid(k=" << k << ",n4nn=" << num_for_1nn
 									<< ")" << std::endl;
 			}
 		}
 
-		for (size_t na = 1; na <= 16; na *= 4) {
-			for (size_t levels = 1; levels * na <= 32; levels *= 2) {
-				for (size_t sc = 32; sc <= 8192; sc *= 4) {
-					std::cerr << "Starting hier arrangement(na=" << na
-										<< ",levels=" << levels << ",sc=" << sc << ")" << std::endl;
-					hier_arrangement_engine<float> engine(na, levels, sc);
+		for (size_t k = 1; k < 4; ++k) {
+			for (size_t n = 4; n <= 256; n *= 2) {
+				for (size_t m = 1; m <= 64; m *= 4) {
+					std::cerr << "Starting arrangement(k=" << k << ",n=" << n
+										<< ",m=" << m << ")" << std::endl;
+					arrangement_engine<float> engine(k, n, m);
 					bdm.add(
 							basic_benchmarker.get_benchmark_data(engine, default_timeout));
-					std::cerr << "Completed hier arrangement(na=" << na
-										<< ",levels=" << levels << ",sc=" << sc << ")" << std::endl;
+					std::cerr << "Completed arrangement(k=" << k << ",n=" << n
+										<< ",m=" << m << ")" << std::endl;
+				}
+			}
+
+			for (size_t na = 1; na <= 16; na *= 4) {
+				for (size_t levels = 1; levels * na <= 32; levels *= 2) {
+					for (size_t sc = 32; sc <= 8192; sc *= 4) {
+						std::cerr << "Starting hier arrangement(na=" << na
+											<< ",levels=" << levels << ",sc=" << sc << ")"
+											<< std::endl;
+						hier_arrangement_engine<float> engine(na, levels, sc);
+						bdm.add(
+								basic_benchmarker.get_benchmark_data(engine, default_timeout));
+						std::cerr << "Completed hier arrangement(na=" << na
+											<< ",levels=" << levels << ",sc=" << sc << ")"
+											<< std::endl;
+					}
 				}
 			}
 		}

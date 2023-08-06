@@ -23,6 +23,10 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 			ann_engine<T, Engine>& eng,
 			const std::chrono::duration<Rep, Period>& timeout_duration) const {
 		std::stop_source ssource;
+
+		// TODO remove this debug code
+		return get_benchmark_data_no_timeout(eng, ssource.get_token());
+
 		std::packaged_task<bench_data()> task([&]() {
 			return get_benchmark_data_no_timeout(eng, ssource.get_token());
 		});
@@ -73,11 +77,12 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		auto time_begin = std::chrono::high_resolution_clock::now();
 		for (size_t q = 0; q < ds.m; ++q) {
 			// TODO make this kNN instead of 1NN
-			const auto& ans = eng.query(q);
+			const auto& ans = eng.query(ds.get_query(q));
 			T d = dist(ds.get_query(q), ans), d2 = dist2(ds.get_query(q), ans);
 			avg_dist += d;
 			avg_dist2 += d2;
-			if (d <= dist(ds.get_query(q), ds.get_query_ans(q)[0]) + TOLERANCE)
+			if (d2 <= dist2(ds.get_query(q), ds.get_vec(ds.get_query_ans(q)[0])) +
+										TOLERANCE)
 				++num_best_found;
 
 			if (stoken.stop_requested())

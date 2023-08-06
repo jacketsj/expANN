@@ -30,9 +30,11 @@ template <typename T> struct dataset_loader {
 		eng.build();
 
 		std::cerr << "About to run brute force to get best solutions." << std::endl;
-		for (const auto& q : imtd.all_query_vecs) {
-			const auto& ans = eng._query_k(q, k);
+		// for (const auto& q : imtd.all_query_vecs) {
+		for (size_t i = 0; i < m; ++i) {
+			const auto& ans = eng._query_k(imtd.all_query_vecs[i], k);
 			imtd.all_query_ans.push_back(ans);
+			assert(imtd.all_query_ans[i].size());
 		}
 		std::cerr << "Finished running brute force." << std::endl;
 		return imtd;
@@ -85,6 +87,7 @@ template <typename T> struct dataset_loader {
 		if (exists_imtd(filename))
 			return load_imtd(filename);
 
+		std::cerr << "Dataset did not exists on disk. Creating it." << std::endl;
 		auto imtd =
 				load_synethetic_uniform_sphere_points_no_cache(name, n, m, k, d);
 		save_imtd(filename, imtd);

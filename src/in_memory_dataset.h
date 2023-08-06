@@ -30,8 +30,8 @@ void to_json(nlohmann::json& j, const in_memory_test_dataset<T>& imtd) {
 										 {"m", imtd.m},
 										 {"k", imtd.k},
 										 {"all_vecs", nlohmann::json(imtd.all_vecs)},
-										 {"all_query_vecs", nlohmann::json(imtd.all_vecs)},
-										 {"all_query_ans", nlohmann::json(imtd.all_vecs)}};
+										 {"all_query_vecs", nlohmann::json(imtd.all_query_vecs)},
+										 {"all_query_ans", nlohmann::json(imtd.all_query_ans)}};
 }
 
 template <typename T>

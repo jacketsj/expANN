@@ -22,12 +22,12 @@ public:
 	}
 	T& operator[](size_t i) { return internal[i]; }
 	void operator+=(const vec<T>& oth) {
-		assert(dim() == oth.dim());
+		// assert(dim() == oth.dim());
 		for (size_t i = 0; i < internal.size(); ++i)
 			internal[i] += oth.internal[i];
 	}
 	void operator-=(const vec<T>& oth) {
-		assert(dim() == oth.dim());
+		// assert(dim() == oth.dim());
 		for (size_t i = 0; i < internal.size(); ++i)
 			internal[i] -= oth.internal[i];
 	}
@@ -45,12 +45,13 @@ public:
 		return ans;
 	}
 	vec<T> operator-(const vec<T>& oth) const {
+		// assert(dim() == oth.dim());
 		vec<T> ans(*this);
 		ans -= oth;
 		return ans;
 	}
 	T dot(const vec<T>& oth) const {
-		assert(dim() == oth.dim());
+		// assert(dim() == oth.dim());
 		T ans = 0;
 		for (size_t i = 0; i < internal.size(); ++i)
 			ans += internal[i] * oth.internal[i];
@@ -70,7 +71,10 @@ public:
 		return ret;
 	}
 	friend T dist2(const vec<T>& a, const vec<T>& b) { return (a - b).norm2(); }
-	friend T dist(const vec<T>& a, const vec<T>& b) { return sqrt(dist2(a, b)); }
+	friend T dist(const vec<T>& a, const vec<T>& b) {
+		// assert(a.dim() == b.dim());
+		return sqrt(dist2(a, b));
+	}
 	friend T dot(const vec<T>& a, const vec<T>& b) { return a.dot(b); }
 	friend T cosinedist2(const vec<T>& a, const vec<T>& b) {
 		T dotres = dot(a, b);
