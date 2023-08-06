@@ -10,6 +10,7 @@
 #include "brute_force_engine.h"
 #include "dataset.h"
 #include "dataset_loader.h"
+#include "ehnsw_engine.h"
 #include "hier_arrangement_engine.h"
 #include "hnsw_engine.h"
 #include "hnsw_engine_2.h"
@@ -26,7 +27,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 	std::cerr << "Running benchmarks with a 10s timeout" << std::endl;
 
 	using namespace std::chrono_literals;
-	auto default_timeout = 10s;
+	auto default_timeout = 30s;
 
 	// bdm.add(basic_benchmarker.get_benchmark_data(engine_bf, default_timeout));
 
@@ -52,6 +53,20 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 				std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
 			}
 		}
+	}
+	for (size_t K = 4; K <= 32; K += 8) {
+		for (size_t k = 2; k * K <= 64; k += 12) {
+			for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
+				std::cerr << "About to start ehnsw(k=" << k << ",K=" << K
+									<< ",n4nn=" << num_for_1nn << ")" << std::endl;
+				ehnsw_engine<float> engine(100, k, K, num_for_1nn);
+				bdm.add(basic_benchmarker.get_benchmark_data(engine, 1360s));
+				std::cerr << "Completed ehnsw(k=" << k << ",K=" << K
+									<< ",n4nn=" << num_for_1nn << ")" << std::endl;
+			}
+		}
+	}
+	if (false) {
 		for (size_t k = 2; k <= 60; k += 12) {
 			for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
 				std::cerr << "About to start hnsw_hybrid(k=" << k
@@ -63,56 +78,60 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 			}
 		}
 
-		for (size_t k = 1; k < 4; ++k) {
-			for (size_t n = 4; n <= 256; n *= 2) {
-				for (size_t m = 1; m <= 64; m *= 4) {
-					std::cerr << "Starting arrangement(k=" << k << ",n=" << n
-										<< ",m=" << m << ")" << std::endl;
-					arrangement_engine<float> engine(k, n, m);
-					bdm.add(
-							basic_benchmarker.get_benchmark_data(engine, default_timeout));
-					std::cerr << "Completed arrangement(k=" << k << ",n=" << n
-										<< ",m=" << m << ")" << std::endl;
-				}
-			}
-
-			for (size_t na = 1; na <= 16; na *= 4) {
-				for (size_t levels = 1; levels * na <= 32; levels *= 2) {
-					for (size_t sc = 32; sc <= 8192; sc *= 4) {
-						std::cerr << "Starting hier arrangement(na=" << na
-											<< ",levels=" << levels << ",sc=" << sc << ")"
-											<< std::endl;
-						hier_arrangement_engine<float> engine(na, levels, sc);
+		if (false) {
+			for (size_t k = 1; k < 4; ++k) {
+				for (size_t n = 4; n <= 256; n *= 2) {
+					for (size_t m = 1; m <= 64; m *= 4) {
+						std::cerr << "Starting arrangement(k=" << k << ",n=" << n
+											<< ",m=" << m << ")" << std::endl;
+						arrangement_engine<float> engine(k, n, m);
 						bdm.add(
 								basic_benchmarker.get_benchmark_data(engine, default_timeout));
-						std::cerr << "Completed hier arrangement(na=" << na
-											<< ",levels=" << levels << ",sc=" << sc << ")"
-											<< std::endl;
+						std::cerr << "Completed arrangement(k=" << k << ",n=" << n
+											<< ",m=" << m << ")" << std::endl;
+					}
+				}
+
+				for (size_t na = 1; na <= 16; na *= 4) {
+					for (size_t levels = 1; levels * na <= 32; levels *= 2) {
+						for (size_t sc = 32; sc <= 8192; sc *= 4) {
+							std::cerr << "Starting hier arrangement(na=" << na
+												<< ",levels=" << levels << ",sc=" << sc << ")"
+												<< std::endl;
+							hier_arrangement_engine<float> engine(na, levels, sc);
+							bdm.add(basic_benchmarker.get_benchmark_data(engine,
+																													 default_timeout));
+							std::cerr << "Completed hier arrangement(na=" << na
+												<< ",levels=" << levels << ",sc=" << sc << ")"
+												<< std::endl;
+						}
 					}
 				}
 			}
 		}
-	}
-	for (size_t tc = 2; tc <= 14; tc += 3) {
-		for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 8;
-				 max_leaf_size *= 16) {
-			for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
-				std::cerr << "Starting tree arrangement(tc=" << tc
-									<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
-									<< std::endl;
-				std::cerr << "Expected time proportional to: " << sc * tc << std::endl;
-				auto begin = std::chrono::high_resolution_clock::now();
-				tree_arrangement_engine<float> engine(tc, max_leaf_size, sc);
-				bdm.add(basic_benchmarker.get_benchmark_data(engine, default_timeout));
-				auto end = std::chrono::high_resolution_clock::now();
-				std::cerr << "Actual time: "
-									<< std::chrono::duration_cast<std::chrono::nanoseconds>(end -
-																																					begin)
-												 .count()
-									<< "ns" << std::endl;
-				std::cerr << "Completed tree arrangement(tc=" << tc
-									<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
-									<< std::endl;
+		for (size_t tc = 2; tc <= 14; tc += 3) {
+			for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 8;
+					 max_leaf_size *= 16) {
+				for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
+					std::cerr << "Starting tree arrangement(tc=" << tc
+										<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
+										<< std::endl;
+					std::cerr << "Expected time proportional to: " << sc * tc
+										<< std::endl;
+					auto begin = std::chrono::high_resolution_clock::now();
+					tree_arrangement_engine<float> engine(tc, max_leaf_size, sc);
+					bdm.add(
+							basic_benchmarker.get_benchmark_data(engine, default_timeout));
+					auto end = std::chrono::high_resolution_clock::now();
+					std::cerr << "Actual time: "
+										<< std::chrono::duration_cast<std::chrono::nanoseconds>(
+													 end - begin)
+													 .count()
+										<< "ns" << std::endl;
+					std::cerr << "Completed tree arrangement(tc=" << tc
+										<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
+										<< std::endl;
+				}
 			}
 		}
 	}
