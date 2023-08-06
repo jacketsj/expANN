@@ -11,6 +11,7 @@
 #include "dataset.h"
 #include "dataset_loader.h"
 #include "ehnsw_engine.h"
+#include "ehnsw_engine_2.h"
 #include "hier_arrangement_engine.h"
 #include "hnsw_engine.h"
 #include "hnsw_engine_2.h"
@@ -44,25 +45,43 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 									<< std::endl;
 			}
 		}
-		for (size_t k = 2; k <= 60; k += 12) {
-			for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
-				std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
-									<< ")" << std::endl;
-				hnsw_engine_2<float> engine2(100, k, num_for_1nn);
-				bdm.add(basic_benchmarker.get_benchmark_data(engine2, default_timeout));
-				std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
+	}
+	for (size_t k = 2; k <= 128; k += 12) {
+		for (size_t num_for_1nn = 32; num_for_1nn <= 64 * 4 * 2; num_for_1nn *= 4) {
+			std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
+								<< ")" << std::endl;
+			hnsw_engine_2<float> engine2(100, k, num_for_1nn);
+			bdm.add(basic_benchmarker.get_benchmark_data(engine2, 360s));
+			std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
+		}
+	}
+	for (size_t K = 4; K <= 64; K += 4) {
+		for (size_t k = 4; k * K <= 128 * 8; k += 4) {
+			for (size_t num_for_1nn = 32; num_for_1nn <= 64 * 4 * 2;
+					 num_for_1nn *= 4) {
+				for (size_t min_per_cut = 2; min_per_cut * K <= k; min_per_cut *= 4) {
+					std::cerr << "About to start ehnsw2(k=" << k << ",K=" << K
+										<< ",n4nn=" << num_for_1nn << ",min_per_cut=" << min_per_cut
+										<< ")" << std::endl;
+					ehnsw_engine_2<float> engine(100, k, num_for_1nn, K, min_per_cut);
+					bdm.add(basic_benchmarker.get_benchmark_data(engine, 360s));
+					std::cerr << "Completed ehnsw2(k=" << k << ",K=" << K
+										<< ",n4nn=" << num_for_1nn << ")" << std::endl;
+				}
 			}
 		}
 	}
-	for (size_t K = 4; K <= 32; K += 8) {
-		for (size_t k = 2; k * K <= 64; k += 12) {
-			for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
-				std::cerr << "About to start ehnsw(k=" << k << ",K=" << K
-									<< ",n4nn=" << num_for_1nn << ")" << std::endl;
-				ehnsw_engine<float> engine(100, k, K, num_for_1nn);
-				bdm.add(basic_benchmarker.get_benchmark_data(engine, 1360s));
-				std::cerr << "Completed ehnsw(k=" << k << ",K=" << K
-									<< ",n4nn=" << num_for_1nn << ")" << std::endl;
+	if (false) {
+		for (size_t K = 4; K <= 32; K += 8) {
+			for (size_t k = 2; k * K <= 64; k += 12) {
+				for (size_t num_for_1nn = 1; num_for_1nn <= 40; num_for_1nn *= 4) {
+					std::cerr << "About to start ehnsw(k=" << k << ",K=" << K
+										<< ",n4nn=" << num_for_1nn << ")" << std::endl;
+					ehnsw_engine<float> engine(100, k, K, num_for_1nn);
+					bdm.add(basic_benchmarker.get_benchmark_data(engine, 360s));
+					std::cerr << "Completed ehnsw(k=" << k << ",K=" << K
+										<< ",n4nn=" << num_for_1nn << ")" << std::endl;
+				}
 			}
 		}
 	}
