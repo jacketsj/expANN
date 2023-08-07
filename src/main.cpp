@@ -14,10 +14,10 @@
 
 int main() {
 	dataset_loader<float> dsl;
-	for (size_t n = 50000 * 10; n <= 50000 * 10 * 1; n *= 10) {
+	for (size_t n = 50000 * 1; n <= 50000 * 1 * 1; n *= 10) {
 		// size_t m = 400 * (n / 50000);
-		// size_t m = 400;
-		size_t m = 300;
+		size_t m = 400;
+		// size_t m = 300;
 		size_t d = 16;
 		auto bdm = perform_benchmarks(
 				dsl.load_synethetic_uniform_sphere_points(n, m, 1, d));
