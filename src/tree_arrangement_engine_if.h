@@ -15,16 +15,21 @@
 // child.
 // should have multiple copies of the tree (with different seeds) to avoid edge
 // problems
-// this is similar to using random quadtrees
+// this is similar to using random quadtrees. Turns out it's also quite similar
+// to the known-optimal data-dependent ANN algorithm (but a lot more practical)
+//
+// this is the version using an inverted file for each node. Should result in
+// higher build time for better query time/cache hits
 template <typename T>
-struct tree_arrangement_engine
-		: public ann_engine<T, tree_arrangement_engine<T>> {
+struct tree_arrangement_engine_if
+		: public ann_engine<T, tree_arrangement_engine_if<T>> {
 	size_t tree_copies, max_leaf_size, search_count_per_copy, affine_copies,
 			num_orientations, max_depth;
-	tree_arrangement_engine(size_t _tree_copies, size_t _max_leaf_size,
-													size_t _search_count_per_copy,
-													size_t _affine_copies = 3,
-													size_t _num_orientations = 8, size_t _max_depth = 40)
+	tree_arrangement_engine_if(size_t _tree_copies, size_t _max_leaf_size,
+														 size_t _search_count_per_copy,
+														 size_t _affine_copies = 3,
+														 size_t _num_orientations = 8,
+														 size_t _max_depth = 40)
 			: tree_copies(_tree_copies), max_leaf_size(_max_leaf_size),
 				search_count_per_copy(_search_count_per_copy),
 				affine_copies(_affine_copies), num_orientations(_num_orientations),
@@ -48,8 +53,8 @@ struct tree_arrangement_engine
 				// return hash;
 			}
 		};
-		std::unordered_map<std::vector<unsigned short>, std::vector<size_t>,
-											 VectorHasher>
+		std::unordered_map<std::vector<unsigned short>,
+											 std::vector<std::pair<vec<T>, size_t>>, VectorHasher>
 				tables;
 		std::unordered_map<std::vector<unsigned short>, size_t, VectorHasher>
 				subtree_tables;
@@ -61,7 +66,9 @@ struct tree_arrangement_engine
 	void _store_vector(const vec<T>& v);
 	void _build();
 	const vec<T>& _query(const vec<T>& v);
-	const std::string _name() { return "Tree Arrangement Engine"; }
+	const std::string _name() {
+		return "Tree Arrangement Engine (with simple IF)";
+	}
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, tree_copies);
@@ -75,11 +82,11 @@ struct tree_arrangement_engine
 };
 
 template <typename T>
-void tree_arrangement_engine<T>::_store_vector(const vec<T>& v) {
+void tree_arrangement_engine_if<T>::_store_vector(const vec<T>& v) {
 	all_entries.push_back(v);
 }
 
-template <typename T> void tree_arrangement_engine<T>::_build() {
+template <typename T> void tree_arrangement_engine_if<T>::_build() {
 	assert(all_entries.size() > 0);
 	std::random_device rd;
 	std::shared_ptr<std::mt19937> gen = std::make_shared<std::mt19937>(rd());
@@ -114,7 +121,7 @@ template <typename T> void tree_arrangement_engine<T>::_build() {
 			for (auto& i : b.ivals) {
 				auto mi = t.nodes[b.node_i].arrange.compute_multiindex(all_entries[i]);
 				auto& table = t.nodes[b.node_i].tables[mi];
-				table.push_back(i);
+				table.emplace_back(all_entries[i], i);
 				if (table.size() == max_leaf_size + 1)
 					to_be_children.push_back(mi); // triggers at most once per table
 			}
@@ -122,18 +129,21 @@ template <typename T> void tree_arrangement_engine<T>::_build() {
 				for (auto mi : to_be_children) {
 					t.nodes.emplace_back();
 					t.nodes[b.node_i].subtree_tables[mi] = t.nodes.size() - 1;
-					to_build.emplace(t.nodes.size() - 1, t.nodes[b.node_i].tables[mi],
-													 b.depth + 1);
+					std::vector<size_t> ivals_only;
+					for (auto& [_, i] : t.nodes[b.node_i].tables[mi])
+						ivals_only.push_back(i);
+					to_build.emplace(t.nodes.size() - 1, ivals_only, b.depth + 1);
 				}
 		}
 	}
 }
 template <typename T>
-const vec<T>& tree_arrangement_engine<T>::_query(const vec<T>& v) {
+const vec<T>& tree_arrangement_engine_if<T>::_query(const vec<T>& v) {
 	vec<T>& ret = all_entries[0];
 	for (auto& t : trees) {
 		size_t visited = 0;
-		std::vector<std::reference_wrapper<std::vector<size_t>>> tables_to_check;
+		std::vector<std::reference_wrapper<std::vector<std::pair<vec<T>, size_t>>>>
+				tables_to_check;
 		// populate all nodes to check
 		{
 			size_t cur = 0;
@@ -148,9 +158,12 @@ const vec<T>& tree_arrangement_engine<T>::_query(const vec<T>& v) {
 			}
 			reverse(tables_to_check.begin(), tables_to_check.end());
 			for (auto& table : tables_to_check) {
-				for (size_t iu : table.get()) {
-					if (dist2(v, all_entries[iu]) < dist2(v, ret)) {
-						ret = all_entries[iu];
+				size_t iters = std::min(table.get().size(), search_count_per_copy);
+				for (size_t table_ind = 0; table_ind < iters; ++table_ind) {
+					// for (auto& [u, _] : table.get()) {
+					auto& u = table.get()[table_ind].first;
+					if (dist2(v, u) < dist2(v, ret)) {
+						ret = u; // all_entries[iu];
 					}
 				}
 				visited += table.get().size();

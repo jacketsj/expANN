@@ -17,6 +17,7 @@ template <typename T> struct arrangement {
 		std::vector<unsigned short> ans(orientations.size());
 		for (size_t i = 0; i < orientations.size(); ++i) {
 			T sd = orientations[i].signeddist(v);
+			// TODO this looks wrong
 			ans[i] = std::lower_bound(distances[i].begin(), distances[i].end(), sd) -
 							 distances[i].begin();
 		}
@@ -83,7 +84,3 @@ public:
 		return res;
 	}
 };
-
-// TODO actually implement ANN and partioning, as well as hierarchical
-// partitioning
-// TODO also turn multiindex into a bitset or something, and then hash it maybe

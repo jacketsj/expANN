@@ -6,8 +6,11 @@
 #include <string>
 #include <vector>
 
+#include "small_vector.hpp"
+
 template <typename T> class vec {
-	std::vector<T> internal;
+	// std::vector<T> internal;
+	gch::small_vector<T> internal;
 
 public:
 	vec() = default;
@@ -87,6 +90,8 @@ public:
 		j = nlohmann::json(v.internal);
 	}
 	friend void from_json(const nlohmann::json& j, vec<T>& v) {
-		v.internal = j.get<std::vector<T>>();
+		// v.internal = j.get<std::vector<T>>();
+		for (auto& val : j.get<std::vector<T>>())
+			v.internal.push_back(val);
 	}
 };

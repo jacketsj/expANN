@@ -17,6 +17,7 @@
 #include "hnsw_engine_2.h"
 #include "hnsw_engine_hybrid.h"
 #include "tree_arrangement_engine.h"
+#include "tree_arrangement_engine_if.h"
 
 template <typename test_dataset_t>
 bench_data_manager perform_benchmarks(test_dataset_t ds) {
@@ -46,8 +47,12 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 			}
 		}
 	}
-	for (size_t k = 2; k <= 128; k += 12) {
-		for (size_t num_for_1nn = 32; num_for_1nn <= 64 * 4 * 2; num_for_1nn *= 4) {
+	// for (size_t k = 2; k <= 128; k += 12) {
+	// 	for (size_t num_for_1nn = 32; num_for_1nn <= 64 * 4 * 2; num_for_1nn *=
+	// 4)
+	// {
+	for (size_t k = 4 * 2; k <= 32 + 4; k *= 2) {
+		for (size_t num_for_1nn = 32; num_for_1nn <= 64 * 2; num_for_1nn *= 4) {
 			std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
 								<< ")" << std::endl;
 			hnsw_engine_2<float> engine2(100, k, num_for_1nn);
@@ -55,18 +60,26 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 			std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
 		}
 	}
-	for (size_t K = 4; K <= 64; K += 4) {
-		for (size_t k = 4; k * K <= 128 * 8; k += 4) {
-			for (size_t num_for_1nn = 32; num_for_1nn <= 64 * 4 * 2;
+	// for (size_t K = 4; K <= 64; K += 4) {
+	//	for (size_t k = 4; k * K <= 128 * 8; k += 4) {
+	//		for (size_t num_for_1nn = 32; num_for_1nn <= 64 * 4 * 2;
+	// for (size_t K = 4; K <= 256; K *= 2) {
+	//	for (size_t k = 16; k <= 128 * 2; k *= 4) {
+	//		for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 64 * 2;
+	for (size_t K = 8 * 2; K <= 16; K *= 2) {
+		for (size_t k = 32; k <= 128; k *= 4) {
+			for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 64 * 2;
 					 num_for_1nn *= 4) {
-				for (size_t min_per_cut = 2; min_per_cut * K <= k; min_per_cut *= 4) {
+				for (size_t min_per_cut = 2; min_per_cut * K <= k && min_per_cut <= 16;
+						 min_per_cut *= 4) {
 					std::cerr << "About to start ehnsw2(k=" << k << ",K=" << K
 										<< ",n4nn=" << num_for_1nn << ",min_per_cut=" << min_per_cut
 										<< ")" << std::endl;
 					ehnsw_engine_2<float> engine(100, k, num_for_1nn, K, min_per_cut);
 					bdm.add(basic_benchmarker.get_benchmark_data(engine, 360s));
 					std::cerr << "Completed ehnsw2(k=" << k << ",K=" << K
-										<< ",n4nn=" << num_for_1nn << ")" << std::endl;
+										<< ",n4nn=" << num_for_1nn << ",min_per_cut=" << min_per_cut
+										<< ")" << std::endl;
 				}
 			}
 		}
@@ -128,9 +141,9 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 				}
 			}
 		}
-		for (size_t tc = 2; tc <= 14; tc += 3) {
-			for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 8;
-					 max_leaf_size *= 16) {
+		for (size_t tc = 2; tc <= 64; tc *= 4) {
+			for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
+					 max_leaf_size *= 8) {
 				for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
 					std::cerr << "Starting tree arrangement(tc=" << tc
 										<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
@@ -151,6 +164,29 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 										<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
 										<< std::endl;
 				}
+			}
+		}
+	}
+	for (size_t tc = 2; tc <= 64; tc *= 4) {
+		for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
+				 max_leaf_size *= 8) {
+			for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
+				std::cerr << "Starting tree arrangement_if(tc=" << tc
+									<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
+									<< std::endl;
+				std::cerr << "Expected time proportional to: " << sc * tc << std::endl;
+				auto begin = std::chrono::high_resolution_clock::now();
+				tree_arrangement_engine_if<float> engine(tc, max_leaf_size, sc);
+				bdm.add(basic_benchmarker.get_benchmark_data(engine, default_timeout));
+				auto end = std::chrono::high_resolution_clock::now();
+				std::cerr << "Actual time: "
+									<< std::chrono::duration_cast<std::chrono::nanoseconds>(end -
+																																					begin)
+												 .count()
+									<< "ns" << std::endl;
+				std::cerr << "Completed tree arrangement_if(tc=" << tc
+									<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
+									<< std::endl;
 			}
 		}
 	}
