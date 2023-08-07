@@ -103,6 +103,7 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		ret.average_squared_distance = double(avg_dist2) / ds.m;
 		// TODO modify recall computation for kNN
 		ret.recall = double(num_best_found) / ds.m;
+		ret.param_list = eng.param_list();
 
 		ret.engine_name = eng.name();
 
