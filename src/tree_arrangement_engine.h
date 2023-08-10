@@ -84,6 +84,8 @@ template <typename T> void tree_arrangement_engine<T>::_build() {
 	std::random_device rd;
 	std::shared_ptr<std::mt19937> gen = std::make_shared<std::mt19937>(rd());
 	for (size_t copy = 0; copy < tree_copies; ++copy) {
+		std::cerr << "Built " << double(copy) / double(tree_copies) * 100 << "%"
+							<< std::endl;
 		trees.emplace_back();
 		auto& t = trees.back();
 		t.nodes.emplace_back();

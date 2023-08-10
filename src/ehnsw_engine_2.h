@@ -129,6 +129,11 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 	for (size_t cut = 0; cut < num_cuts; ++cut)
 		e_labels[0].emplace_back(int_distribution(gen));
 	for (size_t i = 1; i < all_entries.size(); ++i) {
+
+		if (i % 5000 == 0)
+			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
+								<< "%" << std::endl;
+
 		for (size_t cut = 0; cut < num_cuts; ++cut)
 			e_labels[i].emplace_back(int_distribution(gen));
 		// get kNN at each layer

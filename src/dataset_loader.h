@@ -93,4 +93,73 @@ template <typename T> struct dataset_loader {
 		save_imtd(filename, imtd);
 		return imtd;
 	}
+	template <typename T2>
+	std::vector<std::vector<T2>> Tvecs_read(const std::string& filename) {
+		std::ifstream file(filename, std::ios::binary);
+		if (!file.is_open()) {
+			throw std::runtime_error("I/O error: Unable to open the file " +
+															 filename);
+		}
+
+		int d;
+		file.read(reinterpret_cast<char*>(&d), sizeof(int));
+
+		int vecsizeof = 1 * 4 + d * 4;
+		file.seekg(0, std::ios::end);
+		int n = file.tellg() / vecsizeof;
+
+		file.seekg(0, std::ios::beg);
+
+		std::vector<T2> data((d + 1) * n);
+		file.read(reinterpret_cast<char*>(data.data()), sizeof(T2) * (d + 1) * n);
+
+		std::vector<std::vector<T2>> vectors(n, std::vector<T2>(d));
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < d; ++j) {
+				vectors[i][j] = data[(i * (d + 1)) + j + 1];
+			}
+		}
+
+		file.close();
+		return vectors;
+	}
+
+	in_memory_test_dataset<float> load_sift1m(std::string filename_base,
+																						std::string filename_query,
+																						std::string filename_groundtruth) {
+		// fvecs format: (d=int,components=float*d) (4+d*4 bytes)
+		// ivecs format: (d=int,components=int*d) (4+d*4 bytes)
+		// read filename_base as fvecs
+		auto base = Tvecs_read<float>(filename_base);
+		// read filename_query as fvecs
+		auto query = Tvecs_read<float>(filename_query);
+		// read filename_groundtruth as ivecs
+		auto groundtruth = Tvecs_read<int>(filename_groundtruth);
+
+		in_memory_test_dataset<float> imtd;
+		// call imtd.all_vecs.push_back(v)
+		for (auto& v : base)
+			imtd.all_vecs.emplace_back(v);
+		// call imtd.all_query_vecs.push_back(v)
+		for (auto& v : base)
+			imtd.all_query_vecs.emplace_back(v);
+		// TODO call imtd.all_query_ans.push_back({i0,i1,i2,...})
+		for (auto& v : groundtruth) {
+			imtd.all_query_ans.emplace_back();
+			auto& vimtd = imtd.all_query_ans.back();
+			for (auto& val : v)
+				vimtd.emplace_back(val);
+		}
+
+		imtd.name = "sift1m_full";
+		imtd.n = base.size();
+		imtd.m = query.size();
+		imtd.k = groundtruth[0].size();
+		imtd.dim = base[0].size();
+
+		std::cerr << "Finished loading sift1m. n=" << imtd.n << ",m=" << imtd.m
+							<< ",k=" << imtd.k << ",dim=" << imtd.dim << std::endl;
+
+		return imtd;
+	}
 };
