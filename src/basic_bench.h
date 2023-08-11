@@ -82,10 +82,14 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 			assert(ans.size() <= ds.k_want);
 			// computation time for if this is good is assumed to be negligible
 			// compared to query_k time in benchmark
-			T d = dist(ds.get_query(q), ds.get_vec(ans[0])),
-				d2 = dist2(ds.get_query(q), ds.get_vec(ans[0]));
-			avg_dist += d;
-			avg_dist2 += d2;
+			if (!ans.empty()) {
+				T d = dist(ds.get_query(q), ds.get_vec(ans[0])),
+					d2 = dist2(ds.get_query(q), ds.get_vec(ans[0]));
+				avg_dist += d;
+				avg_dist2 += d2;
+			} else {
+				avg_dist += 1e8; // distance is very large
+			}
 			const auto& expected_ans = ds.get_query_ans(q);
 			// recall is number of ans that appear in expected ans, divided by k_want
 			std::set<size_t> ans_s;

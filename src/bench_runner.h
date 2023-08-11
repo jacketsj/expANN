@@ -1,6 +1,9 @@
 #pragma once
 
+#include <atomic>
+#include <functional>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "basic_bench.h"
@@ -20,8 +23,31 @@
 #include "tree_arrangement_engine.h"
 #include "tree_arrangement_engine_if.h"
 
+struct job {
+	std::function<void()> f;
+	std::string name;
+	param_list_t param_list;
+	job(std::function<void()> _f, std::string _name, param_list_t _param_list)
+			: f(_f), name(_name), param_list(_param_list) {}
+	std ::string to_string() const {
+		std::string ret;
+		ret += name;
+		ret += "(";
+		for (const auto& [k, v] : param_list) {
+			ret += k + '=' + v + ',';
+		}
+		ret[ret.size() - 1] = ')';
+		return ret;
+	}
+	void run(size_t t) {
+		std::cerr << "Running job (t=" << t << "): " << to_string() << std::endl;
+		f();
+		std::cerr << "Completed job (t=" << t << "): " << to_string() << std::endl;
+	}
+};
+
 template <typename test_dataset_t>
-bench_data_manager perform_benchmarks(test_dataset_t ds) {
+bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	basic_bench<float, test_dataset_t> basic_benchmarker(ds);
 	bench_data_manager bdm(ds.name);
 
@@ -32,35 +58,59 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 	using namespace std::chrono_literals;
 	auto default_timeout = 6000s;
 
+	std::vector<job> jobs;
+	std::vector<std::variant<bench_data, std::string>> job_results;
+
+	auto add_engine = [&jobs, &job_results, &basic_benchmarker,
+										 &default_timeout](auto engine_gen) mutable {
+		size_t i = jobs.size();
+		job_results.emplace_back();
+		jobs.emplace_back(
+				[&basic_benchmarker, i, engine_gen, default_timeout,
+				 &job_results]() mutable {
+					auto engine = engine_gen();
+					job_results[i] =
+							basic_benchmarker.get_benchmark_data(engine, default_timeout);
+				},
+				engine_gen().name(), engine_gen().param_list());
+	};
+
+	for (const auto& bd : job_results)
+		bdm.add(bd);
+
+	auto add_hnsw2 = [&](size_t max_depth, size_t k, size_t num_for_1nn) {
+		auto engine_gen = [&] {
+			return hnsw_engine_2<float>(max_depth, k, num_for_1nn);
+		};
+		add_engine(engine_gen);
+	};
+
+	auto add_hnsw3 = [&](size_t max_depth, size_t k, size_t num_for_1nn) {
+		auto engine_gen = [&] {
+			return hnsw_engine_3<float>(max_depth, k, num_for_1nn);
+		};
+		add_engine(engine_gen);
+	};
+
 	// brute_force_engine<float> engine_bf;
 	// bdm.add(basic_benchmarker.get_benchmark_data(engine_bf, default_timeout));
 
-	if (true) {
-		for (size_t k = 38; k <= 50; k += 10) {
-			for (size_t num_for_1nn = 1; num_for_1nn <= 27; num_for_1nn *= 3) {
-				std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
-									<< ")" << std::endl;
-				hnsw_engine_2<float> engine2(100, k, num_for_1nn);
-				hnsw_engine_3<float> engine3(100, k, num_for_1nn);
-				bdm.add(basic_benchmarker.get_benchmark_data(engine2, default_timeout));
-				bdm.add(basic_benchmarker.get_benchmark_data(engine3, default_timeout));
-				std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
-			}
+	// for (size_t k = 38; k <= 50; k += 10) {
+	for (size_t k = 20; k <= 80; k += 10) {
+		for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 32 * 8; num_for_1nn *= 2) {
+			add_hnsw2(100, k, num_for_1nn);
+			add_hnsw3(100, k, num_for_1nn);
 		}
 	}
-	struct ehnsw2_run {
-		size_t edge_count_mult;
-		size_t max_depth;
-		size_t min_per_cut;
-		size_t num_cuts;
-		size_t num_for_1nn;
-		ehnsw2_run(size_t _edge_count_mult, size_t _max_depth, size_t _min_per_cut,
-							 size_t _num_cuts, size_t _num_for_1nn)
-				: edge_count_mult(_edge_count_mult), max_depth(_max_depth),
-					min_per_cut(_min_per_cut), num_cuts(_num_cuts),
-					num_for_1nn(_num_for_1nn) {}
+	auto add_ehnsw2 = [&](size_t edge_count_mult, size_t max_depth,
+												size_t min_per_cut, size_t num_cuts,
+												size_t num_for_1nn) {
+		auto engine_gen = [&] {
+			return ehnsw_engine_2<float>(max_depth, edge_count_mult, num_for_1nn,
+																	 num_cuts, min_per_cut);
+		};
+		add_engine(engine_gen);
 	};
-	std::vector<ehnsw2_run> to_run;
 	//	for (size_t ecm = 10; ecm <= 40; ecm *= 2)
 	//		for (size_t mpc = 1; mpc <= 8; mpc *= 2)
 	//			for (size_t nc = 1; nc <= 8; nc *= 2)
@@ -70,123 +120,59 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 		for (size_t mpc = 1; mpc <= 4; mpc *= 2)
 			for (size_t nc = 1; nc * mpc < ecm; nc *= 2)
 				for (size_t n4nn = 16; n4nn <= 16; n4nn *= 4) {
-					to_run.emplace_back(ecm, 100, mpc, nc, n4nn);
+					add_ehnsw2(ecm, 100, mpc, nc, n4nn);
 				}
-	// to_run.emplace_back(56, 100, 1, 16, 32);
-	// to_run.emplace_back(56, 100, 4, 8, 8);
-	// to_run.emplace_back(47, 100, 1, 16, 64);
-	// to_run.emplace_back(46, 100, 1, 4, 128);
-	std::cerr << "Running " << to_run.size() << " jobs in total." << std::endl;
-	std::vector<std::variant<bench_data, std::string>> to_run_bd(to_run.size());
+	// add_hnsw2(56, 100, 1, 16, 32);
+	// add_hnsw2(56, 100, 4, 8, 8);
+	// add_hnsw2(47, 100, 1, 16, 64);
+	// add_hnsw2(46, 100, 1, 4, 128);
+
+	auto add_tae = [&](size_t tc, size_t max_leaf_size, size_t sc) {
+		auto engine_gen = [&] {
+			return tree_arrangement_engine<float>(tc, max_leaf_size, sc);
+		};
+		add_engine(engine_gen);
+	};
+
+	for (size_t tc = 2; tc <= 64; tc *= 2) {
+		for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
+				 max_leaf_size *= 4) {
+			for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
+				add_tae(tc, max_leaf_size, sc);
+			}
+		}
+	}
+
+	auto add_tae_if = [&](size_t tc, size_t max_leaf_size, size_t sc) {
+		auto engine_gen = [&] {
+			return tree_arrangement_engine_if<float>(tc, max_leaf_size, sc);
+		};
+		add_engine(engine_gen);
+	};
+
+	for (size_t tc = 2; tc <= 64; tc *= 2) {
+		for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
+				 max_leaf_size *= 4) {
+			for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
+				add_tae_if(tc, max_leaf_size, sc);
+			}
+		}
+	}
+
 	{
-		std::vector<std::jthread> to_run_jobs;
-		size_t num_threads = 6;
+		std::vector<std::jthread> threadpool;
+		std::atomic_size_t g_job_index = 0;
 		for (size_t t_index = 0; t_index < num_threads; ++t_index) {
-			to_run_jobs.emplace_back([&to_run_bd, &to_run, t_index,
-																&basic_benchmarker, default_timeout,
-																num_threads]() {
-				for (size_t r_index = t_index; r_index < to_run.size();
-						 r_index += num_threads) {
-					// for (auto& r : to_run) {
-					size_t k = to_run[r_index].edge_count_mult;
-					size_t K = to_run[r_index].num_cuts;
-					size_t md = to_run[r_index].max_depth;
-					size_t mpc = to_run[r_index].min_per_cut;
-					size_t n4nn = to_run[r_index].num_for_1nn;
-					std::cerr << "About to start ehnsw2(k=" << k << ",K=" << K
-										<< ",n4nn=" << n4nn << ",min_per_cut=" << mpc << ")"
-										<< std::endl;
-					ehnsw_engine_2<float> engine(md, k, n4nn, K, mpc);
-					// bdm.add(basic_benchmarker.get_benchmark_data(engine,
-					// default_timeout));
-					to_run_bd[r_index] =
-							basic_benchmarker.get_benchmark_data(engine, default_timeout);
-					std::cerr << "Completed ehnsw2(k=" << k << ",K=" << K
-										<< ",n4nn=" << n4nn << ",min_per_cut=" << mpc << ")"
-										<< std::endl;
+			threadpool.emplace_back([&]() {
+				for (size_t t_job_index = g_job_index++; t_job_index < jobs.size();
+						 t_job_index = g_job_index++) {
+					jobs[t_job_index].run(t_index);
 				}
 			});
 		}
 	}
-	for (size_t r_index = 0; r_index < to_run.size(); ++r_index)
-		bdm.add(to_run_bd[r_index]);
-	// for (size_t K = 4; K <= 64; K += 4) {
-	//	for (size_t k = 4; k * K <= 128 * 8; k += 4) {
-	//		for (size_t num_for_1nn = 32; num_for_1nn <= 64 * 4 * 2;
-	// for (size_t K = 4; K <= 256; K *= 2) {
-	//	for (size_t k = 16; k <= 128 * 2; k *= 4) {
-	//		for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 64 * 2;
-	if (false) {
-		for (size_t K = 2; K <= 32; K *= 2) {
-			for (size_t k = 11; k < 64; k += 9) {
-				for (size_t num_for_1nn = 4; num_for_1nn <= 64; num_for_1nn *= 2) {
-					for (size_t min_per_cut = 1;
-							 min_per_cut * K <= k && min_per_cut <= 16; min_per_cut *= 2) {
-						std::cerr << "About to start ehnsw2(k=" << k << ",K=" << K
-											<< ",n4nn=" << num_for_1nn
-											<< ",min_per_cut=" << min_per_cut << ")" << std::endl;
-						ehnsw_engine_2<float> engine(100, k, num_for_1nn, K, min_per_cut);
-						bdm.add(
-								basic_benchmarker.get_benchmark_data(engine, default_timeout));
-						std::cerr << "Completed ehnsw2(k=" << k << ",K=" << K
-											<< ",n4nn=" << num_for_1nn
-											<< ",min_per_cut=" << min_per_cut << ")" << std::endl;
-					}
-				}
-			}
-		}
-	}
-	if (true) {
-		for (size_t tc = 2; tc <= 64; tc *= 2) {
-			for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
-					 max_leaf_size *= 4) {
-				for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
-					std::cerr << "Starting tree arrangement(tc=" << tc
-										<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
-										<< std::endl;
-					std::cerr << "Expected time proportional to: " << sc * tc
-										<< std::endl;
-					auto begin = std::chrono::high_resolution_clock::now();
-					tree_arrangement_engine<float> engine(tc, max_leaf_size, sc);
-					bdm.add(
-							basic_benchmarker.get_benchmark_data(engine, default_timeout));
-					auto end = std::chrono::high_resolution_clock::now();
-					std::cerr << "Actual time: "
-										<< std::chrono::duration_cast<std::chrono::nanoseconds>(
-													 end - begin)
-													 .count()
-										<< "ns" << std::endl;
-					std::cerr << "Completed tree arrangement(tc=" << tc
-										<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
-										<< std::endl;
-				}
-			}
-		}
-		for (size_t tc = 2; tc <= 64; tc *= 2) {
-			for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
-					 max_leaf_size *= 4) {
-				for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
-					std::cerr << "Starting tree arrangement_if(tc=" << tc
-										<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
-										<< std::endl;
-					std::cerr << "Expected time proportional to: " << sc * tc
-										<< std::endl;
-					auto begin = std::chrono::high_resolution_clock::now();
-					tree_arrangement_engine_if<float> engine(tc, max_leaf_size, sc);
-					bdm.add(
-							basic_benchmarker.get_benchmark_data(engine, default_timeout));
-					auto end = std::chrono::high_resolution_clock::now();
-					std::cerr << "Actual time: "
-										<< std::chrono::duration_cast<std::chrono::nanoseconds>(
-													 end - begin)
-													 .count()
-										<< "ns" << std::endl;
-					std::cerr << "Completed tree arrangement_if(tc=" << tc
-										<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc << ")"
-										<< std::endl;
-				}
-			}
-		}
+	for (size_t job_index = 0; job_index < job_results.size(); ++job_index) {
+		bdm.add(job_results[job_index]);
 	}
 	return bdm;
 }

@@ -6,13 +6,17 @@
 // TODO small size optimization
 
 template <typename T>
-struct topk_t : std::priority_queue<std::pair<T, size_t>> {
+struct topk_t : private std::priority_queue<std::pair<T, size_t>> {
+
+private:
 	typedef std::pair<T, size_t> dat;
 	using std::priority_queue<dat>::top;
 	using std::priority_queue<dat>::pop;
-	using std::priority_queue<dat>::size;
 	using std::priority_queue<dat>::emplace;
 	using std::priority_queue<dat>::empty;
+
+public:
+	using std::priority_queue<dat>::size;
 	size_t k;
 	topk_t(size_t _k) : k(_k) {}
 	bool consider(const T& d, size_t v) {
