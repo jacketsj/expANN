@@ -39,10 +39,15 @@ struct job {
 		ret[ret.size() - 1] = ')';
 		return ret;
 	}
-	void run(size_t t) {
-		std::cerr << "Running job (t=" << t << "): " << to_string() << std::endl;
+	void run(size_t t, size_t job_index, size_t num_jobs) {
+		std::printf("Running job (t=%zu, job %zu/%zu): %s\n", t, job_index,
+								num_jobs, to_string().c_str());
+		// std::cerr << "Running job (t=" << t << "): " << to_string() << std::endl;
 		f();
-		std::cerr << "Completed job (t=" << t << "): " << to_string() << std::endl;
+		// std::cerr << "Completed job (t=" << t << "): " << to_string() <<
+		// std::endl;
+		std::printf("Completed job (t=%zu, job %zu/%zu): %s\n", t, job_index,
+								num_jobs, to_string().c_str());
 	}
 };
 
@@ -166,7 +171,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			threadpool.emplace_back([&]() {
 				for (size_t t_job_index = g_job_index++; t_job_index < jobs.size();
 						 t_job_index = g_job_index++) {
-					jobs[t_job_index].run(t_index);
+					jobs[t_job_index].run(t_index, t_job_index, jobs.size());
 				}
 			});
 		}

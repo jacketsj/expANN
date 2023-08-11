@@ -117,8 +117,9 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 									 .count());
 		ret.average_distance = double(avg_dist) / ds.m;
 		ret.average_squared_distance = double(avg_dist2) / ds.m;
-		std::cout << "num_best_found=" << num_best_found << "/" << ds.m * ds.k_want
-							<< std::endl;
+		// std::cout << "num_best_found=" << num_best_found << "/" << ds.m *
+		// ds.k_want
+		//					<< std::endl;
 		ret.recall = double(num_best_found) / double(ds.m * ds.k_want);
 		ret.param_list = eng.param_list();
 

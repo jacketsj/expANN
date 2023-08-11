@@ -35,8 +35,7 @@ struct hnsw_engine_3 : public ann_engine<T, hnsw_engine_3<T>> {
 	const std::vector<std::vector<size_t>>
 	_query_k_internal(const vec<T>& v, size_t k, bool fill_all_layers = false);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	// const std::string _name() { return "HNSW Engine"; }
-	const std::string _name() { return "HNSW Engine 2"; }
+	const std::string _name() { return "HNSW Engine 3"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, max_depth);
