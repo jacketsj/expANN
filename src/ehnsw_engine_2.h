@@ -145,6 +145,8 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 	add_layer(0);
 	for (size_t cut = 0; cut < num_cuts; ++cut)
 		e_labels[0].emplace_back(int_distribution(gen));
+	// size_t starting_size = 3; // = edge_count_mult
+	size_t starting_size = edge_count_mult;
 	for (size_t i = 1; i < all_entries.size(); ++i) {
 		if (i % 5000 == 0)
 			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
@@ -159,7 +161,7 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 		while (cur_layer >= hadj.size())
 			add_layer(i);
 		// add all the neighbours as edges
-		topk_t<T> tk(edge_count_mult);
+		topk_t<T> tk(starting_size);
 		tk.consider(dist2(all_entries[starting_vertex], all_entries[i]),
 								starting_vertex);
 		for (int layer = hadj.size() - 1; layer >= 0; --layer) {
@@ -174,12 +176,24 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 				}
 		}
 	}
-	// for (size_t num_nn = 4; num_nn <= edge_count_mult; num_nn *= 2)
+	//{
+	//	for (size_t num_nn = starting_size * 2; num_nn < edge_count_mult;
+	//			 num_nn *= 2)
+	//		for (size_t i = 1; i < all_entries.size(); ++i) {
+	//			if (i % 5000 == 0)
+	//				std::cerr << "Built " << double(i) / double(all_entries.size()) *
+	//100
+	//									<< "% (num_nn=" << num_nn << ")" << std::endl;
+	//			improve_vertex(i, num_nn);
+	//		}
 	//	for (size_t i = 1; i < all_entries.size(); ++i) {
-	//		improve_vertex(i, num_nn);
+	//		if (i % 5000 == 0)
+	//			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
+	//								<< "% (num_nn=" << edge_count_mult << " aka max)"
+	//								<< std::endl;
+	//		improve_vertex(i, edge_count_mult);
 	//	}
-	// for (size_t i = 1; i < all_entries.size(); ++i)
-	//	improve_vertex(i, edge_count_mult);
+	//}
 }
 template <typename T>
 std::vector<size_t>

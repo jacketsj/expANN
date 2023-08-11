@@ -80,14 +80,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		bdm.add(bd);
 
 	auto add_hnsw2 = [&](size_t max_depth, size_t k, size_t num_for_1nn) {
-		auto engine_gen = [&] {
+		auto engine_gen = [=] {
 			return hnsw_engine_2<float>(max_depth, k, num_for_1nn);
 		};
 		// add_engine(engine_gen);
 	};
 
 	auto add_hnsw3 = [&](size_t max_depth, size_t k, size_t num_for_1nn) {
-		auto engine_gen = [&] {
+		auto engine_gen = [=] {
 			return hnsw_engine_3<float>(max_depth, k, num_for_1nn);
 		};
 		// add_engine(engine_gen);
@@ -106,7 +106,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	auto add_ehnsw2 = [&](size_t edge_count_mult, size_t max_depth,
 												size_t min_per_cut, size_t num_cuts,
 												size_t num_for_1nn) {
-		auto engine_gen = [&] {
+		auto engine_gen = [=] {
 			return ehnsw_engine_2<float>(max_depth, edge_count_mult, num_for_1nn,
 																	 num_cuts, min_per_cut);
 		};
@@ -115,7 +115,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	auto add_ehnsw3 = [&](size_t edge_count_mult, size_t max_depth,
 												size_t min_per_cut, size_t num_cuts,
 												size_t num_for_1nn) {
-		auto engine_gen = [&] {
+		auto engine_gen = [=] {
 			return ehnsw_engine_3<float>(max_depth, edge_count_mult, num_for_1nn,
 																	 num_cuts, min_per_cut);
 		};
@@ -139,7 +139,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// add_hnsw2(46, 100, 1, 4, 128);
 
 	auto add_tae = [&](size_t tc, size_t max_leaf_size, size_t sc) {
-		auto engine_gen = [&] {
+		auto engine_gen = [=] {
 			return tree_arrangement_engine<float>(tc, max_leaf_size, sc);
 		};
 		// add_engine(engine_gen);
@@ -155,7 +155,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	}
 
 	auto add_tae_if = [&](size_t tc, size_t max_leaf_size, size_t sc) {
-		auto engine_gen = [&] {
+		auto engine_gen = [=] {
 			return tree_arrangement_engine_if<float>(tc, max_leaf_size, sc);
 		};
 		// add_engine(engine_gen);
