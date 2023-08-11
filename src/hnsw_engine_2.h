@@ -68,9 +68,9 @@ template <typename T> void hnsw_engine_2<T>::_build() {
 	// add one layer to start, with first vertex
 	add_layer(0);
 	for (size_t i = 1; i < all_entries.size(); ++i) {
-		// if (i % 25000 == 0)
-		// 	std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
-		// 						<< "%" << std::endl;
+		if (i % 5000 == 0)
+			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
+								<< "%" << std::endl;
 		// get the layer this entry will go up to
 		size_t cur_layer_ub =
 				floor(-log(distribution(gen)) * 1 / log(double(edge_count_mult)));
