@@ -9,6 +9,7 @@
 
 #include "ann_engine.h"
 #include "robin_hood.h"
+#include "topk_t.h"
 
 // Expander HNSW Engine
 template <typename T>
@@ -127,25 +128,19 @@ const std::vector<size_t>
 ehnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 																	 size_t starting_point, size_t layer,
 																	 std::function<bool(size_t, size_t)> filter) {
-	std::priority_queue<std::pair<T, size_t>> top_k;
+	topk_t<T> tk;
 	std::priority_queue<std::pair<T, size_t>> to_visit;
 	robin_hood::unordered_flat_set<size_t> visited;
 	auto visit = [&](T d, size_t u) {
-		bool is_good =
-				!visited.contains(u) && (top_k.size() < k || top_k.top().first > d);
-		//&& filter(layer, u);
+		// top k should contain unfiltered items in the event that everything is
+		// filtered out
+		T d_maybe = d;
+		if (!filter(layer, u))
+			d_maybe = std::numeric_limits<T>::max();
+		bool is_good = !visited.contains(u) && tk.consider(d_maybe, u);
 		visited.insert(u);
-		if (is_good) {
-			if (filter(layer, u))
-				top_k.emplace(d, u); // top_k is a max heap
-			else
-				top_k.emplace(std::numeric_limits<T>::max(),
-											u);			 // top k should contain unfiltered items in the
-															 // event that everything is filtered out
+		if (is_good)
 			to_visit.emplace(-d, u); // to_visit is a min heap
-		}
-		if (top_k.size() > k)
-			top_k.pop();
 		return is_good;
 	};
 	visit(dist(v, all_entries[starting_point]), starting_point);
@@ -153,7 +148,7 @@ ehnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 		T nd;
 		size_t cur;
 		std::tie(nd, cur) = to_visit.top();
-		if (-nd > top_k.top().first)
+		if (-nd > tk.worst_val()).first)
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
@@ -168,13 +163,7 @@ ehnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			}
 		}
 	}
-	std::vector<size_t> ret;
-	while (!top_k.empty()) {
-		ret.push_back(top_k.top().second);
-		top_k.pop();
-	}
-	reverse(ret.begin(), ret.end()); // sort from closest to furthest
-	return ret;
+	return tk.to_vector();
 }
 
 template <typename T>
@@ -182,7 +171,6 @@ const std::vector<std::vector<size_t>>
 ehnsw_engine<T>::_query_k(const vec<T>& v, size_t k, bool fill_all_layers,
 													std::function<bool(size_t, size_t)> filter) {
 	auto current = starting_vertex;
-	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::vector<size_t>> ret;
 	// for each layer, in decreasing depth
 	for (int layer = hadj_same.size() - 1; layer >= 0; --layer) {

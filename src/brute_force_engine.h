@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "ann_engine.h"
+#include "topk_t.h"
 
 template <typename T>
 struct brute_force_engine : public ann_engine<T, brute_force_engine<T>> {
@@ -26,31 +27,10 @@ template <typename T> void brute_force_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 }
 template <typename T>
-const vec<T>& brute_force_engine<T>::_query(const vec<T>& v) {
-	vec<T>& ret = all_entries[0];
-	for (const auto& e : all_entries) {
-		if (dist2(v, e) < dist2(v, ret)) {
-			ret = e;
-		}
-	}
-	return ret;
-}
-template <typename T>
 std::vector<size_t> brute_force_engine<T>::_query_k(const vec<T>& v, size_t k) {
-	std::priority_queue<std::pair<T, size_t>> top_k;
+	topk_t<T> tk(k);
 	for (size_t i = 0; i < all_entries.size(); ++i) {
-		T d = dist2(v, all_entries[i]);
-		if (top_k.size() < k || top_k.top().first > d) {
-			top_k.emplace(d, i);
-		}
-		if (top_k.size() > k)
-			top_k.pop();
+		tk.consider(dist2(v, all_entries[i]), i);
 	}
-	std::vector<size_t> ret;
-	while (!top_k.empty()) {
-		ret.push_back(top_k.top().second);
-		top_k.pop();
-	}
-	reverse(ret.begin(), ret.end()); // sort from closest to furthest
-	return ret;
+	return tk.to_vector();
 }

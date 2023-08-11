@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <future>
+#include <set>
 #include <string>
 #include <thread>
 #include <variant>
@@ -77,13 +78,24 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		auto time_begin = std::chrono::high_resolution_clock::now();
 		for (size_t q = 0; q < ds.m; ++q) {
 			// TODO make this kNN instead of 1NN
-			const auto& ans = eng.query(ds.get_query(q));
-			T d = dist(ds.get_query(q), ans), d2 = dist2(ds.get_query(q), ans);
+			const auto& ans = eng.query_k(ds.get_query(q), ds.k_want);
+			assert(ans.size() <= ds.k_want);
+			// computation time for if this is good is assumed to be negligible
+			// compared to query_k time in benchmark
+			T d = dist(ds.get_query(q), ds.get_vec(ans[0])),
+				d2 = dist2(ds.get_query(q), ds.get_vec(ans[0]));
 			avg_dist += d;
 			avg_dist2 += d2;
-			if (d2 <= dist2(ds.get_query(q), ds.get_vec(ds.get_query_ans(q)[0])) +
-										TOLERANCE)
-				++num_best_found;
+			const auto& expected_ans = ds.get_query_ans(q);
+			// recall is number of ans that appear in expected ans, divided by k_want
+			std::set<size_t> ans_s;
+			for (auto& vi : ans)
+				ans_s.emplace(vi);
+			// num_best_found += ans_s.size();
+			for (auto& vi : expected_ans)
+				if (ans_s.contains(vi)) {
+					++num_best_found;
+				}
 
 			if (stoken.stop_requested())
 				return ret;
@@ -101,8 +113,9 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 									 .count());
 		ret.average_distance = double(avg_dist) / ds.m;
 		ret.average_squared_distance = double(avg_dist2) / ds.m;
-		// TODO modify recall computation for kNN
-		ret.recall = double(num_best_found) / ds.m;
+		std::cout << "num_best_found=" << num_best_found << "/" << ds.m * ds.k_want
+							<< std::endl;
+		ret.recall = double(num_best_found) / double(ds.m * ds.k_want);
 		ret.param_list = eng.param_list();
 
 		ret.engine_name = eng.name();

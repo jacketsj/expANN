@@ -1,0 +1,44 @@
+#pragma once
+
+#include <algorithm>
+#include <queue>
+
+// TODO small size optimization
+
+template <typename T>
+struct topk_t : std::priority_queue<std::pair<T, size_t>> {
+	typedef std::pair<T, size_t> dat;
+	using std::priority_queue<dat>::top;
+	using std::priority_queue<dat>::pop;
+	using std::priority_queue<dat>::size;
+	using std::priority_queue<dat>::emplace;
+	using std::priority_queue<dat>::empty;
+	size_t k;
+	topk_t(size_t _k) : k(_k) {}
+	bool consider(const T& d, size_t v) {
+		bool is_good = size() < k || top().first > d;
+		if (is_good) {
+			emplace(d, v); // max heap
+		}
+		if (size() > k)
+			pop();
+		return is_good;
+	}
+	void discard_until_size(size_t goal) {
+		while (size() > goal)
+			pop();
+	}
+	size_t worst() const { return top().second; }
+	const T& worst_val() const { return top().first; }
+	std::vector<size_t> to_vector() const {
+		std::vector<size_t> ret;
+		std::priority_queue<dat> dupe(
+				static_cast<const std::priority_queue<dat>&>(*this));
+		while (!dupe.empty()) {
+			ret.push_back(dupe.top().second);
+			dupe.pop();
+		}
+		std::reverse(ret.begin(), ret.end()); // sort from closest to furthest
+		return ret;
+	}
+};

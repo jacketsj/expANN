@@ -40,7 +40,8 @@ template <typename T> struct vec_generator {
 			: rd(), gen(_gen), d(0, 1), eps(1e-7), dim(_dim) {}
 
 	vec<T> random_vec() {
-		vec<T> res(dim);
+		vec<T> res;
+		res.set_dim(dim);
 		do {
 			for (size_t i = 0; i < res.size(); ++i)
 				res[i] = d(*gen);

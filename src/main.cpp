@@ -1,21 +1,17 @@
 #include <iostream>
 #include <string>
 
-#include "arrangement_engine.h"
 #include "basic_bench.h"
 #include "bench_runner.h"
-#include "brute_force_engine.h"
 #include "dataset_loader.h"
-#include "hnsw_engine.h"
 #include "matplotlibcpp.h"
 #include "plotter.h"
-#include "randomgeometry.h"
 #include "vec.h"
 
 int main() {
 	dataset_loader<float> dsl;
-	{
-		auto bdm = perform_benchmarks(dsl.load_sift1m(
+	if (true) {
+		auto bdm = perform_benchmarks(dsl.load_sift1m_easy(
 				"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
 				"datasets/sift/sift_groundtruth.ivecs"));
 		auto ds_name = bdm.dataset_name;

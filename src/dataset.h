@@ -18,8 +18,9 @@ template <typename T, class Derived> struct dataset {
 
 template <typename T, class DerivedTest, class Derived>
 struct test_dataset : public Derived {
-	size_t m; // number of queries
-	size_t k; // size of query ans
+	size_t m;			 // number of queries
+	size_t k;			 // size of query ans
+	size_t k_want; // size of expected answer (<= k)
 	vec<T> get_query(size_t i) const {
 		// assert(i < m);
 		return static_cast<const DerivedTest*>(this)->_get_query(i);

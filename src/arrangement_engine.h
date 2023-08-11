@@ -7,6 +7,7 @@
 
 #include "ann_engine.h"
 #include "randomgeometry.h"
+#include "topk_t.h"
 #include "vecset.h"
 
 // basic lsh method
@@ -19,11 +20,12 @@ struct arrangement_engine : public ann_engine<T, arrangement_engine<T>> {
 				num_arranges(_num_arranges) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<arrangement<T>> arranges;
-	std::vector<std::map<std::vector<unsigned short>, std::vector<vec<T>>>>
+	std::vector<std::map<std::vector<unsigned short>,
+											 std::vector<std::pair<vec<T>, size_t>>>>
 			tables;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const vec<T>& _query(const vec<T>& v);
+	const std::vector<size_t> _query_k(const vec<T>& v);
 	const std::string _name() { return "Arrangement Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -49,18 +51,18 @@ template <typename T> void arrangement_engine<T>::_build() {
 		vecset vs(all_entries);
 		arranges.push_back(arrange_gen(vs));
 		tables.emplace_back();
-		for (const auto& v : all_entries)
-			tables.back()[arranges.back().compute_multiindex(v)].push_back(v);
+		for (size_t vi = 0; vi < all_entires.size(); ++vi)
+			tables.back()[arranges.back().compute_multiindex(all_entries[vi])]
+					.emplace_back(all_entries[vi], vi);
 	}
 }
 template <typename T>
-const vec<T>& arrangement_engine<T>::_query(const vec<T>& v) {
-	vec<T>& ret = all_entries[0];
+const std::vector<size_t> arrangement_engine<T>::_query_k(const vec<T>& v,
+																													size_t k) {
+	topk_t<T> ret;
 	for (size_t a = 0; a < num_arranges; ++a)
-		for (const auto& e : tables[a][arranges[a].compute_multiindex(v)]) {
-			if (dist2(v, e) < dist2(v, ret)) {
-				ret = e;
-			}
+		for (const auto& [e, ei] : tables[a][arranges[a].compute_multiindex(v)]) {
+			ret.consider(dist2(v, e), ei);
 		}
-	return ret;
+	return ret.to_vector();
 }

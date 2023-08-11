@@ -87,7 +87,8 @@ class AnnoteFinder(object):
             self.drawAnnote(self.ax, x, y, a)
 
 #f = open('./data/synthetic_uniform_sphere_n50000_dim16_m400_k1/data/all.json')
-f = open('./data/sift1m_full/data/all.json')
+#f = open('./data/sift1m_full/data/all.json')
+f = open('./data/sift1m_easy/data/all.json')
 
 datavec = json.load(f)
 

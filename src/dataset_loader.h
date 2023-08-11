@@ -15,6 +15,7 @@ template <typename T> struct dataset_loader {
 		imtd.n = n;
 		imtd.m = m;
 		imtd.k = k;
+		imtd.k_want = k;
 		imtd.dim = d;
 		vec_generator<T> vg(d);
 		for (size_t i = 0; i < n; ++i) {
@@ -78,7 +79,8 @@ template <typename T> struct dataset_loader {
 																																	size_t m,
 																																	size_t k,
 																																	size_t d) {
-		std::string name = "synthetic_uniform_sphere_n" + std::to_string(n) +
+		// TODO remove bad_ after debugging
+		std::string name = "bad_synthetic_uniform_sphere_n" + std::to_string(n) +
 											 "_dim" + std::to_string(d) + "_m" + std::to_string(m) +
 											 "_k" + std::to_string(k);
 		std::string filename = "./data/" + name + ".dataset";
@@ -151,15 +153,36 @@ template <typename T> struct dataset_loader {
 				vimtd.emplace_back(val);
 		}
 
-		imtd.name = "sift1m_full";
+		imtd.name = "sift1m_full_k100";
 		imtd.n = base.size();
 		imtd.m = query.size();
 		imtd.k = groundtruth[0].size();
+		imtd.k_want = groundtruth[0].size();
 		imtd.dim = base[0].size();
 
 		std::cerr << "Finished loading sift1m. n=" << imtd.n << ",m=" << imtd.m
 							<< ",k=" << imtd.k << ",dim=" << imtd.dim << std::endl;
 
+		return imtd;
+	}
+	in_memory_test_dataset<float>
+	load_sift1m_1nn(std::string filename_base, std::string filename_query,
+									std::string filename_groundtruth) {
+		auto imtd =
+				load_sift1m(filename_base, filename_query, filename_groundtruth);
+		imtd.k = 1;
+		imtd.k_want = 1;
+		imtd.name = "sift1m_full";
+		return imtd;
+	}
+	in_memory_test_dataset<float>
+	load_sift1m_easy(std::string filename_base, std::string filename_query,
+									 std::string filename_groundtruth) {
+		auto imtd =
+				load_sift1m(filename_base, filename_query, filename_groundtruth);
+		imtd.k = 20;
+		imtd.k_want = 10;
+		imtd.name = "sift1m_easy";
 		return imtd;
 	}
 };

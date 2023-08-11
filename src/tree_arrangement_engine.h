@@ -9,6 +9,7 @@
 
 #include "ann_engine.h"
 #include "randomgeometry.h"
+#include "topk_t.h"
 #include "vecset.h"
 
 // idea: create a tree of arrangements. Each cell with too many points becomes a
@@ -60,7 +61,7 @@ struct tree_arrangement_engine
 	std::vector<tree> trees;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const vec<T>& _query(const vec<T>& v);
+	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "Tree Arrangement Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -131,8 +132,9 @@ template <typename T> void tree_arrangement_engine<T>::_build() {
 	}
 }
 template <typename T>
-const vec<T>& tree_arrangement_engine<T>::_query(const vec<T>& v) {
-	vec<T>& ret = all_entries[0];
+std::vector<size_t> tree_arrangement_engine<T>::_query_k(const vec<T>& v,
+																												 size_t k) {
+	topk_t<T> tk(k);
 	for (auto& t : trees) {
 		size_t visited = 0;
 		std::vector<std::reference_wrapper<std::vector<size_t>>> tables_to_check;
@@ -151,9 +153,7 @@ const vec<T>& tree_arrangement_engine<T>::_query(const vec<T>& v) {
 			reverse(tables_to_check.begin(), tables_to_check.end());
 			for (auto& table : tables_to_check) {
 				for (size_t iu : table.get()) {
-					if (dist2(v, all_entries[iu]) < dist2(v, ret)) {
-						ret = all_entries[iu];
-					}
+					tk.consider(dist2(v, all_entries[iu]), iu);
 				}
 				visited += table.get().size();
 				if (visited >= search_count_per_copy)
@@ -161,5 +161,5 @@ const vec<T>& tree_arrangement_engine<T>::_query(const vec<T>& v) {
 			}
 		}
 	}
-	return ret;
+	return tk.to_vector();
 }
