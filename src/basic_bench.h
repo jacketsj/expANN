@@ -77,7 +77,6 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		size_t num_best_found = 0;
 		auto time_begin = std::chrono::high_resolution_clock::now();
 		for (size_t q = 0; q < ds.m; ++q) {
-			// TODO make this kNN instead of 1NN
 			const auto& ans = eng.query_k(ds.get_query(q), ds.k_want);
 			assert(ans.size() <= ds.k_want);
 			// computation time for if this is good is assumed to be negligible
@@ -87,6 +86,10 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 					d2 = dist2(ds.get_query(q), ds.get_vec(ans[0]));
 				avg_dist += d;
 				avg_dist2 += d2;
+
+				// if (d2 <= dist2(ds.get_query(q), ds.get_vec(ds.get_query_ans(q)[0]))
+				// + 							TOLERANCE)
+				//++num_best_found;
 			} else {
 				avg_dist += 1e8; // distance is very large
 			}

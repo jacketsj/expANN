@@ -43,6 +43,7 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 																								 size_t layer);
 	void add_edge(size_t layer, size_t i, size_t j);
 	void add_edge_directional(size_t layer, size_t i, size_t j);
+	void improve_vertex(size_t i, size_t num_nn);
 	std::vector<size_t> _query_k_internal(const vec<T>& v, topk_t<T>& tk);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "EHNSW Engine 2"; }
@@ -113,6 +114,23 @@ void ehnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
 	add_edge_directional(layer, j, i);
 }
 
+template <typename T>
+void ehnsw_engine_2<T>::improve_vertex(size_t i, size_t num_nn) {
+	topk_t<T> tk(num_nn);
+	tk.consider(dist2(all_entries[starting_vertex], all_entries[i]),
+							starting_vertex);
+	for (int layer = hadj.size() - 1; layer >= 0; --layer) {
+		// get kNN at current layer
+		tk.discard_until_size(1);
+		std::vector<size_t> kNN =
+				_query_k_at_layer_internal(all_entries[i], tk, layer);
+		edge_ranks[layer][i].resize(num_cuts + 1);
+		if (hadj[layer].contains(i))
+			for (size_t j : kNN) {
+				add_edge(layer, i, j);
+			}
+	}
+}
 template <typename T> void ehnsw_engine_2<T>::_build() {
 	assert(all_entries.size() > 0);
 	auto add_layer = [&](size_t v) {
@@ -124,7 +142,6 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 		starting_vertex = v;
 	};
 	// add one layer to start, with first vertex
-	size_t num_attempts = 0;
 	add_layer(0);
 	for (size_t cut = 0; cut < num_cuts; ++cut)
 		e_labels[0].emplace_back(int_distribution(gen));
@@ -154,11 +171,15 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 			if (layer <= int(cur_layer))
 				for (size_t j : kNN) {
 					add_edge(layer, i, j);
-					++num_attempts;
 				}
 		}
 	}
-	std::cerr << "num_attempts=" << num_attempts << std::endl;
+	// for (size_t num_nn = 4; num_nn <= edge_count_mult; num_nn *= 2)
+	//	for (size_t i = 1; i < all_entries.size(); ++i) {
+	//		improve_vertex(i, num_nn);
+	//	}
+	// for (size_t i = 1; i < all_entries.size(); ++i)
+	//	improve_vertex(i, edge_count_mult);
 }
 template <typename T>
 std::vector<size_t>

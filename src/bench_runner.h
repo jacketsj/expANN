@@ -9,17 +9,13 @@
 #include "basic_bench.h"
 #include "bench_data_manager.h"
 
-//#include "arrangement_engine.h"
 #include "brute_force_engine.h"
 #include "dataset.h"
 #include "dataset_loader.h"
-//#include "ehnsw_engine.h"
 #include "ehnsw_engine_2.h"
-//#include "hier_arrangement_engine.h"
-//#include "hnsw_engine.h"
+#include "ehnsw_engine_3.h"
 #include "hnsw_engine_2.h"
 #include "hnsw_engine_3.h"
-//#include "hnsw_engine_hybrid.h"
 #include "tree_arrangement_engine.h"
 #include "tree_arrangement_engine_if.h"
 
@@ -87,14 +83,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		auto engine_gen = [&] {
 			return hnsw_engine_2<float>(max_depth, k, num_for_1nn);
 		};
-		add_engine(engine_gen);
+		// add_engine(engine_gen);
 	};
 
 	auto add_hnsw3 = [&](size_t max_depth, size_t k, size_t num_for_1nn) {
 		auto engine_gen = [&] {
 			return hnsw_engine_3<float>(max_depth, k, num_for_1nn);
 		};
-		add_engine(engine_gen);
+		// add_engine(engine_gen);
 	};
 
 	// brute_force_engine<float> engine_bf;
@@ -116,16 +112,26 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		};
 		add_engine(engine_gen);
 	};
+	auto add_ehnsw3 = [&](size_t edge_count_mult, size_t max_depth,
+												size_t min_per_cut, size_t num_cuts,
+												size_t num_for_1nn) {
+		auto engine_gen = [&] {
+			return ehnsw_engine_3<float>(max_depth, edge_count_mult, num_for_1nn,
+																	 num_cuts, min_per_cut);
+		};
+		// add_engine(engine_gen);
+	};
 	//	for (size_t ecm = 10; ecm <= 40; ecm *= 2)
 	//		for (size_t mpc = 1; mpc <= 8; mpc *= 2)
 	//			for (size_t nc = 1; nc <= 8; nc *= 2)
 	//				for (size_t n4nn = 1; n4nn <= 16; n4nn *= 4)
 	// for (size_t ecm = 2; ecm <= 10; ecm += 1)
-	for (size_t ecm = 10; ecm <= 10; ecm += 1)
+	for (size_t ecm = 47; ecm <= 47; ecm += 1)
 		for (size_t mpc = 1; mpc <= 4; mpc *= 2)
 			for (size_t nc = 1; nc * mpc < ecm; nc *= 2)
 				for (size_t n4nn = 16; n4nn <= 16; n4nn *= 4) {
 					add_ehnsw2(ecm, 100, mpc, nc, n4nn);
+					add_ehnsw3(ecm, 100, mpc, nc, n4nn);
 				}
 	// add_hnsw2(56, 100, 1, 16, 32);
 	// add_hnsw2(56, 100, 4, 8, 8);
@@ -136,7 +142,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		auto engine_gen = [&] {
 			return tree_arrangement_engine<float>(tc, max_leaf_size, sc);
 		};
-		add_engine(engine_gen);
+		// add_engine(engine_gen);
 	};
 
 	for (size_t tc = 2; tc <= 64; tc *= 2) {
@@ -152,7 +158,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		auto engine_gen = [&] {
 			return tree_arrangement_engine_if<float>(tc, max_leaf_size, sc);
 		};
-		add_engine(engine_gen);
+		// add_engine(engine_gen);
 	};
 
 	for (size_t tc = 2; tc <= 64; tc *= 2) {

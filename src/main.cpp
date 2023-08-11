@@ -9,7 +9,7 @@
 #include "topk_t.h"
 #include "vec.h"
 
-#define NUM_THREADS 6
+#define NUM_THREADS 4
 
 int main() {
 	dataset_loader<float> dsl;
