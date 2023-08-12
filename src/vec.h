@@ -14,11 +14,12 @@ template <typename T> class vec {
 
 public:
 	vec() = default;
-	vec(size_t dim) : internal(dim) {}
+	// vec(size_t dim) : internal(dim) {}
 	vec(const std::vector<T>& v) {
 		for (const auto& val : v)
 			internal.emplace_back(val);
 	}
+	void set_dim(size_t dim) { internal.resize(dim); }
 	size_t size() const { return internal.size(); }
 	size_t dim() const { return internal.size(); }
 	std::string to_string() const {

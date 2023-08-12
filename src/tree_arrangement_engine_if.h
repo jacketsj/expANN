@@ -65,7 +65,7 @@ struct tree_arrangement_engine_if
 	std::vector<tree> trees;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const vec<T>& _query(const vec<T>& v);
+	size_t _query(const vec<T>& v);
 	const std::string _name() {
 		return "Tree Arrangement Engine (with simple IF)";
 	}
@@ -140,8 +140,8 @@ template <typename T> void tree_arrangement_engine_if<T>::_build() {
 	}
 }
 template <typename T>
-const vec<T>& tree_arrangement_engine_if<T>::_query(const vec<T>& v) {
-	vec<T>& ret = all_entries[0];
+size_t tree_arrangement_engine_if<T>::_query(const vec<T>& v) {
+	size_t ret = 0;
 	for (auto& t : trees) {
 		size_t visited = 0;
 		std::vector<std::reference_wrapper<std::vector<std::pair<vec<T>, size_t>>>>
@@ -164,8 +164,9 @@ const vec<T>& tree_arrangement_engine_if<T>::_query(const vec<T>& v) {
 				for (size_t table_ind = 0; table_ind < iters; ++table_ind) {
 					// for (auto& [u, _] : table.get()) {
 					auto& u = table.get()[table_ind].first;
-					if (dist2(v, u) < dist2(v, ret)) {
-						ret = u; // all_entries[iu];
+					auto ui = table.get()[table_ind].second;
+					if (dist2(v, u) < dist2(v, all_entries[ret])) {
+						ret = ui;
 					}
 				}
 				visited += table.get().size();

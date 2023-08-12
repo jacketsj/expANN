@@ -19,11 +19,11 @@ struct arrangement_engine : public ann_engine<T, arrangement_engine<T>> {
 				num_arranges(_num_arranges) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<arrangement<T>> arranges;
-	std::vector<std::map<std::vector<unsigned short>, std::vector<vec<T>>>>
+	std::vector<std::map<std::vector<unsigned short>, std::vector<size_t>>>
 			tables;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const vec<T>& _query(const vec<T>& v);
+	size_t _query(const vec<T>& v);
 	const std::string _name() { return "Arrangement Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -49,17 +49,17 @@ template <typename T> void arrangement_engine<T>::_build() {
 		vecset vs(all_entries);
 		arranges.push_back(arrange_gen(vs));
 		tables.emplace_back();
-		for (const auto& v : all_entries)
-			tables.back()[arranges.back().compute_multiindex(v)].push_back(v);
+		for (size_t vi = 0; vi < all_entries.size(); ++vi)
+			tables.back()[arranges.back().compute_multiindex(all_entries[vi])]
+					.push_back(vi);
 	}
 }
-template <typename T>
-const vec<T>& arrangement_engine<T>::_query(const vec<T>& v) {
-	vec<T>& ret = all_entries[0];
+template <typename T> size_t arrangement_engine<T>::_query(const vec<T>& v) {
+	size_t ret = 0;
 	for (size_t a = 0; a < num_arranges; ++a)
-		for (const auto& e : tables[a][arranges[a].compute_multiindex(v)]) {
-			if (dist2(v, e) < dist2(v, ret)) {
-				ret = e;
+		for (const auto& ei : tables[a][arranges[a].compute_multiindex(v)]) {
+			if (dist2(v, all_entries[ei]) < dist2(v, all_entries[ret])) {
+				ret = ei;
 			}
 		}
 	return ret;

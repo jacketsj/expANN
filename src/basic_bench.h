@@ -77,8 +77,9 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		auto time_begin = std::chrono::high_resolution_clock::now();
 		for (size_t q = 0; q < ds.m; ++q) {
 			// TODO make this kNN instead of 1NN
-			const auto& ans = eng.query(ds.get_query(q));
-			T d = dist(ds.get_query(q), ans), d2 = dist2(ds.get_query(q), ans);
+			size_t ans = eng.query(ds.get_query(q));
+			T d = dist(ds.get_query(q), ds.get_vec(ans)),
+				d2 = dist2(ds.get_query(q), ds.get_vec(ans));
 			avg_dist += d;
 			avg_dist2 += d2;
 			if (d2 <= dist2(ds.get_query(q), ds.get_vec(ds.get_query_ans(q)[0])) +

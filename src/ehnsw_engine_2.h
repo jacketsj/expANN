@@ -45,7 +45,7 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 	void add_edge_directional(size_t layer, size_t i, size_t j);
 	const std::vector<std::vector<size_t>> _query_k(const vec<T>& v, size_t k,
 																									bool fill_all_layers = false);
-	const vec<T>& _query(const vec<T>& v);
+	size_t _query(const vec<T>& v);
 	const std::string _name() { return "EHNSW Engine 2"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -214,6 +214,6 @@ ehnsw_engine_2<T>::_query_k(const vec<T>& v, size_t k, bool fill_all_layers) {
 	return ret;
 }
 
-template <typename T> const vec<T>& ehnsw_engine_2<T>::_query(const vec<T>& v) {
-	return all_entries[_query_k(v, num_for_1nn)[0][0]];
+template <typename T> size_t ehnsw_engine_2<T>::_query(const vec<T>& v) {
+	return _query_k(v, num_for_1nn)[0][0];
 }

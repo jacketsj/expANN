@@ -60,7 +60,7 @@ struct tree_arrangement_engine
 	std::vector<tree> trees;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const vec<T>& _query(const vec<T>& v);
+	size_t _query(const vec<T>& v);
 	const std::string _name() { return "Tree Arrangement Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -131,8 +131,8 @@ template <typename T> void tree_arrangement_engine<T>::_build() {
 	}
 }
 template <typename T>
-const vec<T>& tree_arrangement_engine<T>::_query(const vec<T>& v) {
-	vec<T>& ret = all_entries[0];
+size_t tree_arrangement_engine<T>::_query(const vec<T>& v) {
+	size_t ret = 0;
 	for (auto& t : trees) {
 		size_t visited = 0;
 		std::vector<std::reference_wrapper<std::vector<size_t>>> tables_to_check;
@@ -151,8 +151,8 @@ const vec<T>& tree_arrangement_engine<T>::_query(const vec<T>& v) {
 			reverse(tables_to_check.begin(), tables_to_check.end());
 			for (auto& table : tables_to_check) {
 				for (size_t iu : table.get()) {
-					if (dist2(v, all_entries[iu]) < dist2(v, ret)) {
-						ret = all_entries[iu];
+					if (dist2(v, all_entries[iu]) < dist2(v, all_entries[ret])) {
+						ret = iu;
 					}
 				}
 				visited += table.get().size();

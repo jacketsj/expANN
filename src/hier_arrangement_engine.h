@@ -26,13 +26,13 @@ struct hier_arrangement_engine
 	std::vector<vec<T>> all_entries;
 	struct arrangement_level {
 		std::vector<arrangement<T>> arranges;
-		std::vector<std::map<std::vector<unsigned short>, std::vector<vec<T>>>>
+		std::vector<std::map<std::vector<unsigned short>, std::vector<size_t>>>
 				tables;
 	};
 	std::vector<arrangement_level> levels;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const vec<T>& _query(const vec<T>& v);
+	size_t _query(const vec<T>& v);
 	const std::string _name() { return "Hierarchical Arrangement Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -64,26 +64,28 @@ template <typename T> void hier_arrangement_engine<T>::_build() {
 			vecset vs(all_entries);
 			levels.back().arranges.push_back(arrange_gen(vs));
 			levels.back().tables.emplace_back();
-			for (const auto& v : all_entries)
+			for (size_t vi = 0; vi < all_entries.size(); ++vi)
 				levels.back()
-						.tables.back()[levels.back().arranges.back().compute_multiindex(v)]
-						.push_back(v);
+						.tables
+						.back()[levels.back().arranges.back().compute_multiindex(
+								all_entries[vi])]
+						.push_back(vi);
 		}
 		starting_orientations *= level_mult;
 	}
 }
 template <typename T>
-const vec<T>& hier_arrangement_engine<T>::_query(const vec<T>& v) {
-	vec<T>& ret = all_entries[0];
+size_t hier_arrangement_engine<T>::_query(const vec<T>& v) {
+	size_t ret = 0;
 	size_t visited = 0;
 	for (int level = num_levels - 1; level >= 0; --level) {
 		for (size_t a = 0; a < num_arranges; ++a) {
 			auto arrange =
 					levels[level]
 							.tables[a][levels[level].arranges[a].compute_multiindex(v)];
-			for (const auto& e : arrange) {
-				if (dist2(v, e) < dist2(v, ret)) {
-					ret = e;
+			for (const auto& ei : arrange) {
+				if (dist2(v, all_entries[ei]) < dist2(v, all_entries[ret])) {
+					ret = ei;
 				}
 			}
 			visited += arrange.size();
