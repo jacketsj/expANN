@@ -9,15 +9,15 @@
 #include "topk_t.h"
 #include "vec.h"
 
-#define NUM_THREADS 4
+#define NUM_THREADS 20
 
 int main() {
 	dataset_loader<float> dsl;
 	if (false) {
 		auto bdm = perform_benchmarks(
-				dsl.load_sift1m_easy("datasets/sift/sift_base.fvecs",
-														 "datasets/sift/sift_query.fvecs",
-														 "datasets/sift/sift_groundtruth.ivecs"),
+				dsl.load_sift1m_1nn("datasets/sift/sift_base.fvecs",
+														"datasets/sift/sift_query.fvecs",
+														"datasets/sift/sift_groundtruth.ivecs"),
 				NUM_THREADS);
 		auto ds_name = bdm.dataset_name;
 		std::string data_prefix = "./data/" + ds_name + "/";

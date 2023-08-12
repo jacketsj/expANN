@@ -13,6 +13,8 @@ struct bench_data {
 	double recall;
 	std::string engine_name;
 	param_list_t param_list;
+
+	std::string to_string() const;
 };
 
 void to_json(nlohmann::json& j, bench_data bd) {
@@ -34,4 +36,8 @@ void from_json(const nlohmann::json& j, bench_data& bd) {
 	if (j.contains("param_list")) {
 		bd.param_list = j.at("param_list").get<param_list_t>();
 	}
+}
+
+std::string bench_data::to_string() const {
+	return nlohmann::json(*this).dump();
 }

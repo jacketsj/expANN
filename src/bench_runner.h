@@ -16,6 +16,7 @@
 #include "ehnsw_engine_3.h"
 #include "hnsw_engine_2.h"
 #include "hnsw_engine_3.h"
+#include "hnsw_engine_basic.h"
 #include "tree_arrangement_engine.h"
 #include "tree_arrangement_engine_if.h"
 
@@ -35,15 +36,20 @@ struct job {
 		ret[ret.size() - 1] = ')';
 		return ret;
 	}
-	void run(size_t t, size_t job_index, size_t num_jobs) {
+	void run(size_t t, size_t job_index, size_t num_jobs,
+					 std::vector<std::variant<bench_data, std::string>>& job_results) {
 		std::printf("Running job (t=%zu, job %zu/%zu): %s\n", t, job_index,
 								num_jobs, to_string().c_str());
 		// std::cerr << "Running job (t=" << t << "): " << to_string() << std::endl;
 		f();
 		// std::cerr << "Completed job (t=" << t << "): " << to_string() <<
 		// std::endl;
-		std::printf("Completed job (t=%zu, job %zu/%zu): %s\n", t, job_index,
-								num_jobs, to_string().c_str());
+		auto res = job_results[job_index];
+		std::string res_str = std::holds_alternative<bench_data>(res)
+															? std::get<bench_data>(res).to_string()
+															: std::get<std::string>(res);
+		std::printf("Completed job (t=%zu, job %zu/%zu): %s\nResult: %s\n", t,
+								job_index, num_jobs, to_string().c_str(), res_str.c_str());
 	}
 };
 
@@ -93,14 +99,31 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// add_engine(engine_gen);
 	};
 
+	auto add_hnsw_basic = [&](size_t max_depth, size_t M, size_t ef_search) {
+		auto engine_gen = [=] {
+			return hnsw_engine_basic<float>(max_depth, M, ef_search);
+		};
+		add_engine(engine_gen);
+	};
+
+	for (size_t ef_search = 2; ef_search <= 100; ef_search *= 5) {
+		add_hnsw_basic(100, 16, ef_search);
+		add_hnsw_basic(100, 40, ef_search);
+		add_hnsw_basic(100, 55, ef_search);
+	}
+
 	// brute_force_engine<float> engine_bf;
 	// bdm.add(basic_benchmarker.get_benchmark_data(engine_bf, default_timeout));
 
-	// for (size_t k = 38; k <= 50; k += 10) {
-	for (size_t k = 20; k <= 80; k += 10) {
-		for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 32 * 8; num_for_1nn *= 2) {
-			add_hnsw2(100, k, num_for_1nn);
-			add_hnsw3(100, k, num_for_1nn);
+	add_hnsw2(100, 55, 8);
+	add_hnsw3(100, 55, 8);
+	for (size_t k = 38; k <= 50; k += 10) {
+		for (size_t k = 30; k <= 70; k += 18) {
+			for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 32 * 4;
+					 num_for_1nn *= 2) {
+				// add_hnsw2(100, k, num_for_1nn);
+				// add_hnsw3(100, k, num_for_1nn);
+			}
 		}
 	}
 	auto add_ehnsw2 = [&](size_t edge_count_mult, size_t max_depth,
@@ -110,7 +133,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			return ehnsw_engine_2<float>(max_depth, edge_count_mult, num_for_1nn,
 																	 num_cuts, min_per_cut);
 		};
-		add_engine(engine_gen);
+		// add_engine(engine_gen);
 	};
 	auto add_ehnsw3 = [&](size_t edge_count_mult, size_t max_depth,
 												size_t min_per_cut, size_t num_cuts,
@@ -126,10 +149,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	//			for (size_t nc = 1; nc <= 8; nc *= 2)
 	//				for (size_t n4nn = 1; n4nn <= 16; n4nn *= 4)
 	// for (size_t ecm = 2; ecm <= 10; ecm += 1)
-	for (size_t ecm = 47; ecm <= 47; ecm += 1)
-		for (size_t mpc = 1; mpc <= 4; mpc *= 2)
-			for (size_t nc = 1; nc * mpc < ecm; nc *= 2)
-				for (size_t n4nn = 16; n4nn <= 16; n4nn *= 4) {
+	// for (size_t ecm = 30; ecm <= 80; ecm += 18)
+	//	for (size_t mpc = 1; mpc <= 1; mpc *= 2)
+	//		for (size_t nc = 1; nc * mpc < ecm - 1 && nc <= 8; nc = (nc + 1) * 2)
+	//			for (size_t n4nn = 2; n4nn <= 8; n4nn *= 2)
+	for (size_t ecm = 10; ecm <= 160; ecm *= 2)
+		for (size_t mpc = 1; mpc <= 8; mpc *= 2)
+			for (size_t nc = 1; nc <= 8; nc *= 2)
+				for (size_t n4nn = 1; n4nn <= 16; n4nn *= 4) {
 					add_ehnsw2(ecm, 100, mpc, nc, n4nn);
 					add_ehnsw3(ecm, 100, mpc, nc, n4nn);
 				}
@@ -177,7 +204,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			threadpool.emplace_back([&]() {
 				for (size_t t_job_index = g_job_index++; t_job_index < jobs.size();
 						 t_job_index = g_job_index++) {
-					jobs[t_job_index].run(t_index, t_job_index, jobs.size());
+					jobs[t_job_index].run(t_index, t_job_index, jobs.size(), job_results);
 				}
 			});
 		}
