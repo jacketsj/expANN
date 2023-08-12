@@ -14,6 +14,7 @@
 #include "dataset_loader.h"
 #include "ehnsw_engine_2.h"
 #include "ehnsw_engine_3.h"
+#include "ehnsw_engine_basic.h"
 #include "hnsw_engine_2.h"
 #include "hnsw_engine_3.h"
 #include "hnsw_engine_basic.h"
@@ -106,9 +107,21 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// add_engine(engine_gen);
 	};
 
+	auto add_ehnsw_basic = [&](size_t max_depth, size_t M, size_t ef_search,
+														 size_t num_cuts, size_t min_per_cut) {
+		auto engine_gen = [=] {
+			return ehnsw_engine_basic<float>(max_depth, M, ef_search, num_cuts,
+																			 min_per_cut);
+		};
+		add_engine(engine_gen);
+	};
+
 	for (size_t M : {12, 16, 24})
 		for (size_t ef_search = 2; ef_search <= 400; ef_search *= 5) {
 			add_hnsw_basic(100, M, ef_search);
+			for (size_t nc = 1; nc <= 8; nc *= 2)
+				for (size_t mpc = 1; mpc <= 8; mpc *= 2)
+					add_ehnsw_basic(100, M, ef_search, nc, mpc);
 		}
 
 	// brute_force_engine<float> engine_bf;
