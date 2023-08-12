@@ -79,6 +79,13 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		for (size_t q = 0; q < ds.m; ++q) {
 			// const auto& ans = eng.query_k(ds.get_query(q), ds.k_want);
 			const auto ans = eng.query_k(ds.get_query(q), ds.k_want);
+			// const auto ans1 = eng.query_k(ds.get_query(q), 1);
+			// std::cout << "ans=";
+			// for (auto& i : ans)
+			//	std::cout << i << ' ';
+			// std::cout << std::endl;
+			// std::cout << "ans1=" << ans1[0] << std::endl;
+			// assert(false);
 			assert(ans.size() <= ds.k_want);
 			// computation time for if this is good is assumed to be negligible
 			// compared to query_k time in benchmark

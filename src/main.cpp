@@ -9,7 +9,7 @@
 #include "topk_t.h"
 #include "vec.h"
 
-#define NUM_THREADS 4
+#define NUM_THREADS 1
 
 int main() {
 	dataset_loader<float> dsl;
@@ -29,16 +29,19 @@ int main() {
 		return 0;
 	}
 
-	for (size_t n = 500000 * 1; n <= 500000 * 1 * 1; n *= 10) {
+	// for (size_t n = 500000 * 1; n <= 500000 * 1 * 1; n *= 10) {
+	for (size_t n = 30000 * 1; n <= 30000 * 1 * 1; n *= 10) {
 		// for (size_t n = 300 * 1; n <= 300 * 10 * 1; n *= 10) {
 		//  size_t m = 400 * (n / 50000);
-		size_t m = 400;
-		// size_t m = 300;
+		// size_t m = 400;
+		// size_t m = 3;
+		size_t m = 300;
 		//  if (n < 500000)
 		//	m = 400;
 		size_t d = 16;
-		size_t k = 20;
-		// size_t k = 1;
+		// size_t k = 20;
+		//  size_t k = 4;
+		size_t k = 1;
 		auto bdm = perform_benchmarks(
 				dsl.load_synethetic_uniform_sphere_points(n, m, k, d), NUM_THREADS);
 		auto ds_name = bdm.dataset_name;

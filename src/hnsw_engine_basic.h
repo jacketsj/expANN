@@ -63,6 +63,8 @@ void hnsw_engine_basic<T>::add_edge(size_t layer, size_t i, size_t j) {
 	if (layer == 0)
 		edge_count_mult = M0;
 	T d = dist2(all_entries[i], all_entries[j]);
+	if (j < i)
+		d = dist2(all_entries[j], all_entries[i]);
 	hadj[layer][i].emplace(-d, j);
 	hadj[layer][j].emplace(-d, i);
 	if (hadj[layer][i].size() > edge_count_mult)
@@ -104,8 +106,13 @@ template <typename T> void hnsw_engine_basic<T>::_build() {
 			auto closest_entries =
 					_query_k_at_layer_internal(all_entries[i], tk, layer);
 			cur_vert = closest_entries[0];
-			for (size_t j : closest_entries)
+			for (size_t j : closest_entries) {
 				add_edge(layer, i, j);
+				// "neighbour selection heuristic" from paper
+				for (auto& [_, j0] : hadj[layer][j]) {
+					add_edge(layer, i, j0);
+				}
+			}
 		}
 		// tk.consider(dist2(all_entries[starting_vertex], all_entries[i]),
 		//						starting_vertex);
@@ -135,14 +142,15 @@ hnsw_engine_basic<T>::_query_k_at_layer_internal(const vec<T>& v, topk_t<T>& tk,
 		}
 		return is_good;
 	};
-	for (auto& u : tk.to_vector())
+	for (auto& u : tk.to_vector()) {
 		to_visit.emplace(dist2(v, all_entries[u]), u);
+		visited.emplace(u);
+	}
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
 		std::tie(nd, cur) = to_visit.top();
-		if (-nd > tk.worst_val())
-			// everything neighbouring current best set is already evaluated
+		if (tk.at_capacity() && -nd > tk.worst_val())
 			break;
 		to_visit.pop();
 		for (auto& [_, u] : hadj[layer][cur]) {
@@ -164,5 +172,7 @@ std::vector<size_t> hnsw_engine_basic<T>::_query_k(const vec<T>& v, size_t k) {
 	}
 	topk_t<T> tk(ef_search * k);
 	tk.consider(dist2(v, all_entries[cur_vert]), cur_vert);
-	return _query_k_at_layer_internal(v, tk, layer);
+	auto ret = _query_k_at_layer_internal(v, tk, layer);
+	ret.resize(std::min(ret.size(), k));
+	return ret;
 }
