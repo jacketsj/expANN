@@ -90,7 +90,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		auto engine_gen = [=] {
 			return hnsw_engine_2<float>(max_depth, k, num_for_1nn);
 		};
-		// add_engine(engine_gen);
+		add_engine(engine_gen);
 	};
 
 	auto add_hnsw3 = [&](size_t max_depth, size_t k, size_t num_for_1nn) {
@@ -104,7 +104,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		auto engine_gen = [=] {
 			return hnsw_engine_basic<float>(max_depth, M, ef_search);
 		};
-		// add_engine(engine_gen);
+		add_engine(engine_gen);
 	};
 
 	auto add_ehnsw_basic = [&](size_t max_depth, size_t M, size_t ef_search,
@@ -113,11 +113,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			return ehnsw_engine_basic<float>(max_depth, M, ef_search, num_cuts,
 																			 min_per_cut);
 		};
-		// add_engine(engine_gen);
+		add_engine(engine_gen);
 	};
 
 	for (size_t M : {12, 16, 24})
-		for (size_t ef_search = 2; ef_search <= 400; ef_search *= 5) {
+		for (size_t ef_search = 20; ef_search <= 400; ef_search *= 5) {
 			add_hnsw_basic(100, M, ef_search);
 			for (size_t nc = 1; nc <= 8; nc *= 2)
 				for (size_t mpc = 1; mpc <= 8; mpc *= 2)
@@ -145,7 +145,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			return ehnsw_engine_2<float>(max_depth, edge_count_mult, num_for_1nn,
 																	 num_cuts, min_per_cut);
 		};
-		// add_engine(engine_gen);
+		add_engine(engine_gen);
 	};
 	auto add_ehnsw3 = [&](size_t edge_count_mult, size_t max_depth,
 												size_t min_per_cut, size_t num_cuts,
@@ -213,17 +213,18 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 
 	{
 		// balance loads randomly
-		std::srand(0); // keep order deterministic between runs
+		std::srand(1); // keep order deterministic between runs
 		std::vector<size_t> ordering;
 		for (size_t job_id = 0; job_id < jobs.size(); ++job_id)
 			ordering.emplace_back(job_id);
-		// std::random_shuffle(ordering.begin(), ordering.end());
+		std::random_shuffle(ordering.begin(), ordering.end());
 
 		std::vector<std::jthread> threadpool;
 		std::atomic_size_t g_job_index = 0;
 		for (size_t t_index = 0; t_index < num_threads; ++t_index) {
 			threadpool.emplace_back([&]() {
-				for (size_t t_job_index = g_job_index++; t_job_index < jobs.size();
+				for (size_t t_job_index = g_job_index++;
+						 t_job_index < jobs.size(); // && t_job_index < num_threads;
 						 t_job_index = g_job_index++) {
 					size_t t_job_index_ordered = ordering[t_job_index];
 					// jobs[t_job_index].run(t_index, t_job_index, jobs.size(),

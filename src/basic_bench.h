@@ -99,6 +99,7 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 			std::set<size_t> ans_s;
 			for (auto& vi : ans)
 				ans_s.emplace(vi);
+			assert(ans_s.size() == ans.size()); // should not be dupes in ans
 			// num_best_found += ans_s.size();
 			for (size_t eai = 0; eai < ds.k; ++eai)
 				// for (auto& vi : expected_ans)
