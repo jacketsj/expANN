@@ -20,24 +20,32 @@ private:
 public:
 	using std::priority_queue<dat>::size;
 	size_t k;
-	topk_t(size_t _k) : k(_k) {}
+	topk_t(size_t _k) : k(_k) {
+		// std::cout << "New topk_t" << std::endl;
+	}
 	bool consider(const T& d, size_t v) {
+		// std::cout << "considering v=" << v << std::endl;
 		bool is_good = !known.contains(v) && (size() < k || top().first > d);
 		if (is_good) {
 			emplace(d, v); // max heap
 			known.emplace(v);
+			// std::cout << "adding v=" << v << std::endl;
 		}
 		if (size() > k) {
+			// std::cout << "removing oldv=" << top().second << std::endl;
 			known.erase(top().second);
 			pop();
 		}
 		return is_good;
 	}
 	void discard_until_size(size_t goal) {
-		while (size() > goal)
+		while (size() > goal) {
+			known.erase(top().second);
 			pop();
+		}
 	}
 	size_t worst() const { return top().second; }
+	bool at_capacity() const { return size() == k; }
 	const T& worst_val() const { return top().first; }
 	std::vector<size_t> to_vector() const {
 		std::vector<size_t> ret;
