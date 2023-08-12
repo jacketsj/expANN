@@ -217,5 +217,5 @@ ehnsw_engine_3<T>::_query_k_internal(const vec<T>& v, size_t k,
 
 template <typename T>
 std::vector<size_t> ehnsw_engine_3<T>::_query_k(const vec<T>& v, size_t k) {
-	return {_query_k_internal(v, k * num_for_1nn)[0][0]};
+	return _query_k_internal(v, k * num_for_1nn)[0];
 }
