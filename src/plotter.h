@@ -42,7 +42,7 @@ void make_plots(const std::vector<bench_data>& dataset, std::string prefix) {
 	// 		{0.0, 0.5, 1.0 - 1.0e-1, 1.0 - 1.0e-3, 1.0 - 1.0e-4, 1.0}));
 	plt::yscale("log");
 	plt::legend();
-	plt::title("recall-querytime for 1-NN");
+	plt::title("recall-querytime for k-NN");
 	plt::save(prefix + "time-recall.png");
 
 	// querytime-avgdist
