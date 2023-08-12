@@ -36,8 +36,10 @@ int main() {
 		// if (n < 500000)
 		//	m = 400;
 		size_t d = 16;
+		size_t k = 10;
+		// size_t k = 1;
 		auto bdm = perform_benchmarks(
-				dsl.load_synethetic_uniform_sphere_points(n, m, 1, d));
+				dsl.load_synethetic_uniform_sphere_points(n, m, k, d));
 		auto ds_name = bdm.dataset_name;
 		std::string data_prefix = "./data/" + ds_name + "/";
 		bdm.save(data_prefix);

@@ -32,7 +32,7 @@ struct hier_arrangement_engine
 	std::vector<arrangement_level> levels;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	size_t _query(const vec<T>& v);
+	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "Hierarchical Arrangement Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -75,7 +75,9 @@ template <typename T> void hier_arrangement_engine<T>::_build() {
 	}
 }
 template <typename T>
-size_t hier_arrangement_engine<T>::_query(const vec<T>& v) {
+std::vector<size_t> hier_arrangement_engine<T>::_query_k(const vec<T>& v,
+																												 size_t k) {
+	std::cout << "Using query (MISSING _query_k impl)" << std::endl; // TODO
 	size_t ret = 0;
 	size_t visited = 0;
 	for (int level = num_levels - 1; level >= 0; --level) {
@@ -95,5 +97,5 @@ size_t hier_arrangement_engine<T>::_query(const vec<T>& v) {
 				break;
 		}
 	}
-	return ret;
+	return {ret};
 }

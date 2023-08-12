@@ -20,8 +20,6 @@ template <typename T, class Derived> struct ann_engine {
 	}
 	void build() { static_cast<Derived*>(this)->_build(); }
 	const std::vector<size_t> query_k(const vec<T>& v, size_t k) {
-		// std::cout << "Using query (MISSING _query_k impl)" << std::endl;
-		return {static_cast<Derived*>(this)->_query(v)};
-		// return static_cast<Derived*>(this)->_query_k(v, k);
+		return static_cast<Derived*>(this)->_query_k(v, k);
 	}
 };

@@ -31,7 +31,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 	using namespace std::chrono_literals;
 	auto default_timeout = 6000s;
 
-	// bdm.add(basic_benchmarker.get_benchmark_data(engine_bf, default_timeout));
+	if (false) {
+		brute_force_engine<float> engine_bf;
+		bdm.add(basic_benchmarker.get_benchmark_data(engine_bf, default_timeout));
+	}
 
 	if (false) {
 		for (size_t k = 100; k <= 140; k += 40) {

@@ -33,9 +33,9 @@ struct hnsw_engine_hybrid : public ann_engine<T, hnsw_engine_hybrid<T>> {
 																							size_t starting_point,
 																							size_t layer);
 	void add_edge(size_t layer, size_t i, size_t j, size_t extra_factor = 1);
-	const std::vector<std::vector<size_t>> _query_k(const vec<T>& v, size_t k,
-																									bool fill_all_layers = false);
-	size_t _query(const vec<T>& v);
+	const std::vector<std::vector<size_t>>
+	_query_k_internal(const vec<T>& v, size_t k, bool fill_all_layers = false);
+	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "HNSW Hybrid Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -75,7 +75,7 @@ template <typename T> void hnsw_engine_hybrid<T>::_build() {
 	for (size_t i = 1; i < all_entries.size(); ++i) {
 		// get kNN at each layer
 		std::vector<std::vector<size_t>> kNN =
-				_query_k(all_entries[i], edge_count_mult, true);
+				_query_k_internal(all_entries[i], edge_count_mult, true);
 		// get the layer this entry will go up to
 		size_t cur_layer_ub =
 				floor(-log(distribution(gen)) * 1 / log(double(edge_count_mult)));
@@ -160,8 +160,8 @@ hnsw_engine_hybrid<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 
 template <typename T>
 const std::vector<std::vector<size_t>>
-hnsw_engine_hybrid<T>::_query_k(const vec<T>& v, size_t k,
-																bool fill_all_layers) {
+hnsw_engine_hybrid<T>::_query_k_internal(const vec<T>& v, size_t k,
+																				 bool fill_all_layers) {
 	auto current = starting_vertex;
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::vector<size_t>> ret;
@@ -176,6 +176,9 @@ hnsw_engine_hybrid<T>::_query_k(const vec<T>& v, size_t k,
 	return ret;
 }
 
-template <typename T> size_t hnsw_engine_hybrid<T>::_query(const vec<T>& v) {
-	return _query_k(v, num_for_1nn)[0][0];
+template <typename T>
+std::vector<size_t> hnsw_engine_hybrid<T>::_query_k(const vec<T>& v, size_t k) {
+	auto ret = _query_k_internal(v, k * num_for_1nn)[0];
+	ret.resize(std::min(k, ret.size()));
+	return ret;
 }

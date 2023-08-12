@@ -43,9 +43,9 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 																							size_t layer);
 	void add_edge(size_t layer, size_t i, size_t j);
 	void add_edge_directional(size_t layer, size_t i, size_t j);
-	const std::vector<std::vector<size_t>> _query_k(const vec<T>& v, size_t k,
-																									bool fill_all_layers = false);
-	size_t _query(const vec<T>& v);
+	const std::vector<std::vector<size_t>>
+	_query_k_internal(const vec<T>& v, size_t k, bool fill_all_layers = false);
+	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "EHNSW Engine 2"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -138,7 +138,7 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 			e_labels[i].emplace_back(int_distribution(gen));
 		// get kNN at each layer
 		std::vector<std::vector<size_t>> kNN =
-				_query_k(all_entries[i], edge_count_mult, true);
+				_query_k_internal(all_entries[i], edge_count_mult, true);
 		// get the layer this entry will go up to
 		size_t cur_layer_ub =
 				floor(-log(distribution(gen)) * 1 / log(double(edge_count_mult)));
@@ -199,7 +199,8 @@ ehnsw_engine_2<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 
 template <typename T>
 const std::vector<std::vector<size_t>>
-ehnsw_engine_2<T>::_query_k(const vec<T>& v, size_t k, bool fill_all_layers) {
+ehnsw_engine_2<T>::_query_k_internal(const vec<T>& v, size_t k,
+																		 bool fill_all_layers) {
 	auto current = starting_vertex;
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::vector<size_t>> ret;
@@ -214,6 +215,9 @@ ehnsw_engine_2<T>::_query_k(const vec<T>& v, size_t k, bool fill_all_layers) {
 	return ret;
 }
 
-template <typename T> size_t ehnsw_engine_2<T>::_query(const vec<T>& v) {
-	return _query_k(v, num_for_1nn)[0][0];
+template <typename T>
+std::vector<size_t> ehnsw_engine_2<T>::_query_k(const vec<T>& v, size_t k) {
+	auto ret = _query_k_internal(v, k * num_for_1nn)[0];
+	ret.resize(std::min(k, ret.size()));
+	return ret;
 }

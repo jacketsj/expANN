@@ -25,7 +25,7 @@ struct hnsw_engine : public ann_engine<T, hnsw_engine<T, TAKE_FIRST>> {
 	std::vector<std::vector<std::vector<size_t>>> hadj;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	size_t _query(const vec<T>& v);
+	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	// const std::string _name() { return "HNSW Engine"; }
 	const std::string _name() { return "HNSW Engine (Random Expanders)"; }
 	const param_list_t _param_list() {
@@ -80,7 +80,9 @@ void hnsw_engine<T, TAKE_FIRST>::_build() {
 	}
 }
 template <typename T, bool TAKE_FIRST>
-size_t hnsw_engine<T, TAKE_FIRST>::_query(const vec<T>& v) {
+std::vector<size_t> hnsw_engine<T, TAKE_FIRST>::_query_k(const vec<T>& v,
+																												 size_t k) {
+	std::cout << "Using query (MISSING _query_k impl)" << std::endl; // TODO
 	size_t cur = starting_vertex;
 	// for each layer, in decreasing depth
 	for (int layer = hadj.size() - 1; layer >= 0; --layer) {
@@ -108,5 +110,5 @@ size_t hnsw_engine<T, TAKE_FIRST>::_query(const vec<T>& v) {
 			cur = best;
 		} while (improvement_found);
 	}
-	return cur;
+	return {cur};
 }

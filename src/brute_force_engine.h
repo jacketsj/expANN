@@ -11,7 +11,6 @@ struct brute_force_engine : public ann_engine<T, brute_force_engine<T>> {
 	std::vector<vec<T>> all_entries;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const vec<T>& _query(const vec<T>& v);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "Brute-Force Engine"; }
 	const param_list_t _param_list() { return param_list_t(); }
@@ -25,16 +24,7 @@ void brute_force_engine<T>::_store_vector(const vec<T>& v) {
 template <typename T> void brute_force_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 }
-template <typename T>
-const vec<T>& brute_force_engine<T>::_query(const vec<T>& v) {
-	vec<T>& ret = all_entries[0];
-	for (const auto& e : all_entries) {
-		if (dist2(v, e) < dist2(v, ret)) {
-			ret = e;
-		}
-	}
-	return ret;
-}
+
 template <typename T>
 std::vector<size_t> brute_force_engine<T>::_query_k(const vec<T>& v, size_t k) {
 	std::priority_queue<std::pair<T, size_t>> top_k;

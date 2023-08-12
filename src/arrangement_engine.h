@@ -23,7 +23,7 @@ struct arrangement_engine : public ann_engine<T, arrangement_engine<T>> {
 			tables;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	size_t _query(const vec<T>& v);
+	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "Arrangement Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -54,7 +54,9 @@ template <typename T> void arrangement_engine<T>::_build() {
 					.push_back(vi);
 	}
 }
-template <typename T> size_t arrangement_engine<T>::_query(const vec<T>& v) {
+template <typename T>
+std::vector<size_t> arrangement_engine<T>::_query_k(const vec<T>& v, size_t k) {
+	std::cout << "Using query (MISSING _query_k impl)" << std::endl; // TODO
 	size_t ret = 0;
 	for (size_t a = 0; a < num_arranges; ++a)
 		for (const auto& ei : tables[a][arranges[a].compute_multiindex(v)]) {
@@ -62,5 +64,5 @@ template <typename T> size_t arrangement_engine<T>::_query(const vec<T>& v) {
 				ret = ei;
 			}
 		}
-	return ret;
+	return {ret};
 }

@@ -42,12 +42,12 @@ struct ehnsw_engine : public ann_engine<T, ehnsw_engine<T>> {
 				return true;
 			});
 	void add_edge(size_t layer, size_t cut, size_t i, size_t j);
-	const std::vector<std::vector<size_t>> _query_k(
+	const std::vector<std::vector<size_t>> _query_k_internal(
 			const vec<T>& v, size_t k, bool fill_all_layers = false,
 			std::function<bool(size_t, size_t)> filter = [](size_t, size_t) {
 				return true;
 			});
-	size_t _query(const vec<T>& v);
+	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "EHNSW Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -108,7 +108,7 @@ template <typename T> void ehnsw_engine<T>::_build() {
 		while (cur_layer >= hadj_same.size())
 			add_layer(i);
 		add_vertex_info(i, cur_layer);
-		std::vector<std::vector<size_t>> kNN = _query_k(
+		std::vector<std::vector<size_t>> kNN = _query_k_internal(
 				all_entries[i], edge_count_mult, true, [&](size_t layer, size_t v) {
 					return e_labels[layer][v] != e_labels[layer][i];
 				});
@@ -179,8 +179,9 @@ ehnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 
 template <typename T>
 const std::vector<std::vector<size_t>>
-ehnsw_engine<T>::_query_k(const vec<T>& v, size_t k, bool fill_all_layers,
-													std::function<bool(size_t, size_t)> filter) {
+ehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
+																	 bool fill_all_layers,
+																	 std::function<bool(size_t, size_t)> filter) {
 	auto current = starting_vertex;
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::vector<size_t>> ret;
@@ -195,6 +196,9 @@ ehnsw_engine<T>::_query_k(const vec<T>& v, size_t k, bool fill_all_layers,
 	return ret;
 }
 
-template <typename T> size_t ehnsw_engine<T>::_query(const vec<T>& v) {
-	return _query_k(v, num_for_1nn)[0][0];
+template <typename T>
+std::vector<size_t> ehnsw_engine<T>::_query_k(const vec<T>& v, size_t k) {
+	auto ret = _query_k_internal(v, k * num_for_1nn)[0];
+	ret.resize(std::min(k, ret.size()));
+	return ret;
 }
