@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <queue>
 
+#include "robin_hood.h"
 // TODO small size optimization
 
 template <typename T>
@@ -14,18 +15,22 @@ private:
 	using std::priority_queue<dat>::pop;
 	using std::priority_queue<dat>::emplace;
 	using std::priority_queue<dat>::empty;
+	robin_hood::unordered_flat_set<size_t> known;
 
 public:
 	using std::priority_queue<dat>::size;
 	size_t k;
 	topk_t(size_t _k) : k(_k) {}
 	bool consider(const T& d, size_t v) {
-		bool is_good = size() < k || top().first > d;
+		bool is_good = !known.contains(v) && (size() < k || top().first > d);
 		if (is_good) {
 			emplace(d, v); // max heap
+			known.emplace(v);
 		}
-		if (size() > k)
+		if (size() > k) {
+			known.erase(top().second);
 			pop();
+		}
 		return is_good;
 	}
 	void discard_until_size(size_t goal) {
