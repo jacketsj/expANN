@@ -79,8 +79,7 @@ template <typename T> struct dataset_loader {
 																																	size_t m,
 																																	size_t k,
 																																	size_t d) {
-		// TODO remove bad_ after debugging
-		std::string name = "bad_synthetic_uniform_sphere_n" + std::to_string(n) +
+		std::string name = "synthetic_uniform_sphere_n" + std::to_string(n) +
 											 "_dim" + std::to_string(d) + "_m" + std::to_string(m) +
 											 "_k" + std::to_string(k);
 		std::string filename = "./data/" + name + ".dataset";
