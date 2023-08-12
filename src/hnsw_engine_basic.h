@@ -91,7 +91,7 @@ template <typename T> void hnsw_engine_basic<T>::_build() {
 		while (cur_layer >= hadj.size())
 			add_layer(i);
 		// search for new edges to add
-		size_t cur_vert = 0;
+		size_t cur_vert = starting_vertex;
 		int layer;
 		for (layer = hadj.size() - 1; layer > int(cur_layer); --layer) {
 			topk_t<T> tk(1);
