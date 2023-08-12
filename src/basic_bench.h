@@ -99,8 +99,9 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 			for (auto& vi : ans)
 				ans_s.emplace(vi);
 			// num_best_found += ans_s.size();
-			for (auto& vi : expected_ans)
-				if (ans_s.contains(vi)) {
+			for (size_t eai = 0; eai < ds.k; ++eai)
+				// for (auto& vi : expected_ans)
+				if (ans_s.contains(expected_ans[eai])) {
 					++num_best_found;
 				}
 
