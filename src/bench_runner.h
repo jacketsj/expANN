@@ -113,7 +113,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			return ehnsw_engine_basic<float>(max_depth, M, ef_search, num_cuts,
 																			 min_per_cut);
 		};
-		add_engine(engine_gen);
+		// add_engine(engine_gen);
 	};
 
 	for (size_t M : {12, 16, 24})
@@ -154,7 +154,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			return ehnsw_engine_3<float>(max_depth, edge_count_mult, num_for_1nn,
 																	 num_cuts, min_per_cut);
 		};
-		add_engine(engine_gen);
+		// add_engine(engine_gen);
 	};
 	//	for (size_t ecm = 10; ecm <= 40; ecm *= 2)
 	//		for (size_t mpc = 1; mpc <= 8; mpc *= 2)
@@ -181,13 +181,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		auto engine_gen = [=] {
 			return tree_arrangement_engine<float>(tc, max_leaf_size, sc);
 		};
-		// add_engine(engine_gen);
+		add_engine(engine_gen);
 	};
 
-	for (size_t tc = 8; tc <= 64; tc *= 2) {
+	for (size_t tc = 8; tc <= 256; tc *= 2) {
 		for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
 				 max_leaf_size *= 4) {
-			for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
+			// for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
+			for (size_t sc = max_leaf_size; sc <= 8192 * 8; sc *= 16 * 2) {
 				add_tae(tc, max_leaf_size, sc);
 			}
 		}
@@ -197,13 +198,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		auto engine_gen = [=] {
 			return tree_arrangement_engine_if<float>(tc, max_leaf_size, sc);
 		};
-		// add_engine(engine_gen);
+		add_engine(engine_gen);
 	};
 
-	for (size_t tc = 8; tc <= 64; tc *= 2) {
+	for (size_t tc = 8; tc <= 256; tc *= 2) {
 		for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
 				 max_leaf_size *= 4) {
-			for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
+			// for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
+			for (size_t sc = max_leaf_size; sc <= 8192 * 8; sc *= 16 * 2) {
 				add_tae_if(tc, max_leaf_size, sc);
 			}
 		}
@@ -215,7 +217,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		std::vector<size_t> ordering;
 		for (size_t job_id = 0; job_id < jobs.size(); ++job_id)
 			ordering.emplace_back(job_id);
-		std::random_shuffle(ordering.begin(), ordering.end());
+		// std::random_shuffle(ordering.begin(), ordering.end());
 
 		std::vector<std::jthread> threadpool;
 		std::atomic_size_t g_job_index = 0;
