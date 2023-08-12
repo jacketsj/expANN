@@ -103,27 +103,26 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		auto engine_gen = [=] {
 			return hnsw_engine_basic<float>(max_depth, M, ef_search);
 		};
-		add_engine(engine_gen);
+		// add_engine(engine_gen);
 	};
 
-	for (size_t ef_search = 2; ef_search <= 100; ef_search *= 5) {
-		add_hnsw_basic(100, 16, ef_search);
-		add_hnsw_basic(100, 40, ef_search);
-		add_hnsw_basic(100, 55, ef_search);
-	}
+	for (size_t M : {12, 16, 24})
+		for (size_t ef_search = 2; ef_search <= 400; ef_search *= 5) {
+			add_hnsw_basic(100, M, ef_search);
+		}
 
 	// brute_force_engine<float> engine_bf;
 	// bdm.add(basic_benchmarker.get_benchmark_data(engine_bf, default_timeout));
 
 	add_hnsw2(100, 55, 8);
 	add_hnsw3(100, 55, 8);
-	for (size_t k = 38; k <= 50; k += 10) {
-		for (size_t k = 30; k <= 70; k += 18) {
-			for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 32 * 4;
-					 num_for_1nn *= 2) {
-				// add_hnsw2(100, k, num_for_1nn);
-				// add_hnsw3(100, k, num_for_1nn);
-			}
+	// for (size_t k = 70; k <= 120; k += 10) {
+	// for (size_t k = 30; k <= 70; k += 18) {
+	for (size_t k = 10; k <= 30; k += 18) {
+		for (size_t num_for_1nn = 32 * 1 / 4; num_for_1nn <= 32 * 4;
+				 num_for_1nn *= 2) {
+			add_hnsw2(100, k, num_for_1nn);
+			add_hnsw3(100, k, num_for_1nn);
 		}
 	}
 	auto add_ehnsw2 = [&](size_t edge_count_mult, size_t max_depth,
@@ -142,7 +141,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			return ehnsw_engine_3<float>(max_depth, edge_count_mult, num_for_1nn,
 																	 num_cuts, min_per_cut);
 		};
-		// add_engine(engine_gen);
+		add_engine(engine_gen);
 	};
 	//	for (size_t ecm = 10; ecm <= 40; ecm *= 2)
 	//		for (size_t mpc = 1; mpc <= 8; mpc *= 2)
@@ -172,7 +171,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// add_engine(engine_gen);
 	};
 
-	for (size_t tc = 2; tc <= 64; tc *= 2) {
+	for (size_t tc = 8; tc <= 64; tc *= 2) {
 		for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
 				 max_leaf_size *= 4) {
 			for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
@@ -188,7 +187,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// add_engine(engine_gen);
 	};
 
-	for (size_t tc = 2; tc <= 64; tc *= 2) {
+	for (size_t tc = 8; tc <= 64; tc *= 2) {
 		for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
 				 max_leaf_size *= 4) {
 			for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
@@ -198,13 +197,24 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	}
 
 	{
+		// balance loads randomly
+		std::srand(0); // keep order deterministic between runs
+		std::vector<size_t> ordering;
+		for (size_t job_id = 0; job_id < jobs.size(); ++job_id)
+			ordering.emplace_back(job_id);
+		std::random_shuffle(ordering.begin(), ordering.end());
+
 		std::vector<std::jthread> threadpool;
 		std::atomic_size_t g_job_index = 0;
 		for (size_t t_index = 0; t_index < num_threads; ++t_index) {
 			threadpool.emplace_back([&]() {
 				for (size_t t_job_index = g_job_index++; t_job_index < jobs.size();
 						 t_job_index = g_job_index++) {
-					jobs[t_job_index].run(t_index, t_job_index, jobs.size(), job_results);
+					size_t t_job_index_ordered = ordering[t_job_index];
+					// jobs[t_job_index].run(t_index, t_job_index, jobs.size(),
+					// job_results);
+					jobs[t_job_index_ordered].run(t_index, t_job_index_ordered,
+																				jobs.size(), job_results);
 				}
 			});
 		}

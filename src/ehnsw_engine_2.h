@@ -182,7 +182,7 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 	//		for (size_t i = 1; i < all_entries.size(); ++i) {
 	//			if (i % 5000 == 0)
 	//				std::cerr << "Built " << double(i) / double(all_entries.size()) *
-	//100
+	// 100
 	//									<< "% (num_nn=" << num_nn << ")" << std::endl;
 	//			improve_vertex(i, num_nn);
 	//		}
