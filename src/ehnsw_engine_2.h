@@ -124,7 +124,6 @@ void ehnsw_engine_2<T>::improve_vertex(size_t i, size_t num_nn) {
 		tk.discard_until_size(1);
 		std::vector<size_t> kNN =
 				_query_k_at_layer_internal(all_entries[i], tk, layer);
-		edge_ranks[layer][i].resize(num_cuts + 1);
 		if (hadj[layer].contains(i))
 			for (size_t j : kNN) {
 				add_edge(layer, i, j);
