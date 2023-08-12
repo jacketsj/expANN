@@ -51,13 +51,29 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 		// 4)
 		// {
 	}
-	for (size_t k = 1; k <= 12; k += 1) {
-		for (size_t num_for_1nn = 1; num_for_1nn <= 8; num_for_1nn += 1) {
-			std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
-								<< ")" << std::endl;
-			hnsw_engine_2<float> engine2(100, k, num_for_1nn);
-			bdm.add(basic_benchmarker.get_benchmark_data(engine2, default_timeout));
-			std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
+	// for (size_t rk = 8; rk * rk <= 140; rk += 8)
+	// for (size_t k = rk * rk; k <= 140; k = rk * rk) { // k += 15) {
+	// for (size_t k = 100; k <= 100; k += 8) {
+	//	for (size_t num_for_1nn = 4; num_for_1nn <= 32; num_for_1nn *= 2) {
+	for (size_t repeats = 0; repeats < 8; ++repeats) {
+		// for (size_t k = 28; k <= 28; k += 8) {
+		// for (size_t k : {28, 56}) {
+		for (size_t k : {28}) {
+			for (size_t num_for_1nn = 128; num_for_1nn <= 128; num_for_1nn *= 2) {
+				std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" << num_for_1nn
+									<< ")" << std::endl;
+				hnsw_engine_2<float> engine2(100, k, num_for_1nn);
+				bdm.add(basic_benchmarker.get_benchmark_data(engine2, default_timeout));
+				// auto bd = basic_benchmarker.get_benchmark_data(engine2,
+				// default_timeout); std::string res_str =
+				// std::holds_alternative<bench_data>(bd) 													?
+				// std::get<bench_data>(bd).to_string() 													:
+				// std::get<std::string>(bd);
+				// bdm.add(bd);
+				std::cerr << "Completed hnsw2(k=" << k << ")" << std::endl;
+				// std::cerr << "Completed hnsw2(k=" << k << ") bd=" << res_str <<
+				// std::endl;
+			}
 		}
 	}
 	struct ehnsw2_run {
@@ -73,14 +89,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds) {
 					num_for_1nn(_num_for_1nn) {}
 	};
 	std::vector<ehnsw2_run> to_run;
-	//	for (size_t ecm = 10; ecm <= 40; ecm *= 2)
-	//		for (size_t mpc = 1; mpc <= 8; mpc *= 2)
-	//			for (size_t nc = 1; nc <= 8; nc *= 2)
-	//				for (size_t n4nn = 1; n4nn <= 16; n4nn *= 4)
-	for (size_t ecm = 2; ecm <= 10; ecm += 1)
-		for (size_t mpc = 1; mpc <= 4; mpc *= 2)
-			for (size_t nc = 1; nc * mpc < ecm; nc *= 2)
+	for (size_t ecm = 10; ecm <= 160; ecm *= 2)
+		for (size_t mpc = 1; mpc <= 8; mpc *= 2)
+			for (size_t nc = 1; nc <= 8; nc *= 2)
 				for (size_t n4nn = 1; n4nn <= 16; n4nn *= 4) {
+					// for (size_t ecm = 2; ecm <= 10; ecm += 1)
+					//	for (size_t mpc = 1; mpc <= 4; mpc *= 2)
+					//		for (size_t nc = 1; nc * mpc < ecm; nc *= 2)
+					//			for (size_t n4nn = 1; n4nn <= 16; n4nn *= 4)
 					// to_run.emplace_back(ecm, 100, mpc, nc, n4nn);
 				}
 	// to_run.emplace_back(56, 100, 1, 16, 32);
