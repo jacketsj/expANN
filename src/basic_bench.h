@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <future>
+#include <set>
 #include <string>
 #include <thread>
 #include <variant>
@@ -76,15 +77,31 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		size_t num_best_found = 0;
 		auto time_begin = std::chrono::high_resolution_clock::now();
 		for (size_t q = 0; q < ds.m; ++q) {
-			// TODO make this kNN instead of 1NN
-			size_t ans = eng.query(ds.get_query(q));
-			T d = dist(ds.get_query(q), ds.get_vec(ans)),
-				d2 = dist2(ds.get_query(q), ds.get_vec(ans));
-			avg_dist += d;
-			avg_dist2 += d2;
-			if (d2 <= dist2(ds.get_query(q), ds.get_vec(ds.get_query_ans(q)[0])) +
-										TOLERANCE)
-				++num_best_found;
+			std::vector<size_t> ans = eng.query_k(ds.get_query(q), ds.k);
+			if (ans.size() > 0) {
+				T d = dist(ds.get_query(q), ds.get_vec(ans[0])),
+					d2 = dist2(ds.get_query(q), ds.get_vec(ans[0]));
+				avg_dist += d;
+				avg_dist2 += d2;
+			}
+
+			std::set<size_t> ans_s;
+			for (auto& i : ans)
+				ans_s.emplace(i);
+			if (ans_s.size() != ans.size()) {
+				std::cerr << "Duplicates detected, engine is buggy." << std::endl;
+				assert(ans_s.size() == ans.size());
+			}
+
+			std::vector<size_t> expected_ans = ds.get_query_ans(q);
+			assert(expected_ans.size() == ds.k);
+
+			size_t intersection_size = 0;
+			for (auto& i : expected_ans) {
+				if (ans_s.contains(i))
+					++intersection_size;
+			}
+			num_best_found += intersection_size;
 
 			if (stoken.stop_requested())
 				return ret;
@@ -103,7 +120,7 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		ret.average_distance = double(avg_dist) / ds.m;
 		ret.average_squared_distance = double(avg_dist2) / ds.m;
 		// TODO modify recall computation for kNN
-		ret.recall = double(num_best_found) / ds.m;
+		ret.recall = double(num_best_found) / (ds.m * ds.k);
 		ret.param_list = eng.param_list();
 
 		ret.engine_name = eng.name();

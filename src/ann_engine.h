@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "vec.h"
 
@@ -21,5 +22,10 @@ template <typename T, class Derived> struct ann_engine {
 	// TODO add query_k and make the return values size_t and std::vector<size_t>
 	const size_t query(const vec<T>& v) {
 		return static_cast<Derived*>(this)->_query(v);
+	}
+	const std::vector<size_t> query_k(const vec<T>& v, size_t k) {
+		// std::cout << "Using query (MISSING _query_k impl)" << std::endl;
+		return {query(v)};
+		// return static_cast<Derived*>(this)->_query_k(v, k);
 	}
 };
