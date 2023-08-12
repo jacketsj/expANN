@@ -171,6 +171,8 @@ template <typename T> struct dataset_loader {
 				load_sift1m(filename_base, filename_query, filename_groundtruth);
 		imtd.k = 1;
 		imtd.k_want = 1;
+		for (auto& v : imtd.all_query_ans)
+			v.resize(imtd.k);
 		imtd.name = "sift1m_full";
 		return imtd;
 	}
@@ -182,6 +184,8 @@ template <typename T> struct dataset_loader {
 		imtd.k = 20;
 		imtd.k_want = 10;
 		imtd.name = "sift1m_easy";
+		for (auto& v : imtd.all_query_ans)
+			v.resize(imtd.k);
 		return imtd;
 	}
 };
