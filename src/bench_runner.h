@@ -305,7 +305,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			}
 		}
 	}
-	if (false) {
+	if (true) {
 		for (size_t tc = 2; tc <= 64; tc *= 2) {
 			for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
 					 max_leaf_size *= 4) {

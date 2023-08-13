@@ -23,7 +23,7 @@ int main() {
 		auto bdm = perform_benchmarks(
 				dsl.load_sift1m("datasets/sift/sift_base.fvecs",
 												"datasets/sift/sift_query.fvecs",
-												"datasets/sift/sift_groundtruth.ivecs", 20),
+												"datasets/sift/sift_groundtruth.ivecs", 10),
 				NUM_THREADS);
 		auto ds_name = bdm.dataset_name;
 		std::string data_prefix = "./data/" + ds_name + "/";

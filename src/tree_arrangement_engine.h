@@ -9,6 +9,7 @@
 
 #include "ann_engine.h"
 #include "randomgeometry.h"
+#include "topk_t.h"
 #include "vecset.h"
 
 struct tree_arrangement_engine_config {
@@ -144,8 +145,7 @@ template <typename T> void tree_arrangement_engine<T>::_build() {
 template <typename T>
 std::vector<size_t> tree_arrangement_engine<T>::_query_k(const vec<T>& v,
 																												 size_t k) {
-	std::cout << "Using query (MISSING _query_k impl)" << std::endl; // TODO
-	size_t ret = 0;
+	topk_t<T> tk(k);
 	for (auto& t : trees) {
 		size_t visited = 0;
 		std::vector<std::reference_wrapper<std::vector<size_t>>> tables_to_check;
@@ -163,10 +163,12 @@ std::vector<size_t> tree_arrangement_engine<T>::_query_k(const vec<T>& v,
 			}
 			reverse(tables_to_check.begin(), tables_to_check.end());
 			for (auto& table : tables_to_check) {
-				for (size_t iu : table.get()) {
-					if (dist2(v, all_entries[iu]) < dist2(v, all_entries[ret])) {
-						ret = iu;
-					}
+				for (size_t ui : table.get()) {
+					auto& u = all_entries[ui];
+					tk.consider(dist(v, u), ui);
+					// if (dist2(v, u) < dist2(v, all_entries[ret])) {
+					//	ret = ui;
+					// }
 				}
 				visited += table.get().size();
 				if (visited >= search_count_per_copy)
@@ -174,5 +176,6 @@ std::vector<size_t> tree_arrangement_engine<T>::_query_k(const vec<T>& v,
 			}
 		}
 	}
-	return {ret};
+	return tk.to_vector();
+	// return {ret};
 }
