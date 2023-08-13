@@ -19,6 +19,7 @@ const double TOLERANCE = 1e-7;
 template <typename T, typename test_dataset_t> struct basic_bench {
 	const test_dataset_t& ds;
 	basic_bench(const test_dataset_t& _ds) : ds(_ds) {}
+	/*
 	template <class Engine, class Rep, class Period>
 	std::variant<bench_data, std::string> get_benchmark_data(
 			ann_engine<T, Engine>& eng,
@@ -53,9 +54,9 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 						 " seconds.";
 		}
 	}
+	*/
 	template <class Engine>
-	bench_data get_benchmark_data_no_timeout(ann_engine<T, Engine>& eng,
-																					 std::stop_token stoken) const {
+	bench_data get_benchmark_data(ann_engine<T, Engine>& eng) const {
 		bench_data ret;
 
 		// record the store and build timespan
@@ -63,14 +64,14 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		// store all vectors in the engine
 		for (size_t i = 0; i < ds.n; ++i)
 			eng.store_vector(ds.get_vec(i));
-		if (stoken.stop_requested())
-			return ret;
-		// build the engine
+		// if (stoken.stop_requested())
+		//	return ret;
+		//  build the engine
 		eng.build();
 		auto time_end_build = std::chrono::high_resolution_clock::now();
 
-		if (stoken.stop_requested())
-			return ret;
+		// if (stoken.stop_requested())
+		//	return ret;
 
 		// run the queries
 		double avg_dist = 0, avg_dist2 = 0;
@@ -116,8 +117,8 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 			}
 			num_best_found += intersection_size;
 
-			if (stoken.stop_requested())
-				return ret;
+			// if (stoken.stop_requested())
+			//	return ret;
 		}
 		auto time_end = std::chrono::high_resolution_clock::now();
 

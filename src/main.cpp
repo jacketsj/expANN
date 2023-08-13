@@ -12,15 +12,19 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
+#define NUM_THREADS 16
+
 int main() {
 	dataset_loader<float> dsl;
-	if (true) {
+	if (false) {
 		// auto bdm = perform_benchmarks(dsl.load_sift1m_custom(
 		//		"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
 		//		"datasets/sift/sift_groundtruth.ivecs", 10, 8));
-		auto bdm = perform_benchmarks(dsl.load_sift1m(
-				"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
-				"datasets/sift/sift_groundtruth.ivecs", 20));
+		auto bdm = perform_benchmarks(
+				dsl.load_sift1m("datasets/sift/sift_base.fvecs",
+												"datasets/sift/sift_query.fvecs",
+												"datasets/sift/sift_groundtruth.ivecs", 20),
+				NUM_THREADS);
 		auto ds_name = bdm.dataset_name;
 		std::string data_prefix = "./data/" + ds_name + "/";
 		bdm.save(data_prefix);
@@ -42,7 +46,7 @@ int main() {
 		size_t k = 10;
 		// size_t k = 1;
 		auto bdm = perform_benchmarks(
-				dsl.load_synethetic_uniform_sphere_points(n, m, k, d));
+				dsl.load_synethetic_uniform_sphere_points(n, m, k, d), NUM_THREADS);
 		auto ds_name = bdm.dataset_name;
 		std::string data_prefix = "./data/" + ds_name + "/";
 		bdm.save(data_prefix);
