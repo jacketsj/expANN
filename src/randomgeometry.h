@@ -1,27 +1,70 @@
 #pragma once
 
+#include <limits>
 #include <memory>
+#include <queue>
 #include <random>
+#include <set>
+#include <utility>
 #include <vector>
 
 #include "hyperplane.h"
 #include "vec.h"
 #include "vecset.h"
 
+typedef std::vector<unsigned short> arrangement_location;
+
 template <typename T> struct arrangement {
 	std::vector<hyperplane<T>> orientations;
 	std::vector<std::vector<T>> distances;
 
 	// lazy/simple implementation
-	std::vector<unsigned short> compute_multiindex(const vec<T>& v) {
+	arrangement_location compute_multiindex(const vec<T>& v) {
 		std::vector<unsigned short> ans(orientations.size());
 		for (size_t i = 0; i < orientations.size(); ++i) {
 			T sd = orientations[i].signeddist(v);
-			// TODO this looks wrong
 			ans[i] = std::lower_bound(distances[i].begin(), distances[i].end(), sd) -
 							 distances[i].begin();
 		}
 		return ans;
+	}
+
+	// get neighbouring arrangement cells (for hamming distance graph)
+	std::vector<arrangement_location> neighbours(arrangement_location loc) {
+		std::vector<arrangement_location> ret;
+		for (size_t i = 0; i < orientations.size(); ++i)
+			for (size_t delta : {-1, 1})
+				if (int(loc[i]) + delta >= 0 &&
+						int(loc[i]) + delta <= distances[i].size()) {
+					arrangement_location next = loc;
+					next[i] += delta;
+					ret.emplace_back(next);
+				}
+		return ret;
+	}
+
+	std::vector<arrangement_location> random_probes(arrangement_location loc,
+																									size_t num_probes,
+																									std::mt19937& gen) {
+		// do a random traversal to get up to num_probes close cells
+		// return value includes loc (not counted in the cell count)
+		std::set<arrangement_location> visited;
+		std::priority_queue<std::pair<size_t, arrangement_location>> to_visit;
+		to_visit.emplace(0, loc);
+		std::uniform_int_distribution<> distrib(0, std::numeric_limits<int>::max());
+		while (!to_visit.empty() && visited.size() <= num_probes) {
+			arrangement_location cur = to_visit.top().second;
+			to_visit.pop();
+			if (visited.contains(cur))
+				continue;
+			visited.emplace(cur);
+			for (auto& neighbour : neighbours(cur))
+				to_visit.emplace(distrib(gen), neighbour);
+		}
+		std::vector<arrangement_location> ret;
+		for (auto& next : visited)
+			ret.emplace_back(next);
+		return ret;
 	}
 };
 

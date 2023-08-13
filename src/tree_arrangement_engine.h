@@ -14,16 +14,16 @@
 
 struct tree_arrangement_engine_config {
 	size_t tree_copies, max_leaf_size, search_count_per_copy, affine_copies,
-			num_orientations, max_depth;
+			num_orientations, max_depth, num_probes;
 	tree_arrangement_engine_config(size_t _tree_copies, size_t _max_leaf_size,
 																 size_t _search_count_per_copy,
 																 size_t _affine_copies = 3,
 																 size_t _num_orientations = 8,
-																 size_t _max_depth = 40)
+																 size_t _max_depth = 40, size_t _num_probes = 4)
 			: tree_copies(_tree_copies), max_leaf_size(_max_leaf_size),
 				search_count_per_copy(_search_count_per_copy),
 				affine_copies(_affine_copies), num_orientations(_num_orientations),
-				max_depth(_max_depth) {}
+				max_depth(_max_depth), num_probes(_num_probes) {}
 };
 
 // idea: create a tree of arrangements. Each cell with too many points becomes a
@@ -35,12 +35,13 @@ template <typename T>
 struct tree_arrangement_engine
 		: public ann_engine<T, tree_arrangement_engine<T>> {
 	size_t tree_copies, max_leaf_size, search_count_per_copy, affine_copies,
-			num_orientations, max_depth;
+			num_orientations, max_depth, num_probes;
 	tree_arrangement_engine(tree_arrangement_engine_config conf)
 			: tree_copies(conf.tree_copies), max_leaf_size(conf.max_leaf_size),
 				search_count_per_copy(conf.search_count_per_copy),
 				affine_copies(conf.affine_copies),
-				num_orientations(conf.num_orientations), max_depth(conf.max_depth) {}
+				num_orientations(conf.num_orientations), max_depth(conf.max_depth),
+				num_probes(conf.num_probes) {}
 	std::vector<vec<T>> all_entries;
 	struct tree_node {
 		arrangement<T> arrange;
@@ -82,6 +83,7 @@ struct tree_arrangement_engine
 		add_param(pl, affine_copies);
 		add_param(pl, num_orientations);
 		add_param(pl, max_depth);
+		add_param(pl, num_probes);
 		return pl;
 	}
 };
@@ -136,7 +138,14 @@ template <typename T> void tree_arrangement_engine<T>::_build() {
 				for (auto mi : to_be_children) {
 					t.nodes.emplace_back();
 					t.nodes[b.node_i].subtree_tables[mi] = t.nodes.size() - 1;
-					to_build.emplace(t.nodes.size() - 1, t.nodes[b.node_i].tables[mi],
+					// get num_probes close cells and add them to the set to be propogated
+					std::vector<arrangement_location> close_cells =
+							t.nodes[b.node_i].arrange.random_probes(mi, num_probes, *gen);
+					std::vector<size_t> close_cells_contents;
+					for (auto& mi_close : close_cells)
+						for (auto& vi : t.nodes[b.node_i].tables[mi_close])
+							close_cells_contents.emplace_back(vi);
+					to_build.emplace(t.nodes.size() - 1, close_cells_contents,
 													 b.depth + 1);
 				}
 		}

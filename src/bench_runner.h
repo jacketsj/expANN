@@ -165,7 +165,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t repeats = 0; repeats < 8; ++repeats) {
 	// for (size_t k = 28; k <= 28; k += 8) {
 	// for (size_t k : {28, 56}) {
-	if (true) {
+	if (false) {
 		// for (size_t k : {28, 50}) {
 		for (size_t k : {55, 74, 80}) {
 			// for (size_t num_for_1nn = 128; num_for_1nn <= 128; num_for_1nn *= 2) {
@@ -213,7 +213,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t K = 4; K <= 256; K *= 2) {
 	//	for (size_t k = 16; k <= 128 * 2; k *= 4) {
 	//		for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 64 * 2;
-	if (true) {
+	if (false) {
 		// for (size_t K = 2; K <= 32; K *= 2) {
 		//	for (size_t k = 11; k < 64; k += 9) {
 		//		for (size_t num_for_1nn = 4; num_for_1nn <= 64; num_for_1nn *= 2) {
@@ -315,38 +315,43 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			}
 		}
 	}
-	if (false) {
+	if (true) {
 		// for (size_t tc = 2; tc <= 64; tc *= 2) {
-		for (size_t tc = 32; tc <= 48; tc += 8) {
+		// for (size_t tc = 32; tc <= 48; tc += 8) {
+		for (size_t tc = 8; tc <= 32; tc *= 2) {
 			// for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
 			// max_leaf_size *= 4) {
 			for (size_t max_leaf_size = 1024; max_leaf_size <= 1024 * 4 * 4;
 					 max_leaf_size *= 16) {
 				for (size_t sc = max_leaf_size / tc; sc * tc <= 8192 * 1; sc *= 16) {
-					// for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2)
-					// {
-					//  std::cerr << "Starting tree arrangement(tc=" << tc
-					//					<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc <<
-					//")"
-					//					<< std::endl;
-					//  std::cerr << "Expected time proportional to: " << sc * tc
-					//					<< std::endl;
-					//  auto begin = std::chrono::high_resolution_clock::now();
-					tree_arrangement_engine_jobs.emplace_back(
-							tree_arrangement_engine_config(tc, max_leaf_size, sc));
-					// tree_arrangement_engine<float> engine(
-					//		tree_arrangement_engine_config(tc, max_leaf_size, sc));
-					// bdm.add(basic_benchmarker.get_benchmark_data(engine));
-					// auto end = std::chrono::high_resolution_clock::now();
-					// std::cerr << "Actual time: "
-					//					<< std::chrono::duration_cast<std::chrono::nanoseconds>(
-					//								 end - begin)
-					//								 .count()
-					//					<< "ns" << std::endl;
-					// std::cerr << "Completed tree arrangement(tc=" << tc
-					//					<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc <<
-					//")"
-					//					<< std::endl;
+					for (size_t num_probes = 0; num_probes <= 20; num_probes += 4) {
+						// for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 *
+						// 2)
+						// {
+						//  std::cerr << "Starting tree arrangement(tc=" << tc
+						//					<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc <<
+						//")"
+						//					<< std::endl;
+						//  std::cerr << "Expected time proportional to: " << sc * tc
+						//					<< std::endl;
+						//  auto begin = std::chrono::high_resolution_clock::now();
+						tree_arrangement_engine_jobs.emplace_back(
+								tree_arrangement_engine_config(tc, max_leaf_size, sc, 3, 8, 40,
+																							 num_probes));
+						// tree_arrangement_engine<float> engine(
+						//		tree_arrangement_engine_config(tc, max_leaf_size, sc));
+						// bdm.add(basic_benchmarker.get_benchmark_data(engine));
+						// auto end = std::chrono::high_resolution_clock::now();
+						// std::cerr << "Actual time: "
+						//					<< std::chrono::duration_cast<std::chrono::nanoseconds>(
+						//								 end - begin)
+						//								 .count()
+						//					<< "ns" << std::endl;
+						// std::cerr << "Completed tree arrangement(tc=" << tc
+						//					<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc <<
+						//")"
+						//					<< std::endl;
+					}
 				}
 			}
 		}
