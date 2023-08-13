@@ -61,10 +61,11 @@ struct tree_arrangement_engine
 				// return hash;
 			}
 		};
-		std::unordered_map<std::vector<unsigned short>, std::vector<size_t>,
-											 VectorHasher>
+		robin_hood::unordered_flat_map<std::vector<unsigned short>,
+																	 std::vector<size_t>, VectorHasher>
 				tables;
-		std::unordered_map<std::vector<unsigned short>, size_t, VectorHasher>
+		robin_hood::unordered_flat_map<std::vector<unsigned short>, size_t,
+																	 VectorHasher>
 				subtree_tables;
 	};
 	struct tree {

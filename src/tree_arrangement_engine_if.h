@@ -9,6 +9,7 @@
 
 #include "ann_engine.h"
 #include "randomgeometry.h"
+#include "robin_hood.h"
 #include "topk_t.h"
 #include "vecset.h"
 
@@ -66,10 +67,12 @@ struct tree_arrangement_engine_if
 				// return hash;
 			}
 		};
-		std::unordered_map<std::vector<unsigned short>,
-											 std::vector<std::pair<vec<T>, size_t>>, VectorHasher>
+		robin_hood::unordered_flat_map<std::vector<unsigned short>,
+																	 std::vector<std::pair<vec<T>, size_t>>,
+																	 VectorHasher>
 				tables;
-		std::unordered_map<std::vector<unsigned short>, size_t, VectorHasher>
+		robin_hood::unordered_flat_map<std::vector<unsigned short>, size_t,
+																	 VectorHasher>
 				subtree_tables;
 	};
 	struct tree {
