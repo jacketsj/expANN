@@ -15,6 +15,9 @@
 int main() {
 	dataset_loader<float> dsl;
 	if (true) {
+		// auto bdm = perform_benchmarks(dsl.load_sift1m_custom(
+		//		"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
+		//		"datasets/sift/sift_groundtruth.ivecs", 10, 8));
 		auto bdm = perform_benchmarks(dsl.load_sift1m(
 				"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
 				"datasets/sift/sift_groundtruth.ivecs", 20));
