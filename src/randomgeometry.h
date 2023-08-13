@@ -9,10 +9,12 @@
 #include <vector>
 
 #include "hyperplane.h"
+#include "small_vector.hpp"
 #include "vec.h"
 #include "vecset.h"
 
-typedef std::vector<unsigned short> arrangement_location;
+typedef gch::small_vector<unsigned short> arrangement_location;
+// typedef std::vector<unsigned short> arrangement_location;
 
 template <typename T> struct arrangement {
 	std::vector<hyperplane<T>> orientations;
