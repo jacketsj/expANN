@@ -37,8 +37,7 @@ struct hier_arrangement_engine
 	std::vector<vec<T>> all_entries;
 	struct arrangement_level {
 		std::vector<arrangement<T>> arranges;
-		std::vector<std::map<std::vector<unsigned short>, std::vector<size_t>>>
-				tables;
+		std::vector<std::map<arrangement_location, std::vector<size_t>>> tables;
 	};
 	std::vector<arrangement_level> levels;
 	void _store_vector(const vec<T>& v);

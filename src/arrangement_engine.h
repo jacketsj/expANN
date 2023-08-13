@@ -27,8 +27,7 @@ struct arrangement_engine : public ann_engine<T, arrangement_engine<T>> {
 				num_arranges(conf.num_arranges) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<arrangement<T>> arranges;
-	std::vector<std::map<std::vector<unsigned short>, std::vector<size_t>>>
-			tables;
+	std::vector<std::map<arrangement_location, std::vector<size_t>>> tables;
 	void _store_vector(const vec<T>& v);
 	void _build();
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
