@@ -166,9 +166,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t k = 28; k <= 28; k += 8) {
 	// for (size_t k : {28, 56}) {
 	if (true) {
-		for (size_t k : {28, 50}) {
+		// for (size_t k : {28, 50}) {
+		for (size_t k : {55, 74, 80}) {
 			// for (size_t num_for_1nn = 128; num_for_1nn <= 128; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 128; num_for_1nn *= 2) {
 				//  std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" <<
 				//  num_for_1nn
@@ -217,9 +219,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		//		for (size_t num_for_1nn = 4; num_for_1nn <= 64; num_for_1nn *= 2) {
 		//			for (size_t min_per_cut = 1;
 		//					 min_per_cut * K <= k && min_per_cut <= 16; min_per_cut *= 2) {
-		for (size_t k : {28, 50}) {
+		// for (size_t k : {28, 50}) {
+		for (size_t k : {55, 74, 80}) {
 			// for (size_t k : {28}) {
-			for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 64; num_for_1nn <= 128; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 2) {
 				//  for (size_t K : {2, 4}) {
