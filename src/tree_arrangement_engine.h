@@ -46,7 +46,7 @@ struct tree_arrangement_engine
 	struct tree_node {
 		arrangement<T> arrange;
 		struct VectorHasher {
-			size_t operator()(const std::vector<unsigned short>& V) const {
+			size_t operator()(const arrangement_location& V) const {
 				int concat_val = 0;
 				size_t num_vals_possible = 4; // TODO this needs to match up with
 																			// affine_copies, should generalize code
@@ -61,11 +61,10 @@ struct tree_arrangement_engine
 				// return hash;
 			}
 		};
-		robin_hood::unordered_flat_map<std::vector<unsigned short>,
-																	 std::vector<size_t>, VectorHasher>
-				tables;
-		robin_hood::unordered_flat_map<std::vector<unsigned short>, size_t,
+		robin_hood::unordered_flat_map<arrangement_location, std::vector<size_t>,
 																	 VectorHasher>
+				tables;
+		robin_hood::unordered_flat_map<arrangement_location, size_t, VectorHasher>
 				subtree_tables;
 	};
 	struct tree {
@@ -127,7 +126,7 @@ template <typename T> void tree_arrangement_engine<T>::_build() {
 				entries.push_back(all_entries[i]);
 			vecset vs(entries);
 			t.nodes[b.node_i].arrange = arrange_gen(vs);
-			std::vector<std::vector<unsigned short>> to_be_children;
+			std::vector<arrangement_location> to_be_children;
 			for (auto& i : b.ivals) {
 				auto mi = t.nodes[b.node_i].arrange.compute_multiindex(all_entries[i]);
 				auto& table = t.nodes[b.node_i].tables[mi];
