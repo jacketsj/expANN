@@ -179,7 +179,7 @@ ehnsw_engine_2<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 		T nd;
 		size_t cur;
 		std::tie(nd, cur) = to_visit.top();
-		if (-nd > top_k.top().first)
+		if (top_k.size() == k && -nd > top_k.top().first)
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
