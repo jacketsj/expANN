@@ -142,15 +142,15 @@ template <typename T> struct dataset_loader {
 		for (auto& v : base)
 			imtd.all_vecs.emplace_back(v);
 		// call imtd.all_query_vecs.push_back(v)
-		for (auto& v : base)
+		for (auto& v : query)
 			imtd.all_query_vecs.emplace_back(v);
 		// TODO call imtd.all_query_ans.push_back({i0,i1,i2,...})
 		for (auto& v : groundtruth) {
+			v.resize(std::min(k_custom, v.size()));
 			imtd.all_query_ans.emplace_back();
 			auto& vimtd = imtd.all_query_ans.back();
 			for (auto& val : v)
 				vimtd.emplace_back(val);
-			vimtd.resize(std::min(k_custom, vimtd.size()));
 		}
 
 		imtd.name = "sift1m_full_k" + std::to_string(k_custom);
@@ -164,6 +164,20 @@ template <typename T> struct dataset_loader {
 		std::cerr << "Finished loading sift1m. n=" << imtd.n << ",m=" << imtd.m
 							<< ",k=" << imtd.k << ",dim=" << imtd.dim << std::endl;
 
+		return imtd;
+	}
+	in_memory_test_dataset<float>
+	load_sift1m_custom(std::string filename_base, std::string filename_query,
+										 std::string filename_groundtruth, size_t k_custom = 100,
+										 size_t m_custom = 2) {
+		auto imtd = load_sift1m(filename_base, filename_query, filename_groundtruth,
+														k_custom);
+		size_t m = std::min(m_custom, imtd.all_query_vecs.size());
+		imtd.all_query_vecs.resize(m);
+		imtd.all_query_ans.resize(m);
+		imtd.m = m;
+		imtd.name = imtd.name + "_m" + std::to_string(m);
+		std::cerr << "Finished modifying sift1m to have m=" << m << std::endl;
 		return imtd;
 	}
 };
