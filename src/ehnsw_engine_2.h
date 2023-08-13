@@ -10,24 +10,37 @@
 #include "ann_engine.h"
 #include "robin_hood.h"
 
+struct ehnsw_engine_2_config {
+	size_t max_depth;
+	size_t edge_count_mult;
+	size_t num_for_1nn;
+	size_t num_cuts;
+	size_t min_per_cut;
+	ehnsw_engine_2_config(size_t _max_depth, size_t _edge_count_mult,
+												size_t _num_for_1nn, size_t _num_cuts,
+												size_t _min_per_cut)
+			: max_depth(_max_depth), edge_count_mult(_edge_count_mult),
+				num_for_1nn(_num_for_1nn), num_cuts(_num_cuts),
+				min_per_cut(_min_per_cut) {}
+};
+
 template <typename T>
 struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 	std::random_device rd;
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
 	std::uniform_int_distribution<> int_distribution;
+	size_t starting_vertex;
 	size_t max_depth;
 	size_t edge_count_mult;
-	size_t starting_vertex;
 	size_t num_for_1nn;
 	size_t num_cuts;
 	size_t min_per_cut;
-	ehnsw_engine_2(size_t _max_depth, size_t _edge_count_mult,
-								 size_t _num_for_1nn, size_t _num_cuts, size_t _min_per_cut)
+	ehnsw_engine_2(ehnsw_engine_2_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
-				max_depth(_max_depth), edge_count_mult(_edge_count_mult),
-				num_for_1nn(_num_for_1nn), num_cuts(_num_cuts),
-				min_per_cut(_min_per_cut) {}
+				max_depth(conf.max_depth), edge_count_mult(conf.edge_count_mult),
+				num_for_1nn(conf.num_for_1nn), num_cuts(conf.num_cuts),
+				min_per_cut(conf.min_per_cut) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<robin_hood::unordered_flat_map<size_t, std::vector<size_t>>> hadj;
 	std::vector<robin_hood::unordered_flat_map<

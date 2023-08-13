@@ -7,6 +7,16 @@
 
 #include "ann_engine.h"
 
+struct hnsw_engine_config {
+	size_t max_depth;
+	size_t edge_count_mult;
+	double coinflip_p;
+	hnsw_engine_config(size_t _max_depth, size_t _edge_count_mult,
+										 double _coinflip_p)
+			: max_depth(_max_depth), edge_count_mult(_edge_count_mult),
+				coinflip_p(_coinflip_p) {}
+};
+
 // basic lsh method
 template <typename T, bool TAKE_FIRST>
 struct hnsw_engine : public ann_engine<T, hnsw_engine<T, TAKE_FIRST>> {
@@ -17,9 +27,9 @@ struct hnsw_engine : public ann_engine<T, hnsw_engine<T, TAKE_FIRST>> {
 	size_t edge_count_mult;
 	double coinflip_p;
 	size_t starting_vertex;
-	hnsw_engine(size_t _max_depth, size_t _edge_count_mult, double _coinflip_p)
-			: rd(), gen(rd()), d(_coinflip_p), max_depth(_max_depth),
-				edge_count_mult(_edge_count_mult), coinflip_p(_coinflip_p) {}
+	hnsw_engine(hnsw_engine_config conf)
+			: rd(), gen(rd()), d(conf.coinflip_p), max_depth(conf.max_depth),
+				edge_count_mult(conf.edge_count_mult), coinflip_p(conf.coinflip_p) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<size_t> priority;
 	std::vector<std::vector<std::vector<size_t>>> hadj;

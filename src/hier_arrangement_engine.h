@@ -9,20 +9,31 @@
 #include "randomgeometry.h"
 #include "vecset.h"
 
+struct hier_arrangement_engine_config {
+	size_t affine_copies, num_arranges, num_levels, level_mult,
+			starting_orientations, search_count;
+	hier_arrangement_engine_config(size_t _num_arranges, size_t _num_levels,
+																 size_t _search_count,
+																 size_t _affine_copies = 3,
+																 size_t _level_mult = 2,
+																 size_t _starting_orientations = 1)
+			: affine_copies(_affine_copies), num_arranges(_num_arranges),
+				num_levels(_num_levels), level_mult(_level_mult),
+				starting_orientations(_starting_orientations),
+				search_count(_search_count) {}
+};
+
 // basic lsh method
 template <typename T>
 struct hier_arrangement_engine
 		: public ann_engine<T, hier_arrangement_engine<T>> {
 	size_t affine_copies, num_arranges, num_levels, level_mult,
 			starting_orientations, search_count;
-	hier_arrangement_engine(size_t _num_arranges, size_t _num_levels,
-													size_t _search_count, size_t _affine_copies = 3,
-													size_t _level_mult = 2,
-													size_t _starting_orientations = 1)
-			: affine_copies(_affine_copies), num_arranges(_num_arranges),
-				num_levels(_num_levels), level_mult(_level_mult),
-				starting_orientations(_starting_orientations),
-				search_count(_search_count) {}
+	hier_arrangement_engine(hier_arrangement_engine_config conf)
+			: affine_copies(conf.affine_copies), num_arranges(conf.num_arranges),
+				num_levels(conf.num_levels), level_mult(conf.level_mult),
+				starting_orientations(conf.starting_orientations),
+				search_count(conf.search_count) {}
 	std::vector<vec<T>> all_entries;
 	struct arrangement_level {
 		std::vector<arrangement<T>> arranges;

@@ -10,6 +10,17 @@
 #include "ann_engine.h"
 #include "robin_hood.h"
 
+struct ehnsw_engine_config {
+	size_t max_depth;
+	size_t edge_count_mult;
+	size_t num_for_1nn;
+	size_t num_cuts;
+	ehnsw_engine_config(size_t _max_depth, size_t _edge_count_mult,
+											size_t _num_cuts, size_t _num_for_1nn)
+			: max_depth(_max_depth), edge_count_mult(_edge_count_mult),
+				num_for_1nn(_num_for_1nn), num_cuts(_num_cuts) {}
+};
+
 // Expander HNSW Engine
 template <typename T>
 struct ehnsw_engine : public ann_engine<T, ehnsw_engine<T>> {
@@ -17,16 +28,15 @@ struct ehnsw_engine : public ann_engine<T, ehnsw_engine<T>> {
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
 	std::uniform_int_distribution<> int_distribution;
+	size_t starting_vertex;
 	size_t max_depth;
 	size_t edge_count_mult;
-	size_t starting_vertex;
 	size_t num_for_1nn;
 	size_t num_cuts;
-	ehnsw_engine(size_t _max_depth, size_t _edge_count_mult, size_t _num_cuts,
-							 size_t _num_for_1nn)
+	ehnsw_engine(ehnsw_engine_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
-				max_depth(_max_depth), edge_count_mult(_edge_count_mult),
-				num_for_1nn(_num_for_1nn), num_cuts(_num_cuts) {}
+				max_depth(conf.max_depth), edge_count_mult(conf.edge_count_mult),
+				num_for_1nn(conf.num_for_1nn), num_cuts(conf.num_cuts) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<robin_hood::unordered_flat_map<size_t, std::vector<bool>>>
 			e_labels; // level -> vertex -> cut labels (*num_cuts)

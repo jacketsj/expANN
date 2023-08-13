@@ -9,14 +9,22 @@
 #include "randomgeometry.h"
 #include "vecset.h"
 
+struct arrangement_engine_config {
+	size_t affine_copies, num_orientations, num_arranges;
+	arrangement_engine_config(size_t _affine_copies, size_t _num_orientations,
+														size_t _num_arranges)
+			: affine_copies(_affine_copies), num_orientations(_num_orientations),
+				num_arranges(_num_arranges) {}
+};
+
 // basic lsh method
 template <typename T>
 struct arrangement_engine : public ann_engine<T, arrangement_engine<T>> {
 	size_t affine_copies, num_orientations, num_arranges;
-	arrangement_engine(size_t _affine_copies, size_t _num_orientations,
-										 size_t _num_arranges)
-			: affine_copies(_affine_copies), num_orientations(_num_orientations),
-				num_arranges(_num_arranges) {}
+	arrangement_engine(arrangement_engine_config conf)
+			: affine_copies(conf.affine_copies),
+				num_orientations(conf.num_orientations),
+				num_arranges(conf.num_arranges) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<arrangement<T>> arranges;
 	std::vector<std::map<std::vector<unsigned short>, std::vector<size_t>>>

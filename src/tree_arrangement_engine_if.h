@@ -11,6 +11,20 @@
 #include "randomgeometry.h"
 #include "vecset.h"
 
+struct tree_arrangement_engine_if_config {
+	size_t tree_copies, max_leaf_size, search_count_per_copy, affine_copies,
+			num_orientations, max_depth;
+	tree_arrangement_engine_if_config(size_t _tree_copies, size_t _max_leaf_size,
+																		size_t _search_count_per_copy,
+																		size_t _affine_copies = 3,
+																		size_t _num_orientations = 8,
+																		size_t _max_depth = 40)
+			: tree_copies(_tree_copies), max_leaf_size(_max_leaf_size),
+				search_count_per_copy(_search_count_per_copy),
+				affine_copies(_affine_copies), num_orientations(_num_orientations),
+				max_depth(_max_depth) {}
+};
+
 // idea: create a tree of arrangements. Each cell with too many points becomes a
 // child.
 // should have multiple copies of the tree (with different seeds) to avoid edge
@@ -25,15 +39,11 @@ struct tree_arrangement_engine_if
 		: public ann_engine<T, tree_arrangement_engine_if<T>> {
 	size_t tree_copies, max_leaf_size, search_count_per_copy, affine_copies,
 			num_orientations, max_depth;
-	tree_arrangement_engine_if(size_t _tree_copies, size_t _max_leaf_size,
-														 size_t _search_count_per_copy,
-														 size_t _affine_copies = 3,
-														 size_t _num_orientations = 8,
-														 size_t _max_depth = 40)
-			: tree_copies(_tree_copies), max_leaf_size(_max_leaf_size),
-				search_count_per_copy(_search_count_per_copy),
-				affine_copies(_affine_copies), num_orientations(_num_orientations),
-				max_depth(_max_depth) {}
+	tree_arrangement_engine_if(tree_arrangement_engine_if_config conf)
+			: tree_copies(conf.tree_copies), max_leaf_size(conf.max_leaf_size),
+				search_count_per_copy(conf.search_count_per_copy),
+				affine_copies(conf.affine_copies),
+				num_orientations(conf.num_orientations), max_depth(conf.max_depth) {}
 	std::vector<vec<T>> all_entries;
 	struct tree_node {
 		arrangement<T> arrange;
