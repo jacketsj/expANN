@@ -16,12 +16,13 @@ struct ehnsw_engine_2_config {
 	size_t num_for_1nn;
 	size_t num_cuts;
 	size_t min_per_cut;
+	bool quick_search;
 	ehnsw_engine_2_config(size_t _max_depth, size_t _edge_count_mult,
 												size_t _num_for_1nn, size_t _num_cuts,
-												size_t _min_per_cut)
+												size_t _min_per_cut, bool _quick_search)
 			: max_depth(_max_depth), edge_count_mult(_edge_count_mult),
 				num_for_1nn(_num_for_1nn), num_cuts(_num_cuts),
-				min_per_cut(_min_per_cut) {}
+				min_per_cut(_min_per_cut), quick_search(_quick_search) {}
 };
 
 template <typename T>
@@ -36,11 +37,12 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 	size_t num_for_1nn;
 	size_t num_cuts;
 	size_t min_per_cut;
+	bool quick_search;
 	ehnsw_engine_2(ehnsw_engine_2_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				max_depth(conf.max_depth), edge_count_mult(conf.edge_count_mult),
 				num_for_1nn(conf.num_for_1nn), num_cuts(conf.num_cuts),
-				min_per_cut(conf.min_per_cut) {}
+				min_per_cut(conf.min_per_cut), quick_search(conf.quick_search) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<robin_hood::unordered_flat_map<size_t, std::vector<size_t>>> hadj;
 	std::vector<robin_hood::unordered_flat_map<
@@ -219,18 +221,19 @@ ehnsw_engine_2<T>::_query_k_internal(const vec<T>& v, size_t k,
 	std::vector<std::vector<size_t>> ret;
 	// for each layer, in decreasing depth
 	for (int layer = hadj.size() - 1; layer >= 0; --layer) {
-		ret.push_back(_query_k_at_layer(v, k, current, layer));
+		size_t layer_k = k;
+		if (!fill_all_layers && layer > 0)
+			layer_k = 1;
+		ret.push_back(_query_k_at_layer(v, layer_k, current, layer));
 		current = ret.back().front();
 	}
 	reverse(ret.begin(), ret.end());
-	if (!fill_all_layers)
-		ret.resize(1);
 	return ret;
 }
 
 template <typename T>
 std::vector<size_t> ehnsw_engine_2<T>::_query_k(const vec<T>& v, size_t k) {
-	auto ret = _query_k_internal(v, k * num_for_1nn)[0];
+	auto ret = _query_k_internal(v, k * num_for_1nn, !quick_search)[0];
 	ret.resize(std::min(k, ret.size()));
 	return ret;
 }

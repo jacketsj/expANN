@@ -48,7 +48,13 @@ template <typename Engine, typename EngineConfig> struct job {
 
 			std::printf("Running job (tid=%zu): %s\n", thread_id, meta.c_str());
 			result = basic_benchmarker.get_benchmark_data(eng);
-			std::printf("Completed job (tid=%zu): %s\n", thread_id, meta.c_str());
+
+			std::string res_str = std::holds_alternative<bench_data>(result)
+																? std::get<bench_data>(result).to_string()
+																: std::get<std::string>(result);
+
+			std::printf("Completed job (tid=%zu): %s\nResult:%s\n", thread_id,
+									meta.c_str(), res_str.c_str());
 		}
 	}
 };
@@ -159,16 +165,16 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t repeats = 0; repeats < 8; ++repeats) {
 	// for (size_t k = 28; k <= 28; k += 8) {
 	// for (size_t k : {28, 56}) {
-	if (false) {
+	if (true) {
 		for (size_t k : {28, 50}) {
 			// for (size_t num_for_1nn = 128; num_for_1nn <= 128; num_for_1nn *= 2) {
-			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 2; num_for_1nn <= 128; num_for_1nn *= 2) {
-				// std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" <<
-				// num_for_1nn
+			for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
+				// for (size_t num_for_1nn = 2; num_for_1nn <= 128; num_for_1nn *= 2) {
+				//  std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" <<
+				//  num_for_1nn
 				//					<< ")" << std::endl;
 				hnsw_engine_2_jobs.emplace_back(
-						hnsw_engine_2_config(100, k, num_for_1nn));
+						hnsw_engine_2_config(100, k, num_for_1nn, true));
 				// hnsw_engine_2<float> engine2(hnsw_engine_2_config(100, k,
 				// num_for_1nn));
 				// bdm.add(basic_benchmarker.get_benchmark_data(engine2));
@@ -205,7 +211,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t K = 4; K <= 256; K *= 2) {
 	//	for (size_t k = 16; k <= 128 * 2; k *= 4) {
 	//		for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 64 * 2;
-	if (false) {
+	if (true) {
 		// for (size_t K = 2; K <= 32; K *= 2) {
 		//	for (size_t k = 11; k < 64; k += 9) {
 		//		for (size_t num_for_1nn = 4; num_for_1nn <= 64; num_for_1nn *= 2) {
@@ -213,8 +219,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		//					 min_per_cut * K <= k && min_per_cut <= 16; min_per_cut *= 2) {
 		for (size_t k : {28, 50}) {
 			// for (size_t k : {28}) {
-			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 64; num_for_1nn <= 128; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
+				// for (size_t num_for_1nn = 64; num_for_1nn <= 128; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 2) {
 				//  for (size_t K : {2, 4}) {
 				for (size_t K : {2}) {
@@ -223,8 +229,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						// std::cerr << "About to start ehnsw2(k=" << k << ",K=" << K
 						//					<< ",n4nn=" << num_for_1nn
 						//					<< ",min_per_cut=" << min_per_cut << ")" << std::endl;
-						ehnsw_engine_2_jobs.emplace_back(
-								ehnsw_engine_2_config(100, k, num_for_1nn, K, min_per_cut));
+						ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
+								100, k, num_for_1nn, K, min_per_cut, true));
 						// ehnsw_engine_2<float> engine(
 						//		ehnsw_engine_2_config(100, k, num_for_1nn, K, min_per_cut));
 						// bdm.add(basic_benchmarker.get_benchmark_data(engine));
@@ -243,7 +249,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					// std::cerr << "About to start ehnsw(k=" << k << ",K=" << K
 					//					<< ",n4nn=" << num_for_1nn << ")" << std::endl;
 					ehnsw_engine_jobs.emplace_back(
-							ehnsw_engine_config(100, k, K, num_for_1nn));
+							ehnsw_engine_config(100, k, K, num_for_1nn, true));
 					// ehnsw_engine<float> engine(
 					//		ehnsw_engine_config(100, k, K, num_for_1nn));
 					// bdm.add(basic_benchmarker.get_benchmark_data(engine));
@@ -259,7 +265,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				// std::cerr << "About to start hnsw_hybrid(k=" << k
 				//					<< ",n4nn=" << num_for_1nn << ")" << std::endl;
 				hnsw_engine_hybrid_jobs.emplace_back(
-						hnsw_engine_hybrid_config(100, k, num_for_1nn));
+						hnsw_engine_hybrid_config(100, k, num_for_1nn, true));
 				// hnsw_engine_hybrid<float> engine(
 				//		hnsw_engine_hybrid_config(100, k, num_for_1nn));
 				// bdm.add(basic_benchmarker.get_benchmark_data(engine));
@@ -305,7 +311,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			}
 		}
 	}
-	if (true) {
+	if (false) {
 		// for (size_t tc = 2; tc <= 64; tc *= 2) {
 		for (size_t tc = 32; tc <= 48; tc += 8) {
 			// for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
