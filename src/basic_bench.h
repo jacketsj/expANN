@@ -78,6 +78,12 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		auto time_begin = std::chrono::high_resolution_clock::now();
 		for (size_t q = 0; q < ds.m; ++q) {
 			std::vector<size_t> ans = eng.query_k(ds.get_query(q), ds.k);
+			// std::cerr << "ans=";
+			// for (auto& i : ans) {
+			// 	std::cerr << "(" << i << "," << dist(ds.get_query(q), ds.get_vec(i))
+			// 						<< "),";
+			// }
+			// std::cerr << std::endl;
 			if (ans.size() > 0) {
 				T d = dist(ds.get_query(q), ds.get_vec(ans[0])),
 					d2 = dist2(ds.get_query(q), ds.get_vec(ans[0]));
@@ -95,6 +101,13 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 
 			std::vector<size_t> expected_ans = ds.get_query_ans(q);
 			assert(expected_ans.size() == ds.k);
+
+			// std::cerr << "expected_ans=";
+			// for (auto& i : expected_ans) {
+			// 	std::cerr << "(" << i << "," << dist(ds.get_query(q), ds.get_vec(i))
+			// 						<< "),";
+			// }
+			// std::cerr << std::endl;
 
 			size_t intersection_size = 0;
 			for (auto& i : expected_ans) {
