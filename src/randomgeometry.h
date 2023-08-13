@@ -20,7 +20,7 @@ template <typename T> struct arrangement {
 
 	// lazy/simple implementation
 	arrangement_location compute_multiindex(const vec<T>& v) {
-		std::vector<unsigned short> ans(orientations.size());
+		arrangement_location ans(orientations.size());
 		for (size_t i = 0; i < orientations.size(); ++i) {
 			T sd = orientations[i].signeddist(v);
 			ans[i] = std::lower_bound(distances[i].begin(), distances[i].end(), sd) -
