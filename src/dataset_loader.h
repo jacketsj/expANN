@@ -126,7 +126,8 @@ template <typename T> struct dataset_loader {
 
 	in_memory_test_dataset<float> load_sift1m(std::string filename_base,
 																						std::string filename_query,
-																						std::string filename_groundtruth) {
+																						std::string filename_groundtruth,
+																						size_t k_custom = 100) {
 		// fvecs format: (d=int,components=float*d) (4+d*4 bytes)
 		// ivecs format: (d=int,components=int*d) (4+d*4 bytes)
 		// read filename_base as fvecs
@@ -149,13 +150,16 @@ template <typename T> struct dataset_loader {
 			auto& vimtd = imtd.all_query_ans.back();
 			for (auto& val : v)
 				vimtd.emplace_back(val);
+			vimtd.resize(std::min(k_custom, vimtd.size()));
 		}
 
-		imtd.name = "sift1m_full";
+		imtd.name = "sift1m_full_k" + std::to_string(k_custom);
 		imtd.n = base.size();
 		imtd.m = query.size();
 		imtd.k = groundtruth[0].size();
 		imtd.dim = base[0].size();
+
+		assert(k_custom == imtd.k);
 
 		std::cerr << "Finished loading sift1m. n=" << imtd.n << ",m=" << imtd.m
 							<< ",k=" << imtd.k << ",dim=" << imtd.dim << std::endl;

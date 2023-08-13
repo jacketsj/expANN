@@ -14,10 +14,10 @@
 
 int main() {
 	dataset_loader<float> dsl;
-	if (false) {
+	if (true) {
 		auto bdm = perform_benchmarks(dsl.load_sift1m(
 				"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
-				"datasets/sift/sift_groundtruth.ivecs"));
+				"datasets/sift/sift_groundtruth.ivecs", 20));
 		auto ds_name = bdm.dataset_name;
 		std::string data_prefix = "./data/" + ds_name + "/";
 		bdm.save(data_prefix);
