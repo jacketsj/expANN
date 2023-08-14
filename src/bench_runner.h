@@ -125,12 +125,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job<tree_arrangement_engine_if<float>, tree_arrangement_engine_if_config>>
 			tree_arrangement_engine_if_jobs;
 
-	// TODO implement a way to disable the timeout in get_benchmark_data (e.g. if
-	// it's 0, or at least a way to make it super long)
-	std::cerr << "Running benchmarks with a 6000s timeout" << std::endl;
-
 	using namespace std::chrono_literals;
-	// auto default_timeout = 6000s;
 
 	if (false) {
 		// std::cerr << "Running brute force engine." << std::endl;
@@ -220,16 +215,19 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		//			for (size_t min_per_cut = 1;
 		//					 min_per_cut * K <= k && min_per_cut <= 16; min_per_cut *= 2) {
 		// for (size_t k : {28, 50}) {
-		for (size_t k : {55, 74, 80}) {
+		// for (size_t k : {55, 74, 80}) {
+		for (size_t k : {95}) {
 			// for (size_t k : {28}) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 64; num_for_1nn <= 128; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 2) {
 				//  for (size_t K : {2, 4}) {
-				for (size_t K : {2}) {
+				// for (size_t K : {2, 4, 8}) {
+				for (size_t K : {3}) {
 					// for (size_t min_per_cut : {1, 2}) {
-					for (size_t min_per_cut : {1}) {
+					for (size_t min_per_cut : {1, 2, 4}) {
 						// std::cerr << "About to start ehnsw2(k=" << k << ",K=" << K
 						//					<< ",n4nn=" << num_for_1nn
 						//					<< ",min_per_cut=" << min_per_cut << ")" << std::endl;
