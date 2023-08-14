@@ -232,7 +232,9 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						//					<< ",n4nn=" << num_for_1nn
 						//					<< ",min_per_cut=" << min_per_cut << ")" << std::endl;
 						ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
-								100, k, num_for_1nn, K, min_per_cut, true));
+								100, k, num_for_1nn, K, min_per_cut, true, false));
+						ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
+								100, k, num_for_1nn, K, min_per_cut, true, true));
 						// ehnsw_engine_2<float> engine(
 						//		ehnsw_engine_2_config(100, k, num_for_1nn, K, min_per_cut));
 						// bdm.add(basic_benchmarker.get_benchmark_data(engine));

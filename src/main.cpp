@@ -16,7 +16,7 @@
 
 int main() {
 	dataset_loader<float> dsl;
-	if (true) {
+	if (false) {
 		// auto bdm = perform_benchmarks(dsl.load_sift1m_custom(
 		//		"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
 		//		"datasets/sift/sift_groundtruth.ivecs", 10, 8));
@@ -36,10 +36,10 @@ int main() {
 	}
 
 	// for (size_t n = 50000 * 1; n <= 50000 * 10 * 1; n *= 10) {
-	for (size_t n = 30000 * 1; n <= 30000 * 1 * 1; n *= 10) {
+	for (size_t n = 80000 * 1; n <= 80000 * 1 * 1; n *= 10) {
 		// size_t m = 400 * (n / 50000);
 		// size_t m = 400;
-		size_t m = 300;
+		size_t m = 600;
 		// if (n < 500000)
 		//	m = 400;
 		size_t d = 16;

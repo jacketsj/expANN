@@ -17,12 +17,14 @@ struct ehnsw_engine_2_config {
 	size_t num_cuts;
 	size_t min_per_cut;
 	bool quick_search;
+	bool bumping;
 	ehnsw_engine_2_config(size_t _max_depth, size_t _edge_count_mult,
 												size_t _num_for_1nn, size_t _num_cuts,
-												size_t _min_per_cut, bool _quick_search)
+												size_t _min_per_cut, bool _quick_search, bool _bumping)
 			: max_depth(_max_depth), edge_count_mult(_edge_count_mult),
 				num_for_1nn(_num_for_1nn), num_cuts(_num_cuts),
-				min_per_cut(_min_per_cut), quick_search(_quick_search) {}
+				min_per_cut(_min_per_cut), quick_search(_quick_search),
+				bumping(_bumping) {}
 };
 
 template <typename T>
@@ -38,11 +40,13 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 	size_t num_cuts;
 	size_t min_per_cut;
 	bool quick_search;
+	bool bumping;
 	ehnsw_engine_2(ehnsw_engine_2_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				max_depth(conf.max_depth), edge_count_mult(conf.edge_count_mult),
 				num_for_1nn(conf.num_for_1nn), num_cuts(conf.num_cuts),
-				min_per_cut(conf.min_per_cut), quick_search(conf.quick_search) {}
+				min_per_cut(conf.min_per_cut), quick_search(conf.quick_search),
+				bumping(conf.bumping) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<robin_hood::unordered_flat_map<size_t, std::vector<size_t>>> hadj;
 	std::vector<robin_hood::unordered_flat_map<
@@ -69,6 +73,8 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 		add_param(pl, num_for_1nn);
 		add_param(pl, num_cuts);
 		add_param(pl, min_per_cut);
+		add_param(pl, quick_search);
+		add_param(pl, bumping);
 		return pl;
 	}
 };
@@ -96,7 +102,8 @@ void ehnsw_engine_2<T>::add_edge_directional(size_t layer, size_t i, size_t j) {
 	// not below min_per_cut, and pick out the one with the longest edge
 	size_t max_cut = 0;
 	T max_cut_val = std::numeric_limits<T>::max();
-	if (hadj[layer][i].size() + 1 >= edge_count_mult) {
+	size_t deleted_j = i; // nothing deleted if deleted_j == i
+	if (hadj[layer][i].size() + 1 > edge_count_mult) {
 		for (size_t cut : cuts) {
 			size_t sz = edge_ranks[layer][i][cut].size();
 			if (cut == found_cut)
@@ -113,6 +120,7 @@ void ehnsw_engine_2<T>::add_edge_directional(size_t layer, size_t i, size_t j) {
 		if (-max_cut_val > d) {
 			auto iter = edge_ranks[layer][i][max_cut].begin();
 			size_t edge_index = iter->second;
+			deleted_j = hadj[layer][i][edge_index];
 			hadj[layer][i][edge_index] = j;
 			edge_ranks[layer][i][max_cut].erase(iter);
 			edge_ranks[layer][i][found_cut].emplace(-d, edge_index);
@@ -121,6 +129,10 @@ void ehnsw_engine_2<T>::add_edge_directional(size_t layer, size_t i, size_t j) {
 		hadj[layer][i].emplace_back(j);
 		edge_ranks[layer][i][found_cut].emplace(-d, hadj[layer][i].size() - 1);
 	}
+	// try to bump a bigger edge until stability is reached (if bumping is
+	// enabled)
+	if (deleted_j != i && bumping)
+		add_edge_directional(layer, i, deleted_j);
 }
 
 template <typename T>
