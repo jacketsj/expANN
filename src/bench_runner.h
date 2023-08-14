@@ -213,7 +213,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t K = 4; K <= 256; K *= 2) {
 	//	for (size_t k = 16; k <= 128 * 2; k *= 4) {
 	//		for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 64 * 2;
-	if (false) {
+	if (true) {
 		// for (size_t K = 2; K <= 32; K *= 2) {
 		//	for (size_t k = 11; k < 64; k += 9) {
 		//		for (size_t num_for_1nn = 4; num_for_1nn <= 64; num_for_1nn *= 2) {
@@ -315,7 +315,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			}
 		}
 	}
-	if (true) {
+	if (false) {
 		// for (size_t tc = 2; tc <= 64; tc *= 2) {
 		// for (size_t tc = 32; tc <= 48; tc += 8) {
 		for (size_t tc = 8; tc <= 32; tc *= 2) {
