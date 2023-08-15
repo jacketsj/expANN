@@ -77,7 +77,7 @@ class AnnoteFinder(object):
                     m.set_visible(False)
                 self.ax.figure.canvas.draw_idle()
             t = ax.text(x, y, " - %s" % (annote), bbox=dict(facecolor='gray', alpha=0.5))
-            m = ax.scatter([x], [y], marker='d', c='r', zorder=100)
+            m = ax.scatter([x], [y], marker='d', c='r', zorder=10000)
             self.drawnAnnotations[(x, y)] = (t, m)
             self.ax.figure.canvas.draw_idle()
 
@@ -115,13 +115,22 @@ for eng in engines:
             yi = benchdata['time_per_query_ns']
             x.append(xi)
             xall.append(xi)
-            y.append(yi)
-            yall.append(yi)
+            #y.append(yi)
+            #yall.append(yi)
+            y.append(1e9/yi)
+            yall.append(1e9/yi)
             s.append(4)
             #annotations[(xi, yi)] = str(benchdata)
             annotationsall.append(pprint.pformat(benchdata))
             # annotations[eng].append(str(benchdata))
     plt.scatter(x, y, s, label=eng, picker=True)
+
+plt.xlabel("Recall")
+#plt.ylabel("Query time (ns)")
+plt.ylabel("QPS")
+
+#plt.title("Recall-Querytime for k-NN.")
+plt.title("Recall-QPS for k-NN.")
 
 plt.yscale("log")
 plt.legend()
