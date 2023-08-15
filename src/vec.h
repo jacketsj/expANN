@@ -20,9 +20,9 @@ template <> struct ChooseUnderlying<double> {
 	using Underlying = Eigen::VectorXd;
 };
 
-template <typename T> struct ChooseUnderlying {
-	using Underlying = gch::small_vector<T>;
-};
+// template <typename T> struct ChooseUnderlying {
+//	using Underlying = gch::small_vector<T>;
+// };
 
 template <typename T> class vec {
 	// std::vector<T> internal;
@@ -31,6 +31,9 @@ template <typename T> class vec {
 	// Eigen::VectorXf internal;
 	using Underlying = ChooseUnderlying<T>::Underlying;
 	Underlying internal;
+
+	vec(const Underlying& _internal) : internal(_internal) {}
+	vec(Underlying&& _internal) : internal(_internal) {}
 
 public:
 	vec() = default;
@@ -53,67 +56,89 @@ public:
 	}
 	T& operator[](size_t i) { return internal[i]; }
 	void operator+=(const vec<T>& oth) {
+		internal += oth.internal;
 		// assert(dim() == oth.dim());
-		for (size_t i = 0; i < size(); ++i)
-			internal[i] += oth.internal[i];
+		// for (size_t i = 0; i < size(); ++i)
+		//	internal[i] += oth.internal[i];
 	}
 	void operator-=(const vec<T>& oth) {
+		internal -= oth.internal;
 		// assert(dim() == oth.dim());
-		for (size_t i = 0; i < size(); ++i)
-			internal[i] -= oth.internal[i];
+		// for (size_t i = 0; i < size(); ++i)
+		//	internal[i] -= oth.internal[i];
 	}
 	void operator*=(const T& val) {
-		for (size_t i = 0; i < size(); ++i)
-			internal[i] *= val;
+		internal *= val;
+		// for (size_t i = 0; i < size(); ++i)
+		//	internal[i] *= val;
 	}
 	void operator/=(const T& val) {
-		for (size_t i = 0; i < size(); ++i)
-			internal[i] /= val;
+		internal /= val;
+		// for (size_t i = 0; i < size(); ++i)
+		//	internal[i] /= val;
 	}
 	vec<T> operator+(const vec<T>& oth) const {
-		vec<T> ans(*this);
-		ans += oth;
-		return ans;
+		return vec<T>(internal + oth.internal);
+		// assert(dim() == oth.dim());
+		// vec<T> ans(*this);
+		// ans += oth;
+		// return ans;
 	}
 	vec<T> operator-(const vec<T>& oth) const {
+		return vec<T>(internal - oth.internal);
 		// assert(dim() == oth.dim());
-		vec<T> ans(*this);
-		ans -= oth;
-		return ans;
+		// vec<T> ans(*this);
+		// ans -= oth;
+		// return ans;
 	}
 	T dot(const vec<T>& oth) const {
+		return internal.dot(oth.internal);
+
 		// assert(dim() == oth.dim());
-		T ans = 0;
-		for (size_t i = 0; i < size(); ++i)
-			ans += internal[i] * oth.internal[i];
-		return ans;
+		// T ans = 0;
+		// for (size_t i = 0; i < size(); ++i)
+		//	ans += internal[i] * oth.internal[i];
+		// return ans;
 	}
 	T norm2() const {
-		T ans = 0;
-		for (const T& val : internal)
-			ans += val * val;
-		return ans;
+		return internal.squaredNorm();
+		// T ans = 0;
+		// for (const T& val : internal)
+		//	ans += val * val;
+		// return ans;
 	}
-	T norm() const { return sqrt(norm2()); }
-	void normalize() { (*this) /= norm(); }
+	T norm() const {
+		return internal.norm();
+		// return sqrt(norm2());
+	}
 	vec<T> normalized() const {
-		vec<T> ret = (*this);
-		ret.normalize();
-		return ret;
+		return vec<T>(internal.normalized());
+		// vec<T> ret = (*this);
+		// ret.normalize();
+		// return ret;
 	}
-	friend T dist2(const vec<T>& a, const vec<T>& b) { return (a - b).norm2(); }
+	void normalize() {
+		(*this) = normalized();
+		// (*this) /= norm();
+	}
+	friend T dist2(const vec<T>& a, const vec<T>& b) {
+		// return (a.internal - b.internal).squaredNorm();
+		return (a - b).norm2();
+	}
 	friend T dist(const vec<T>& a, const vec<T>& b) {
 		// assert(a.dim() == b.dim());
-		return sqrt(dist2(a, b));
+		return (a.internal - b.internal).norm();
+		// return sqrt(dist2(a, b));
 	}
 	friend T dot(const vec<T>& a, const vec<T>& b) { return a.dot(b); }
-	friend T cosinedist2(const vec<T>& a, const vec<T>& b) {
-		T dotres = dot(a, b);
-		return dotres * dotres / (a.norm2() * b.norm2());
-	}
-	friend T cosinedist(const vec<T>& a, const vec<T>& b) {
-		return sqrt(cosinedist2(a, b));
-	}
+	// cosine dist not currently used anywhere in the codebase, commented for now
+	// friend T cosinedist2(const vec<T>& a, const vec<T>& b) {
+	// 	T dotres = dot(a, b);
+	// 	return dotres * dotres / (a.norm2() * b.norm2());
+	// }
+	// friend T cosinedist(const vec<T>& a, const vec<T>& b) {
+	// 	return sqrt(cosinedist2(a, b));
+	// }
 	friend void to_json(nlohmann::json& j, const vec<T>& v) {
 		j = nlohmann::json(v.internal);
 	}
