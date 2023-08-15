@@ -1,3 +1,6 @@
 [submodule "plt"]
 	path = plt
 	url = https://github.com/jacketsj/matplotlib-cpp.git
+[submodule "eigen"]
+	path = eigen
+	url = https://gitlab.com/libeigen/eigen.git
