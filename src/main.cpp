@@ -12,7 +12,7 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
-#define NUM_THREADS 11
+#define NUM_THREADS 9
 
 int main() {
 	dataset_loader<float> dsl;
@@ -36,14 +36,14 @@ int main() {
 	}
 
 	// for (size_t n = 50000 * 1; n <= 50000 * 10 * 1; n *= 10) {
-	for (size_t n = 90000 * 1; n <= 90000 * 1 * 1; n *= 10) {
+	for (size_t n = 300000 * 1; n <= 300000 * 1 * 1; n *= 10) {
 		// size_t m = 400 * (n / 50000);
 		// size_t m = 400;
-		size_t m = 600;
+		size_t m = 400;
 		// if (n < 500000)
 		//	m = 400;
-		size_t d = 16;
-		size_t k = 10;
+		size_t d = 32;
+		size_t k = 20;
 		// size_t k = 1;
 		auto bdm = perform_benchmarks(
 				dsl.load_synethetic_uniform_sphere_points(n, m, k, d), NUM_THREADS);

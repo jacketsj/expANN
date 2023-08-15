@@ -18,13 +18,15 @@ struct ehnsw_engine_2_config {
 	size_t min_per_cut;
 	bool quick_search;
 	bool bumping;
+	bool quick_build;
 	ehnsw_engine_2_config(size_t _max_depth, size_t _edge_count_mult,
 												size_t _num_for_1nn, size_t _num_cuts,
-												size_t _min_per_cut, bool _quick_search, bool _bumping)
+												size_t _min_per_cut, bool _quick_search, bool _bumping,
+												bool _quick_build)
 			: max_depth(_max_depth), edge_count_mult(_edge_count_mult),
 				num_for_1nn(_num_for_1nn), num_cuts(_num_cuts),
 				min_per_cut(_min_per_cut), quick_search(_quick_search),
-				bumping(_bumping) {}
+				bumping(_bumping), quick_build(_quick_build) {}
 };
 
 template <typename T>
@@ -41,12 +43,13 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 	size_t min_per_cut;
 	bool quick_search;
 	bool bumping;
+	bool quick_build;
 	ehnsw_engine_2(ehnsw_engine_2_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				max_depth(conf.max_depth), edge_count_mult(conf.edge_count_mult),
 				num_for_1nn(conf.num_for_1nn), num_cuts(conf.num_cuts),
 				min_per_cut(conf.min_per_cut), quick_search(conf.quick_search),
-				bumping(conf.bumping) {}
+				bumping(conf.bumping), quick_build(conf.quick_build) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<robin_hood::unordered_flat_map<size_t, std::vector<size_t>>> hadj;
 	std::vector<robin_hood::unordered_flat_map<
@@ -63,7 +66,7 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 	void add_edge(size_t layer, size_t i, size_t j);
 	void add_edge_directional(size_t layer, size_t i, size_t j);
 	const std::vector<std::vector<size_t>>
-	_query_k_internal(const vec<T>& v, size_t k, bool fill_all_layers = false);
+	_query_k_internal(const vec<T>& v, size_t k, size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "EHNSW Engine 2"; }
 	const param_list_t _param_list() {
@@ -75,6 +78,7 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 		add_param(pl, min_per_cut);
 		add_param(pl, quick_search);
 		add_param(pl, bumping);
+		add_param(pl, quick_build);
 		return pl;
 	}
 };
@@ -163,15 +167,19 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 
 		for (size_t cut = 0; cut < num_cuts; ++cut)
 			e_labels[i].emplace_back(int_distribution(gen));
-		// get kNN at each layer
-		std::vector<std::vector<size_t>> kNN =
-				_query_k_internal(all_entries[i], edge_count_mult, true);
 		// get the layer this entry will go up to
 		size_t cur_layer_ub =
 				floor(-log(distribution(gen)) * 1 / log(double(edge_count_mult)));
 		size_t cur_layer = std::min(cur_layer_ub, max_depth);
-		// if it is a new layer, add a layer
-		if (cur_layer >= hadj.size())
+		// get kNN at each layer
+		size_t full_search_top_layer = hadj.size() - 1;
+		if (quick_build)
+			full_search_top_layer = cur_layer;
+		std::vector<std::vector<size_t>> kNN = _query_k_internal(
+				all_entries[i], edge_count_mult, full_search_top_layer);
+		// if it is a new layer, add a layer (important that this happens AFTER kNN
+		// at each layer)
+		while (cur_layer >= hadj.size())
 			add_layer(i);
 		// add all the neighbours as edges
 		for (size_t layer = 0; layer <= cur_layer && layer < kNN.size(); ++layer) {
@@ -227,14 +235,14 @@ ehnsw_engine_2<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 template <typename T>
 const std::vector<std::vector<size_t>>
 ehnsw_engine_2<T>::_query_k_internal(const vec<T>& v, size_t k,
-																		 bool fill_all_layers) {
+																		 size_t full_search_top_layer) {
 	auto current = starting_vertex;
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::vector<size_t>> ret;
 	// for each layer, in decreasing depth
 	for (int layer = hadj.size() - 1; layer >= 0; --layer) {
 		size_t layer_k = k;
-		if (!fill_all_layers && layer > 0)
+		if (layer > int(full_search_top_layer))
 			layer_k = 1;
 		ret.push_back(_query_k_at_layer(v, layer_k, current, layer));
 		current = ret.back().front();
@@ -245,7 +253,7 @@ ehnsw_engine_2<T>::_query_k_internal(const vec<T>& v, size_t k,
 
 template <typename T>
 std::vector<size_t> ehnsw_engine_2<T>::_query_k(const vec<T>& v, size_t k) {
-	auto ret = _query_k_internal(v, k * num_for_1nn, !quick_search)[0];
+	auto ret = _query_k_internal(v, k * num_for_1nn, 0)[0];
 	ret.resize(std::min(k, ret.size()));
 	return ret;
 }
