@@ -164,7 +164,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k : {28, 50}) {
 		// for (size_t k : {55, 74, 80}) {
 		// for (size_t k = 44; k <= 80; k += 12) {
-		for (size_t k = 38; k <= 60; k += 6) {
+		// for (size_t k = 38; k <= 60; k += 6) {
+		for (size_t k = 20; k <= 32; k += 6) {
 			// for (size_t num_for_1nn = 128; num_for_1nn <= 128; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
 			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
