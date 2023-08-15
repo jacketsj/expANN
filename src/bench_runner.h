@@ -160,12 +160,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t repeats = 0; repeats < 8; ++repeats) {
 	// for (size_t k = 28; k <= 28; k += 8) {
 	// for (size_t k : {28, 56}) {
-	if (false) {
+	if (true) {
 		// for (size_t k : {28, 50}) {
-		for (size_t k : {55, 74, 80}) {
+		// for (size_t k : {55, 74, 80}) {
+		for (size_t k = 44; k <= 80; k += 12) {
 			// for (size_t num_for_1nn = 128; num_for_1nn <= 128; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 128; num_for_1nn *= 2) {
 				//  std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" <<
 				//  num_for_1nn
@@ -216,29 +218,30 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		//					 min_per_cut * K <= k && min_per_cut <= 16; min_per_cut *= 2) {
 		// for (size_t k : {28, 50}) {
 		// for (size_t k : {55, 74, 80}) {
-		for (size_t k : {95}) {
+		// for (size_t k : {85, 95}) {
+		for (size_t k = 44; k <= 80; k += 12) {
 			// for (size_t k : {28}) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 64; num_for_1nn <= 128; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 2) {
 				//  for (size_t K : {2, 4}) {
 				// for (size_t K : {2, 4, 8}) {
-				for (size_t K : {3}) {
+				for (size_t K : {1, 3}) {
 					// for (size_t min_per_cut : {1, 2}) {
-					for (size_t min_per_cut : {1, 2, 4}) {
+					for (size_t min_per_cut : {1}) {
 						// std::cerr << "About to start ehnsw2(k=" << k << ",K=" << K
 						//					<< ",n4nn=" << num_for_1nn
 						//					<< ",min_per_cut=" << min_per_cut << ")" << std::endl;
 						ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
-								100, k, num_for_1nn, K, min_per_cut, true, false));
-						ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 								100, k, num_for_1nn, K, min_per_cut, true, true));
-						// ehnsw_engine_2<float> engine(
+						// ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
+						//		100, k, num_for_1nn, K, min_per_cut, true, false));
+						//  ehnsw_engine_2<float> engine(
 						//		ehnsw_engine_2_config(100, k, num_for_1nn, K, min_per_cut));
-						// bdm.add(basic_benchmarker.get_benchmark_data(engine));
-						// std::cerr << "Completed ehnsw2(k=" << k << ",K=" << K
+						//  bdm.add(basic_benchmarker.get_benchmark_data(engine));
+						//  std::cerr << "Completed ehnsw2(k=" << k << ",K=" << K
 						//					<< ",n4nn=" << num_for_1nn
 						//					<< ",min_per_cut=" << min_per_cut << ")" << std::endl;
 					}
