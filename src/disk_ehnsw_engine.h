@@ -389,7 +389,11 @@ disk_ehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k) {
 
 template <typename T>
 std::vector<size_t> disk_ehnsw_engine<T>::_query_k(const vec<T>& v, size_t k) {
-	auto ret = _query_k_internal(v, k * num_for_1nn)[0];
-	ret.resize(std::min(k, ret.size()));
+	auto node_indices = _query_k_internal(v, k * num_for_1nn)[0];
+	node_indices.resize(std::min(k, node_indices.size()));
+	// convert node indices to data indexes
+	std::vector<size_t> ret;
+	for (auto& node_index : node_indices)
+		ret.emplace_back(di->get_node(node_index).data_index);
 	return ret;
 }
