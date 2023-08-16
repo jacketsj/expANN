@@ -12,7 +12,7 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
-#define NUM_THREADS 6
+#define NUM_THREADS 8
 
 int main() {
 	dataset_loader<float> dsl;
@@ -42,7 +42,7 @@ int main() {
 		size_t m = 400;
 		// if (n < 500000)
 		//	m = 400;
-		size_t d = 32;
+		size_t d = 128;
 		size_t k = 20;
 		// size_t k = 1;
 		auto bdm = perform_benchmarks(

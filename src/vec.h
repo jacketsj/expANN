@@ -32,9 +32,6 @@ template <typename T> class vec {
 	using Underlying = ChooseUnderlying<T>::Underlying;
 	Underlying internal;
 
-	vec(const Underlying& _internal) : internal(_internal) {}
-	vec(Underlying&& _internal) : internal(_internal) {}
-
 public:
 	vec() = default;
 	// vec(size_t dim) : internal(dim) {}
@@ -45,6 +42,8 @@ public:
 		// for (const auto& val : v)
 		//	internal.emplace_back(val);
 	}
+	vec(const Underlying& _internal) : internal(_internal) {}
+	vec(Underlying&& _internal) : internal(_internal) {}
 	void set_dim(size_t dim) { internal.resize(dim); }
 	size_t size() const { return size_t(internal.size()); }
 	size_t dim() const { return size(); }
@@ -54,6 +53,7 @@ public:
 			ret += std::to_string(val) + ' ';
 		return ret;
 	}
+	const Underlying& get_underlying() const { return internal; }
 	T& operator[](size_t i) { return internal[i]; }
 	void operator+=(const vec<T>& oth) {
 		internal += oth.internal;

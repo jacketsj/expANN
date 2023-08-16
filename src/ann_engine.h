@@ -8,6 +8,8 @@
 
 typedef std::map<std::string, std::string> param_list_t;
 #define add_param(pl, p) pl[#p] = std::to_string(p)
+#define add_sub_param(pl, prefix_name, pname, p)                               \
+	pl[std::string(prefix_name) + pname] = p
 
 template <typename T, class Derived> struct ann_engine {
 	ann_engine() = default;
