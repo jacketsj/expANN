@@ -12,6 +12,7 @@
 #include "brute_force_engine.h"
 #include "dataset.h"
 #include "dataset_loader.h"
+#include "disk_ehnsw_engine.h"
 #include "ehnsw_engine.h"
 #include "ehnsw_engine_2.h"
 #include "hier_arrangement_engine.h"
@@ -117,6 +118,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	std::vector<job<ehnsw_engine<float>, ehnsw_engine_config>> ehnsw_engine_jobs;
 	std::vector<job<ehnsw_engine_2<float>, ehnsw_engine_2_config>>
 			ehnsw_engine_2_jobs;
+	std::vector<job<disk_ehnsw_engine<float>, disk_ehnsw_engine_config>>
+			disk_ehnsw_engine_jobs;
 	std::vector<job<projection_engine<float, ehnsw_engine_2<float>>,
 									projection_engine_config<ehnsw_engine_2_config>>>
 			projection_ehnsw_engine_2_jobs;
@@ -167,7 +170,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t repeats = 0; repeats < 8; ++repeats) {
 	// for (size_t k = 28; k <= 28; k += 8) {
 	// for (size_t k : {28, 56}) {
-	if (true) {
+	if (false) {
 		// for (size_t k : {28, 50}) {
 		// for (size_t k : {55, 74, 80}) {
 		// for (size_t k = 44; k <= 80; k += 12) {
@@ -186,10 +189,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						hnsw_engine_2_config(100, k, num_for_1nn, true));
 				// projection_hnsw_engine_2_jobs.emplace_back(projection_engine_config(
 				//		1, ds.dim, true, hnsw_engine_2_config(100, k, num_for_1nn,
-				//true)));
+				// true)));
 				// projection_hnsw_engine_2_jobs.emplace_back(projection_engine_config(
 				//		4, ds.dim, true, hnsw_engine_2_config(100, k, num_for_1nn,
-				//true)));
+				// true)));
 				// projection_hnsw_engine_2_jobs.emplace_back(projection_engine_config(
 				//		4, ds.dim / 4, true,
 				//		hnsw_engine_2_config(100, k, num_for_1nn, true)));
@@ -232,7 +235,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t K = 4; K <= 256; K *= 2) {
 	//	for (size_t k = 16; k <= 128 * 2; k *= 4) {
 	//		for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 64 * 2;
-	if (false) {
+	if (true) {
 		// for (size_t K = 2; K <= 32; K *= 2) {
 		//	for (size_t k = 11; k < 64; k += 9) {
 		//		for (size_t num_for_1nn = 4; num_for_1nn <= 64; num_for_1nn *= 2) {
@@ -243,13 +246,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k : {85, 95}) {
 		// for (size_t k = 44; k <= 80; k += 12) {
 		// for (size_t k = 38; k <= 60; k += 6) {
-		for (size_t k = 70; k <= 95; k += 6) {
+		// for (size_t k = 70; k <= 95; k += 6) {
+		for (size_t k = 40; k <= 40; k += 6) {
 			// for (size_t k : {28}) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
-			// for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 3; num_for_1nn <= 8; num_for_1nn += 1) {
+			// for (size_t num_for_1nn = 3; num_for_1nn <= 8; num_for_1nn += 1) {
+			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 64; num_for_1nn <= 128; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 2) {
 				//  for (size_t K : {2, 4}) {
@@ -265,8 +269,12 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						//		100, k, num_for_1nn, K, min_per_cut, true, true, true));
 						// ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 						//		100, k, num_for_1nn, K, min_per_cut, true, true));
-						ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
-								100, k, num_for_1nn, K, min_per_cut, true, true, false));
+						// ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
+						//		100, k, num_for_1nn, K, min_per_cut, true, true, false));
+						disk_ehnsw_engine_jobs.emplace_back(disk_ehnsw_engine_config(
+								ehnsw_engine_2_config(100, k, num_for_1nn, K, min_per_cut, true,
+																			true, false),
+								"tempindexfile.expannind"));
 						//  ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 						//		100, k, num_for_1nn, K, min_per_cut, true, false));
 						//   ehnsw_engine_2<float> engine(
@@ -426,7 +434,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			arrangement_engine_jobs, ehnsw_engine_jobs, ehnsw_engine_2_jobs,
 			hier_arrangement_engine_jobs, hnsw_engine_hybrid_jobs,
 			tree_arrangement_engine_jobs, tree_arrangement_engine_if_jobs,
-			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs);
+			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
+			disk_ehnsw_engine_jobs);
 
 	bench_data_manager bdm(ds.name);
 	store_benchmark_results(
@@ -434,7 +443,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			ehnsw_engine_jobs, ehnsw_engine_2_jobs, hier_arrangement_engine_jobs,
 			hnsw_engine_hybrid_jobs, tree_arrangement_engine_jobs,
 			tree_arrangement_engine_if_jobs, projection_hnsw_engine_2_jobs,
-			projection_ehnsw_engine_2_jobs);
+			projection_ehnsw_engine_2_jobs, disk_ehnsw_engine_jobs);
 
 	return bdm;
 }

@@ -14,15 +14,10 @@
 
 struct disk_ehnsw_engine_config {
 	ehnsw_engine_2_config subconf;
-	size_t max_mb_all_accessor;
-	size_t max_mb_index_accessor;
 	std::string filename;
 	disk_ehnsw_engine_config(ehnsw_engine_2_config _subconf,
-													 size_t _max_mb_all_accessor,
-													 size_t _max_mb_index_accessor,
 													 const std::string& _filename)
-			: subconf(_subconf), max_mb_all_accessor(_max_mb_all_accessor),
-				max_mb_index_accessor(_max_mb_index_accessor), filename(_filename) {}
+			: subconf(_subconf), filename(_filename) {}
 };
 
 // Disk index contains the following (in order):
@@ -36,7 +31,7 @@ struct disk_ehnsw_engine_config {
 
 // The first 4 items are encoded in disk_metadata
 struct disk_metadata {
-	size_t num_vecs, dim, num_nodes, num_edges;
+	size_t num_vecs, dim, num_nodes, num_edges, starting_node;
 };
 
 // Nodes are formatted as follows
@@ -45,12 +40,14 @@ struct disk_node {
 	size_t child_node_index;
 	size_t num_edges;
 	size_t edges_start_index;
+	// disk_node(size_t _data_index, size_t _child_node_index, size_t _num_edges,
+	//					size_t _edges_start_index)
+	//		: data_index(_data_index), child_node_index(_child_node_index),
+	//			num_edges(_num_edges), edges_start_index(_edges_start_index) {}
 };
 template <typename T> struct disk_node_if : disk_node {
-	disk_node_if(const disk_node& dn)
-			: data_index(dn.data_index), child_node_index(dn.child_node_index),
-				num_edges(dn.num_edges), edges_start_index(dn.edges_start_index) {}
 	vec<T> v;
+	disk_node_if(const disk_node& dn) : disk_node(dn) {}
 };
 // followed by an encoding of the corresponding vector
 
@@ -72,7 +69,7 @@ template <typename T> struct disk_index {
 			: mmv(filename.c_str(), size) {
 		populate_disk_metadata();
 	}
-	void populate_disk_metadata() { dm = mmv.read<disk_metadata>(0); }
+	void populate_disk_metadata() { dm = mmv.tread<disk_metadata>(0); }
 	const disk_metadata& get_disk_metadata() { return dm; }
 	size_t num_vecs() { return get_disk_metadata().num_vecs; }
 	size_t dim() { return get_disk_metadata().dim; }
@@ -84,16 +81,17 @@ template <typename T> struct disk_index {
 		return sizeof(disk_metadata) + node_size() * num_nodes();
 	}
 	size_t edge_size() { return sizeof(size_t); }
-	disk_node_if get_node(size_t i) {
+	disk_node_if<T> get_node(size_t i) {
 		size_t location = node_array_start() + i * node_size();
-		disk_node dn = mmv.read<disk_node>(location);
-		disk_node_if dnif(dn);
+		disk_node dn = mmv.tread<disk_node>(location);
+		disk_node_if<T> dnif(dn);
 		dnif.v = vec<T>(mmv.read_list<T>(location + sizeof(disk_node), dim()));
 		return dnif;
 	}
+	size_t get_starting_node_index() { return dm.starting_node; }
 	std::vector<size_t> get_edges(const disk_node& dn) {
 		size_t location =
-				edge_array_start() + dn.edge_size() * dn.edges_start_index;
+				edge_array_start() + sizeof(size_t) * dn.edges_start_index;
 		return mmv.read_list<size_t>(location, dn.num_edges);
 	}
 };
@@ -104,6 +102,7 @@ template <typename T> struct disk_index_builder {
 	// map level -> vertex -> node index
 	size_t dim;
 	size_t num_vecs;
+	size_t starting_node;
 	std::vector<disk_node> nodes;
 	std::vector<size_t> edges;
 	const std::vector<vec<T>>& all_entries;
@@ -122,8 +121,8 @@ template <typename T> struct disk_index_builder {
 		size_t node_index = map_to_node[level][data_index];
 		nodes[node_index].edges_start_index = edges.size();
 		nodes[node_index].num_edges = to_nodes.size();
-		for (size_t to_node_index : map_to_node[level][to_data_index])
-			edges.emplace_back(to_node_index);
+		for (size_t to_data_index : to_nodes)
+			edges.emplace_back(map_to_node[level][to_data_index]);
 	}
 	void populate_child_index(size_t level, size_t data_index) {
 		size_t node_index = map_to_node[level][data_index];
@@ -133,13 +132,15 @@ template <typename T> struct disk_index_builder {
 	disk_index_builder(
 			const std::vector<
 					robin_hood::unordered_flat_map<size_t, std::vector<size_t>>>& hadj,
-			const std::vector<vec<T>>& all_entries) {
+			const std::vector<vec<T>>& _all_entries, size_t starting_vertex)
+			: all_entries(_all_entries) {
 		num_vecs = all_entries.size();
 		for (size_t level = 0; level < hadj.size(); ++level) {
 			for (const auto& [data_index, _] : hadj[level]) {
 				add_node(level, data_index, all_entries.at(data_index));
 			}
 		}
+		starting_node = map_to_node[hadj.size() - 1][starting_vertex];
 		for (size_t level = 0; level < hadj.size(); ++level) {
 			for (const auto& [data_index, edges] : hadj[level]) {
 				add_edges(level, data_index, edges);
@@ -152,7 +153,7 @@ template <typename T> struct disk_index_builder {
 		}
 	}
 	size_t write(const std::string& filename) { // returns size of file
-		disk_metadata dm { num_vecs, dim, nodes.size(), edges.size(); };
+		disk_metadata dm{num_vecs, dim, nodes.size(), edges.size(), starting_node};
 		// compute total size
 		size_t total_size =
 				sizeof(disk_metadata) +
@@ -161,17 +162,17 @@ template <typename T> struct disk_index_builder {
 		memory_mapped_vector mmv(filename.c_str(), total_size);
 		// write dm, then nodes, then edges
 		size_t size_written = 0;
-		mmv.write(size_written, dm);
+		mmv.twrite(size_written, dm);
 		size_written += sizeof(disk_metadata);
 		for (size_t i = 0; i < nodes.size(); ++i) {
-			mmv.write(size_written, nodes[i]);
+			mmv.twrite(size_written, nodes[i]);
 			size_written += sizeof(disk_node);
 			std::vector<T> entry = all_entries[i].to_vector();
-			mmv.write_list(size_written, entry.begin(), entry.end());
+			mmv.write_list<T>(size_written, entry.begin(), entry.end());
 			size_written += entry.size() * sizeof(T);
 			assert(entry.size() == dim);
 		}
-		mmv.write_list(size_written, edges.begin(), edges.end());
+		mmv.write_list<size_t>(size_written, edges.begin(), edges.end());
 		size_written += edges.size() * sizeof(size_t);
 		return size_written;
 	}
@@ -182,29 +183,25 @@ struct disk_ehnsw_engine : public ann_engine<T, disk_ehnsw_engine<T>> {
 	std::string filename;
 	std::optional<ehnsw_engine_2<T>> builder_engine;
 	ehnsw_engine_2_config subconf;
-	size_t max_mb_all_accessor;
-	size_t max_mb_index_accessor;
 	std::optional<disk_index<T>> di;
+	size_t num_for_1nn;
 	disk_ehnsw_engine(disk_ehnsw_engine_config conf)
 			: filename(conf.filename),
-				builder_engine(std::make_optional<ehnsw_engine_2>(conf.subconf)),
-				subconf(conf.subconf), max_mb_all_accessor(conf.max_mb_all_accessor),
-				max_mb_index_accessor(conf.max_mb_index_accessor) {}
+				builder_engine(std::make_optional<ehnsw_engine_2<T>>(conf.subconf)),
+				subconf(conf.subconf), num_for_1nn(conf.subconf.num_for_1nn) {}
 	void _store_vector(const vec<T>& v);
 	void _build();
 	const std::vector<size_t> _query_k_at_layer(const vec<T>& v, size_t k,
-																							size_t starting_point,
-																							size_t layer);
-	const std::vector<std::vector<size_t>>
-	_query_k_internal(const vec<T>& v, size_t k, size_t full_search_top_layer);
+																							size_t starting_point);
+	const std::vector<std::vector<size_t>> _query_k_internal(const vec<T>& v,
+																													 size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "Disk EHNSW Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
-		for (auto& [pname, p] : ehnsw_engine_2(subconf).param_list())
+		for (auto& [pname, p] : ehnsw_engine_2<T>(subconf).param_list())
 			add_sub_param(pl, "subengine-", pname, p);
-		add_param(pl, max_mb_all_accessor);
-		add_param(pl, max_mb_index_accessor);
+		// add_param(pl, filename.c_str());
 		return pl;
 	}
 };
@@ -220,7 +217,8 @@ template <typename T> void disk_ehnsw_engine<T>::_build() {
 	size_t di_size = 0;
 	// flatten the builder_engine graph, store it on disk (+remove the hashmaps)
 	{
-		disk_index_builder dib(builder_engine->hadj, builder_engine->all_entries);
+		disk_index_builder<T> dib(builder_engine->hadj, builder_engine->all_entries,
+															builder_engine->starting_vertex);
 		di_size = dib.write(filename);
 	}
 
@@ -228,7 +226,7 @@ template <typename T> void disk_ehnsw_engine<T>::_build() {
 	builder_engine.reset();
 
 	// load the disk index that was built
-	di = std::make_optional<disk_index>(filename, di_size);
+	di = std::make_optional<disk_index<T>>(filename, di_size);
 }
 
 // starting point is now a node index
@@ -237,14 +235,16 @@ template <typename T>
 const std::vector<size_t>
 disk_ehnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 																				size_t starting_point) {
-	std::priority_queue<std::pair<T, size_t>> top_k;
-	std::priority_queue<std::pair<T, size_t>> to_visit;
-	robin_hood::unordered_flat_set<size_t> visited;
-	auto visit = [&](T d, size_t u) {
+	std::priority_queue<std::pair<T, size_t>> top_k; // stores distance + node_id
+	std::priority_queue<std::pair<T, size_t>>
+			to_visit;																		// stores distance + node_id
+	robin_hood::unordered_flat_set<size_t> visited; // stores node_ids
+	auto visit = [&](T d, size_t u) {								// takes distance + node_id
 		bool is_good =
 				!visited.contains(u) && (top_k.size() < k || top_k.top().first > d);
 		visited.insert(u);
 		if (is_good) {
+			// TODO pre-fetch/hint edges here
 			top_k.emplace(d, u);		 // top_k is a max heap
 			to_visit.emplace(-d, u); // to_visit is a min heap
 		}
@@ -252,7 +252,7 @@ disk_ehnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			top_k.pop();
 		return is_good;
 	};
-	visit(dist(v, all_entries[starting_point]), starting_point);
+	visit(dist(v, di->get_node(starting_point).v), starting_point);
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -261,8 +261,8 @@ disk_ehnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
-		for (const auto& u : hadj[layer][cur]) {
-			T d_next = dist(v, all_entries[u]);
+		for (const auto& u : di->get_edges(di->get_node(cur))) {
+			T d_next = dist(v, di->get_node(u).v);
 			visit(d_next, u);
 		}
 	}
@@ -275,18 +275,20 @@ disk_ehnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 	return ret;
 }
 
+// TODO change this to not use 'layer' but instead keep track of whether the
+// child index exists
+// TODO call di->get_starting_node() to get initial node
 template <typename T>
 const std::vector<std::vector<size_t>>
 disk_ehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k) {
-	auto current = starting_vertex;
-	std::priority_queue<std::pair<T, size_t>> top_k;
+	auto current = di->get_starting_node_index();
 	std::vector<std::vector<size_t>> ret;
 	// for each layer, in decreasing depth
-	for (int layer = hadj.size() - 1; layer >= 0; --layer) {
+	while (current != NO_CHILD) {
 		size_t layer_k = k;
-		if (layer > 0)
+		if (di->get_node(current).child_node_index != NO_CHILD)
 			layer_k = 1;
-		ret.push_back(_query_k_at_layer(v, layer_k, current, layer));
+		ret.push_back(_query_k_at_layer(v, layer_k, current));
 		current = ret.back().front();
 	}
 	reverse(ret.begin(), ret.end());

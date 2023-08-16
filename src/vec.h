@@ -139,8 +139,15 @@ public:
 	// friend T cosinedist(const vec<T>& a, const vec<T>& b) {
 	// 	return sqrt(cosinedist2(a, b));
 	// }
+	std::vector<T> to_vector() const {
+		std::vector<T> ret(dim());
+		for (size_t i = 0; i < dim(); ++i) {
+			ret[i] = internal[i];
+		}
+		return ret;
+	}
 	friend void to_json(nlohmann::json& j, const vec<T>& v) {
-		j = nlohmann::json(v.internal);
+		j = nlohmann::json(v.to_vector());
 	}
 	friend void from_json(const nlohmann::json& j, vec<T>& v) {
 		// v.internal = j.get<std::vector<T>>();
