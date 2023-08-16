@@ -247,7 +247,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 44; k <= 80; k += 12) {
 		// for (size_t k = 38; k <= 60; k += 6) {
 		// for (size_t k = 70; k <= 95; k += 6) {
-		for (size_t k = 40; k <= 40; k += 6) {
+		// for (size_t k = 40; k <= 40; k += 6) {
+		for (size_t k = 5; k <= 5; k += 6) {
 			// for (size_t k : {28}) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
@@ -259,7 +260,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				//  for (size_t K : {2, 4}) {
 				// for (size_t K : {2, 4, 8}) {
 				// for (size_t K : {1, 3}) {
-				for (size_t K : {3}) {
+				// for (size_t K : {3}) {
+				for (size_t K : {1}) {
 					// for (size_t min_per_cut : {1, 2}) {
 					for (size_t min_per_cut : {1}) {
 						// std::cerr << "About to start ehnsw2(k=" << k << ",K=" << K
