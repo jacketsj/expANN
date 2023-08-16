@@ -16,9 +16,10 @@
 struct disk_ehnsw_engine_config {
 	ehnsw_engine_2_config subconf;
 	std::string filename;
+	bool create_index;
 	disk_ehnsw_engine_config(ehnsw_engine_2_config _subconf,
-													 const std::string& _filename)
-			: subconf(_subconf), filename(_filename) {}
+													 const std::string& _filename, bool _create_index)
+			: subconf(_subconf), filename(_filename), create_index(_create_index) {}
 };
 
 // Disk index contains the following (in order):
@@ -80,7 +81,7 @@ template <typename T> struct disk_index {
 	mio::mmap_source miom;
 	// memory_mapped_vector mmv;
 	disk_metadata dm;
-	disk_index(const std::string& filename, size_t size)
+	disk_index(const std::string& filename) //, size_t size)
 			: miom(filename.c_str()) {
 		// , mmv(filename.c_str(), size, true)
 		populate_disk_metadata();
@@ -213,7 +214,7 @@ template <typename T> struct disk_index_builder {
 			}
 		}
 	}
-	size_t write(const std::string& filename) { // returns size of file
+	void write(const std::string& filename) { // returns size of file
 		// disk_metadata dm{num_vecs, dim, nodes.size(), edges.size(),
 		// starting_node};
 		disk_metadata dm{dim, nodes.size(), edges.size(), starting_node};
@@ -245,6 +246,7 @@ template <typename T> struct disk_index_builder {
 		// memory_mapped_vector mmv(filename.c_str(), total_size);
 		// write dm, then nodes, then edges
 		size_t size_written = 0;
+		size_t size_written_data_only = 0;
 		mio_write(miom, dm, size_written, sizeof(disk_metadata));
 		// mmv.twrite(size_written, dm);
 		size_written += sizeof(disk_metadata);
@@ -260,13 +262,17 @@ template <typename T> struct disk_index_builder {
 			mio_write(miom, *entry.data(), size_written, sizeof(T) * entry.size());
 			// mmv.write_list<T>(size_written, entry.begin(), entry.end());
 			size_written += entry.size() * sizeof(T);
+			size_written_data_only += entry.size() * sizeof(T);
 			assert(entry.size() == dim);
 		}
+		std::cerr << "size_written_before_edges=" << size_written << std::endl;
 		mio_write(miom, *edges.data(), size_written, sizeof(size_t) * edges.size());
 		// mmv.write_list<size_t>(size_written, edges.begin(), edges.end());
 		size_written += edges.size() * sizeof(size_t);
 		// std::cerr << "size_written=" << size_written << std::endl;
-		return size_written;
+		std::cerr << "size_written_data_only=" << size_written_data_only
+							<< std::endl;
+		// return size_written;
 	}
 };
 
@@ -277,10 +283,12 @@ struct disk_ehnsw_engine : public ann_engine<T, disk_ehnsw_engine<T>> {
 	ehnsw_engine_2_config subconf;
 	std::optional<disk_index<T>> di;
 	size_t num_for_1nn;
+	bool create_index;
 	disk_ehnsw_engine(disk_ehnsw_engine_config conf)
 			: filename(conf.filename),
 				builder_engine(std::make_optional<ehnsw_engine_2<T>>(conf.subconf)),
-				subconf(conf.subconf), num_for_1nn(conf.subconf.num_for_1nn) {}
+				subconf(conf.subconf), num_for_1nn(conf.subconf.num_for_1nn),
+				create_index(conf.create_index) {}
 	void _store_vector(const vec<T>& v);
 	void _build();
 	const std::vector<size_t> _query_k_at_layer(const vec<T>& v, size_t k,
@@ -294,6 +302,7 @@ struct disk_ehnsw_engine : public ann_engine<T, disk_ehnsw_engine<T>> {
 		for (auto& [pname, p] : ehnsw_engine_2<T>(subconf).param_list())
 			add_sub_param(pl, "subengine-", pname, p);
 		// add_param(pl, filename.c_str());
+		add_param(pl, create_index);
 		return pl;
 	}
 };
@@ -304,16 +313,16 @@ void disk_ehnsw_engine<T>::_store_vector(const vec<T>& v) {
 }
 
 template <typename T> void disk_ehnsw_engine<T>::_build() {
-	builder_engine->build();
+	if (create_index) {
+		builder_engine->build();
 
-	size_t di_size = 0;
-	// flatten the builder_engine graph, store it on disk (+remove the hashmaps)
-	{
+		// flatten the builder_engine graph, store it on disk (+remove the hashmaps)
 		// std::cerr << "Finished building, now flattening." << std::endl;
 		disk_index_builder<T> dib(builder_engine->hadj, builder_engine->all_entries,
 															builder_engine->starting_vertex);
 		// std::cerr << "Finished flatterning, now writing." << std::endl;
-		di_size = dib.write(filename);
+		dib.write(filename);
+		// size_t di_size = dib.write(filename);
 		// di_size = 6960;
 		// std::cerr << "Finished writing." << std::endl;
 	}
@@ -322,7 +331,7 @@ template <typename T> void disk_ehnsw_engine<T>::_build() {
 	builder_engine.reset();
 
 	// load the disk index that was built
-	di = std::make_optional<disk_index<T>>(filename, di_size);
+	di = std::make_optional<disk_index<T>>(filename); //, di_size);
 }
 
 // starting point is now a node index

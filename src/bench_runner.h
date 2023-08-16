@@ -277,10 +277,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 									100, k, num_for_1nn, K, min_per_cut, true, true, false));
 						}
 						if (true) {
+							bool create_index = true;
 							disk_ehnsw_engine_jobs.emplace_back(disk_ehnsw_engine_config(
 									ehnsw_engine_2_config(100, k, num_for_1nn, K, min_per_cut,
 																				true, true, false),
-									"tempindexfile.expannind"));
+									"tempindexfile.expannind", create_index));
 						}
 						//  ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 						//		100, k, num_for_1nn, K, min_per_cut, true, false));
