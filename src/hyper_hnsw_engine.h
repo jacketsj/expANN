@@ -157,7 +157,7 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
 								<< "%" << std::endl;
 		// get kNN at each layer
-		size_t k = degree_node * degree_cluster;
+		size_t k = degree_node * (degree_cluster - 1);
 		// TODO should also be getting some "k nearest clusters" or similar
 		// (also suffices to try adding to every cluster visited with the distance
 		// to that cluster's mean)
@@ -173,6 +173,8 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 		// add all the neighbours as edges
 		for (size_t layer = 0; layer <= cur_layer && layer < kNN.size(); ++layer) {
 			size_t node_index = hypergraphs.back().add_node(i);
+			// TODO do k-means or something like it (b-matching?) instead of
+			// random_shuffle
 			random_shuffle(kNN[layer].begin(), kNN[layer].end());
 			size_t neighbours_i = 0;
 			for (size_t local_cluster_index = 0; local_cluster_index < degree_node;
@@ -181,22 +183,34 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 					break;
 				// create new cluster
 				size_t cluster_index = hypergraphs[layer].add_cluster();
-				hypergraphs[layer].add_to_cluster(node_index, cluster_index, 0);
+				std::vector<size_t>
+						cluster_elems; // elems to add to cluster (node indexes)
+				cluster_elems.push_back(node_index);
 				for (size_t cur_neighbours_i = neighbours_i;
 						 cur_neighbours_i < kNN[layer].size() &&
 						 cur_neighbours_i < degree_cluster + neighbours_i;
 						 ++cur_neighbours_i) {
-					T d; // TODO compute the distance, or just do this after somehow
-							 // (maybe by inserting with max distance at first)
-					hypergraphs[layer].add_to_cluster(kNN[layer][cur_neighbours_i],
-																						cluster_index, d);
+					cluster_elems.emplace_back(kNN[layer][cur_neighbours_i]);
 				}
 				neighbours_i += degree_cluster;
+				// compute mean
+				vec<T> mean();
+				mean.set_dim(all_entries[0].dim());
+				for (size_t cur_node_index : cluster_elems)
+					mean +=
+							all_entries[hypergraphs[layer].get_data_index(cur_node_index)];
+				mean /= T(cluster_elems.size());
+				for (size_t cur_node_index : cluster_elems)
+					hypergraphs[layer].add_to_cluster(
+							cur_node_index, cluster_index,
+							dist2(mean, all_entries[hypergraphs[layer].get_data_index(
+															cur_node_index)]));
 			}
 		}
-		// TODO do a training run now (just on the new clusters)
-		// for each one:
+		// TODO do a training run now (just on the new clusters), or maybe a few
+		// even, for each new cluster:
 		// - re-compute means
+		// 	   (add a function which takes a vec<T> and computes distance from it)
 		// - discard existing ranks in clusters and recompute
 		// - compute kNN again (from the mean location, for k=degree_cluster)
 		// - call add_to_cluster with new ranks
@@ -224,7 +238,8 @@ hyper_hnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			top_k.pop();
 		return is_good;
 	};
-	visit(dist(v, all_entries[starting_point]), starting_point);
+	visit(dist(v, all_entries[hypergraphs[layer].get_data_index(starting_point)]),
+				starting_point);
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -233,8 +248,8 @@ hyper_hnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
-		for (auto& [_, u] : hadj[layer][cur]) {
-			T d_next = dist(v, all_entries[u]);
+		for (auto& u : get_neighbours(const size_t& node_index)) {
+			T d_next = dist(v, all_entries[hypergraphs[layer].get_data_index(u)]);
 			visit(d_next, u);
 		}
 	}
@@ -255,7 +270,7 @@ hyper_hnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::vector<size_t>> ret;
 	// for each layer, in decreasing depth
-	for (int layer = hadj.size() - 1; layer >= 0; --layer) {
+	for (int layer = hypergraphs.size() - 1; layer >= 0; --layer) {
 		size_t layer_k = k;
 		if (!fill_all_layers && layer > 0)
 			layer_k = 1;
@@ -268,7 +283,7 @@ hyper_hnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 
 template <typename T>
 std::vector<size_t> hyper_hnsw_engine<T>::_query_k(const vec<T>& v, size_t k) {
-	auto ret = _query_k_internal(v, k * num_for_1nn, !quick_search)[0];
+	auto ret = _query_k_internal(v, k * num_for_1nn, false)[0];
 	ret.resize(std::min(k, ret.size()));
 	return ret;
 }
