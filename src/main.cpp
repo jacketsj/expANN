@@ -12,7 +12,7 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
-#define NUM_THREADS 8
+#define NUM_THREADS 1
 
 int main() {
 	dataset_loader<float> dsl;
@@ -36,11 +36,12 @@ int main() {
 	}
 
 	// for (size_t n = 50000 * 1; n <= 50000 * 10 * 1; n *= 10) {
-	for (size_t n = 45000 * 1; n <= 45000 * 1 * 1; n *= 10) {
+	// for (size_t n = 45000 * 1; n <= 45000 * 1 * 1; n *= 10) {
+	for (size_t n = 10 * 1; n <= 10 * 1 * 1; n *= 10) {
 		// size_t m = 400 * (n / 50000);
 		// size_t m = 400;
-		size_t m = 400;
-		// size_t m = 4;
+		// size_t m = 400;
+		size_t m = 4;
 		// if (n < 500000)
 		//	m = 400;
 		size_t d = 128;
