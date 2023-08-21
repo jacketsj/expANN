@@ -19,6 +19,7 @@
 #include "hnsw_engine.h"
 #include "hnsw_engine_2.h"
 #include "hnsw_engine_hybrid.h"
+#include "hyper_hnsw_engine.h"
 #include "projection_engine.h"
 #include "tree_arrangement_engine.h"
 #include "tree_arrangement_engine_if.h"
@@ -110,6 +111,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			hnsw_engine_jobs;
 	std::vector<job<hnsw_engine_2<float>, hnsw_engine_2_config>>
 			hnsw_engine_2_jobs;
+	std::vector<job<hyper_hnsw_engine<float>, hyper_hnsw_engine_config>>
+			hyper_hnsw_engine_jobs;
 	std::vector<job<projection_engine<float, hnsw_engine_2<float>>,
 									projection_engine_config<hnsw_engine_2_config>>>
 			projection_hnsw_engine_2_jobs;
@@ -228,6 +231,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// to_run.emplace_back(56, 100, 1, 16, 32);
 	// to_run.emplace_back(47, 100, 1, 16, 64);
 	// to_run.emplace_back(46, 100, 1, 4, 128);
+	for (size_t degree_cluster = 2; degree_cluster <= 64; degree_cluster *= 4) {
+		for (size_t degree_node = 2; degree_node <= 64; degree_node *= 4) {
+			for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
+				hyper_hnsw_engine_jobs.emplace_back(hyper_hnsw_engine_config(
+						100, degree_cluster, degree_node, num_for_1nn));
+			}
+		}
+	}
 
 	// for (size_t K = 4; K <= 64; K += 4) {
 	//	for (size_t k = 4; k * K <= 128 * 8; k += 4) {
@@ -235,7 +246,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// for (size_t K = 4; K <= 256; K *= 2) {
 	//	for (size_t k = 16; k <= 128 * 2; k *= 4) {
 	//		for (size_t num_for_1nn = 32 * 4; num_for_1nn <= 64 * 2;
-	if (true) {
+	if (false) {
 		// for (size_t K = 2; K <= 32; K *= 2) {
 		//	for (size_t k = 11; k < 64; k += 9) {
 		//		for (size_t num_for_1nn = 4; num_for_1nn <= 64; num_for_1nn *= 2) {
@@ -276,7 +287,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 									100, k, num_for_1nn, K, min_per_cut, true, true, false));
 						}
-						if (true) {
+						if (false) {
 							bool create_index = true;
 							disk_ehnsw_engine_jobs.emplace_back(disk_ehnsw_engine_config(
 									ehnsw_engine_2_config(100, k, num_for_1nn, K, min_per_cut,
@@ -443,7 +454,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			hier_arrangement_engine_jobs, hnsw_engine_hybrid_jobs,
 			tree_arrangement_engine_jobs, tree_arrangement_engine_if_jobs,
 			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
-			disk_ehnsw_engine_jobs);
+			disk_ehnsw_engine_jobs, hyper_hnsw_engine_jobs);
 
 	bench_data_manager bdm(ds.name);
 	store_benchmark_results(
@@ -451,7 +462,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			ehnsw_engine_jobs, ehnsw_engine_2_jobs, hier_arrangement_engine_jobs,
 			hnsw_engine_hybrid_jobs, tree_arrangement_engine_jobs,
 			tree_arrangement_engine_if_jobs, projection_hnsw_engine_2_jobs,
-			projection_ehnsw_engine_2_jobs, disk_ehnsw_engine_jobs);
+			projection_ehnsw_engine_2_jobs, disk_ehnsw_engine_jobs,
+			hyper_hnsw_engine_jobs);
 
 	return bdm;
 }
