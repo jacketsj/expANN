@@ -231,11 +231,13 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// to_run.emplace_back(56, 100, 1, 16, 32);
 	// to_run.emplace_back(47, 100, 1, 16, 64);
 	// to_run.emplace_back(46, 100, 1, 4, 128);
-	for (size_t degree_cluster = 2; degree_cluster <= 64; degree_cluster *= 4) {
-		for (size_t degree_node = 2; degree_node <= 64; degree_node *= 4) {
-			for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
-				hyper_hnsw_engine_jobs.emplace_back(hyper_hnsw_engine_config(
-						100, degree_cluster, degree_node, num_for_1nn));
+	if (true) {
+		for (size_t degree_cluster = 2; degree_cluster <= 64; degree_cluster *= 4) {
+			for (size_t degree_node = 2; degree_node <= 64; degree_node *= 4) {
+				for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
+					hyper_hnsw_engine_jobs.emplace_back(hyper_hnsw_engine_config(
+							100, degree_cluster, degree_node, num_for_1nn));
+				}
 			}
 		}
 	}

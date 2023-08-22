@@ -43,10 +43,6 @@ template <typename T> struct simple_hypergraph {
 		vertex_with_ranks(size_t _data_index) : vertex::vertex(_data_index) {}
 		std::priority_queue<std::pair<T, size_t>> ranks;
 		void add(size_t new_neighbour, T rank_val, size_t max_degree) {
-			std::cerr << "Called add(" << new_neighbour << "," << rank_val << ","
-								<< max_degree << "),adj.size()=" << adj.size()
-								<< ",ranks.size()=" << ranks.size()
-								<< ",data_index=" << data_index << std::endl;
 			bool should_add = adj.size() < max_degree;
 			should_add = should_add || ranks.top().first > rank_val;
 			if (should_add) {
@@ -71,29 +67,14 @@ template <typename T> struct simple_hypergraph {
 	simple_hypergraph(size_t _degree_cluster, size_t _degree_node)
 			: degree_cluster(_degree_cluster), degree_node(_degree_node) {}
 	std::vector<size_t> get_neighbours(const size_t& node_index) {
-		assert(node_index < nodes.size());
-		std::cerr << "line=" << __LINE__ << ",node_index=" << node_index
-							<< ",nodes.size()=" << nodes.size() << std::endl;
 		std::vector<size_t> ret;
 		for (size_t cluster_index : nodes[node_index].adj) {
-			std::cerr << "line=" << __LINE__ << ",cluster_index=" << cluster_index
-								<< ",clusters.size()=" << clusters.size() << std::endl;
 			for (size_t neighbour_node_index : clusters[cluster_index].adj)
 				ret.emplace_back(neighbour_node_index);
 		}
 		return ret;
 	}
 	size_t get_data_index(const size_t& node_index) {
-		assert(node_index < nodes.size());
-		std::cerr << __LINE__ << ":Accessing nodes: node_index=" << node_index
-							<< "/nodes.size()=" << nodes.size() << std::endl;
-		// TODO debug code below
-		if (node_index >= nodes.size()) {
-			// intentionally cause a segfault to get stack trace since abort isn't
-			// working
-			static int* thingy = NULL;
-			thingy[4] = 12;
-		}
 		return nodes[node_index].data_index;
 	}
 	std::vector<size_t> get_cluster_contents(const size_t& cluster_index) {
@@ -106,10 +87,6 @@ template <typename T> struct simple_hypergraph {
 	std::vector<size_t> next_layer_node_indexes;
 	void add_next_layer_node_index(size_t node_index,
 																 size_t next_layer_node_index) {
-		assert(node_index < nodes.size());
-		std::cerr << __LINE__ << ":Accessing nodes: node_index=" << node_index
-							<< "/nodes.size()=" << nodes.size() << std::endl;
-		assert(next_layer_node_indexes.size() == nodes.size());
 		next_layer_node_indexes[node_index] = next_layer_node_index;
 	}
 	size_t get_next_layer_node_index(size_t node_index) {
@@ -117,12 +94,9 @@ template <typename T> struct simple_hypergraph {
 	}
 	size_t add_node(const size_t& data_index) {
 		size_t ret = nodes.size();
-		// std::cerr << "adding a new node for data_index=" << data_index
-		//					<< ", with node_index=" << ret << std::endl;
 		nodes.emplace_back(data_index);
 		next_layer_node_indexes.emplace_back(
 				data_index); // initialize this to the data index
-		// std::cerr << "nodes.size()=" << nodes.size() << std::endl;
 		return ret;
 	}
 	// TODO don't require data to be stored in clusters
@@ -138,12 +112,7 @@ template <typename T> struct simple_hypergraph {
 			static int* thingy = NULL;
 			thingy[4] = 12;
 		}
-		assert(node_index < nodes.size());
-		std::cerr << "About to call clusters add() with node_index=" << node_index
-							<< ",nodes.size()=" << nodes.size() << std::endl;
 		clusters[cluster_index].add(node_index, rank_val, degree_cluster);
-		std::cerr << "About to call add() with node_index=" << node_index
-							<< ",nodes.size()=" << nodes.size() << std::endl;
 		nodes[node_index].add(cluster_index, rank_val, degree_node);
 	}
 };
@@ -160,9 +129,7 @@ struct hyper_hnsw_engine : public ann_engine<T, hyper_hnsw_engine<T>> {
 	// double cluster_count_constant;
 	size_t num_for_1nn;
 	hyper_hnsw_engine(hyper_hnsw_engine_config conf)
-			: rd(),
-				// gen(rd()), // TODO restore this
-				gen(2), distribution(0, 1), max_depth(conf.max_depth),
+			: rd(), gen(rd()), distribution(0, 1), max_depth(conf.max_depth),
 				degree_cluster(conf.degree_cluster), degree_node(conf.degree_node),
 				// cluster_count_constant(conf.cluster_count_constant),
 				num_for_1nn(conf.num_for_1nn) {}
@@ -202,19 +169,13 @@ void hyper_hnsw_engine<T>::_store_vector(const vec<T>& v) {
 // neighbours to it, and replace the elements of the cluster by calling
 // add_to_cluster (which updates both directions of edges)
 template <typename T> void hyper_hnsw_engine<T>::_build() {
-	assert(all_entries.size() > 0);
 	auto add_layer = [&](size_t v) {
 		hypergraphs.emplace_back(degree_cluster, degree_node);
-		// starting_node_index = hypergraphs.back().add_node(v);
-		std::cerr << "Building data_index=" << v << ",layer="
-							<< "new"
-							<< ",node_index=" << starting_node_index << std::endl;
 	};
 	// add one layer to start, with first vertex
 	add_layer(0);
 	starting_node_index = hypergraphs[0].add_node(0);
 	for (size_t i = 1; i < all_entries.size(); ++i) {
-		std::cerr << "Big iter Line=" << __LINE__ << ",i=" << i << std::endl;
 		if (i % 5000 == 0)
 			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
 								<< "%" << std::endl;
@@ -251,12 +212,6 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 			starting_node_index = next_layer_node_index;
 		// add all the neighbours as edges
 		for (size_t layer = 0; layer <= cur_layer && layer < kNN.size(); ++layer) {
-			// size_t node_index = hypergraphs[layer].add_node(i);
-			// std::cerr << "Building data_index=" << i << ",layer=" << layer
-			//					<< ",node_index=" << node_index << std::endl;
-			// hypergraphs[layer].add_next_layer_node_index(node_index,
-			//																						 next_layer_node_index);
-			// next_layer_node_index = node_index;
 			size_t node_index = layer_to_node_index[layer];
 			//  TODO do k-means or something like it (b-matching?) instead of
 			//  random_shuffle
@@ -286,26 +241,10 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 				mean /= T(cluster_elems.size());
 				size_t cluster_index = hypergraphs[layer].add_cluster();
 				for (size_t cur_node_index : cluster_elems) {
-					std::cerr << "Cluster-Adding cur_node_index=" << cur_node_index
-										<< " to cluster_index=" << cluster_index
-										<< " in layer=" << layer
-										<< ",total_layers=" << hypergraphs.size() << std::endl;
-					std::cerr << "\thypergraphs[layer].nodes.size()="
-										<< hypergraphs[layer].nodes.size() << std::endl;
-					std::cerr << "\thypergraphs[layer].clusters.size()="
-										<< hypergraphs[layer].clusters.size() << std::endl;
 					hypergraphs[layer].add_to_cluster(
 							cur_node_index, cluster_index,
 							dist2(mean, all_entries[hypergraphs[layer].get_data_index(
 															cur_node_index)]));
-					std::cerr << "Finished Cluster-Adding cur_node_index="
-										<< cur_node_index << " to cluster_index=" << cluster_index
-										<< " in layer=" << layer
-										<< ",total_layers=" << hypergraphs.size() << std::endl;
-					std::cerr << "\thypergraphs[layer].nodes.size()="
-										<< hypergraphs[layer].nodes.size() << std::endl;
-					std::cerr << "\thypergraphs[layer].clusters.size()="
-										<< hypergraphs[layer].clusters.size() << std::endl;
 				}
 			}
 		}
@@ -377,8 +316,6 @@ hyper_hnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 		size_t layer_k = k;
 		if (!fill_all_layers && layer > 0)
 			layer_k = 1;
-		std::cerr << "About to call query_k_at_layer with layer=" << layer
-							<< ",layer_k=" << layer_k << ",current=" << current << std::endl;
 		ret.push_back(_query_k_at_layer(v, layer_k, current, layer));
 		current = hypergraphs[layer].get_next_layer_node_index(ret.back().front());
 	}
