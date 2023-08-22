@@ -85,8 +85,15 @@ template <typename T> struct simple_hypergraph {
 	}
 	size_t get_data_index(const size_t& node_index) {
 		assert(node_index < nodes.size());
-		std::cerr << "Accessing nodes: node_index=" << node_index
+		std::cerr << __LINE__ << ":Accessing nodes: node_index=" << node_index
 							<< "/nodes.size()=" << nodes.size() << std::endl;
+		// TODO debug code below
+		if (node_index >= nodes.size()) {
+			// intentionally cause a segfault to get stack trace since abort isn't
+			// working
+			static int* thingy = NULL;
+			thingy[4] = 12;
+		}
 		return nodes[node_index].data_index;
 	}
 	std::vector<size_t> get_cluster_contents(const size_t& cluster_index) {
@@ -100,7 +107,7 @@ template <typename T> struct simple_hypergraph {
 	void add_next_layer_node_index(size_t node_index,
 																 size_t next_layer_node_index) {
 		assert(node_index < nodes.size());
-		std::cerr << "Accessing nodes: node_index=" << node_index
+		std::cerr << __LINE__ << ":Accessing nodes: node_index=" << node_index
 							<< "/nodes.size()=" << nodes.size() << std::endl;
 		assert(next_layer_node_indexes.size() == nodes.size());
 		next_layer_node_indexes[node_index] = next_layer_node_index;
@@ -125,7 +132,15 @@ template <typename T> struct simple_hypergraph {
 		return ret;
 	}
 	void add_to_cluster(size_t node_index, size_t cluster_index, T rank_val) {
+		if (node_index >= nodes.size()) {
+			// intentionally cause a segfault to get stack trace since abort isn't
+			// working
+			static int* thingy = NULL;
+			thingy[4] = 12;
+		}
 		assert(node_index < nodes.size());
+		std::cerr << "About to call clusters add() with node_index=" << node_index
+							<< ",nodes.size()=" << nodes.size() << std::endl;
 		clusters[cluster_index].add(node_index, rank_val, degree_cluster);
 		std::cerr << "About to call add() with node_index=" << node_index
 							<< ",nodes.size()=" << nodes.size() << std::endl;
@@ -190,14 +205,16 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 	auto add_layer = [&](size_t v) {
 		hypergraphs.emplace_back(degree_cluster, degree_node);
-		starting_node_index = hypergraphs.back().add_node(v);
+		// starting_node_index = hypergraphs.back().add_node(v);
 		std::cerr << "Building data_index=" << v << ",layer="
 							<< "new"
 							<< ",node_index=" << starting_node_index << std::endl;
 	};
 	// add one layer to start, with first vertex
 	add_layer(0);
+	starting_node_index = hypergraphs[0].add_node(0);
 	for (size_t i = 1; i < all_entries.size(); ++i) {
+		std::cerr << "Big iter Line=" << __LINE__ << ",i=" << i << std::endl;
 		if (i % 5000 == 0)
 			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
 								<< "%" << std::endl;
@@ -215,20 +232,34 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 		// log(double(degree_node*degree_cluster)));
 		size_t cur_layer = std::min(cur_layer_ub, max_depth);
 		// if it is a new layer, add a layer
-		while (cur_layer >= hypergraphs.size())
+		bool is_new_top = false;
+		while (cur_layer >= hypergraphs.size()) {
 			add_layer(i);
-		// add all the neighbours as edges
+			is_new_top = true;
+		}
+		std::vector<size_t> layer_to_node_index;
 		size_t next_layer_node_index =
 				i; // for layer=0, this should be the data_index
-		for (size_t layer = 0; layer <= cur_layer && layer < kNN.size(); ++layer) {
+		for (size_t layer = 0; layer <= cur_layer; ++layer) {
 			size_t node_index = hypergraphs[layer].add_node(i);
-			std::cerr << "Building data_index=" << i << ",layer=" << layer
-								<< ",node_index=" << node_index << std::endl;
 			hypergraphs[layer].add_next_layer_node_index(node_index,
 																									 next_layer_node_index);
 			next_layer_node_index = node_index;
-			// TODO do k-means or something like it (b-matching?) instead of
-			// random_shuffle
+			layer_to_node_index.emplace_back(node_index);
+		}
+		if (is_new_top)
+			starting_node_index = next_layer_node_index;
+		// add all the neighbours as edges
+		for (size_t layer = 0; layer <= cur_layer && layer < kNN.size(); ++layer) {
+			// size_t node_index = hypergraphs[layer].add_node(i);
+			// std::cerr << "Building data_index=" << i << ",layer=" << layer
+			//					<< ",node_index=" << node_index << std::endl;
+			// hypergraphs[layer].add_next_layer_node_index(node_index,
+			//																						 next_layer_node_index);
+			// next_layer_node_index = node_index;
+			size_t node_index = layer_to_node_index[layer];
+			//  TODO do k-means or something like it (b-matching?) instead of
+			//  random_shuffle
 			random_shuffle(kNN[layer].begin(), kNN[layer].end());
 			size_t neighbours_i = 0;
 			for (size_t local_cluster_index = 0; local_cluster_index < degree_node;
@@ -346,6 +377,8 @@ hyper_hnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 		size_t layer_k = k;
 		if (!fill_all_layers && layer > 0)
 			layer_k = 1;
+		std::cerr << "About to call query_k_at_layer with layer=" << layer
+							<< ",layer_k=" << layer_k << ",current=" << current << std::endl;
 		ret.push_back(_query_k_at_layer(v, layer_k, current, layer));
 		current = hypergraphs[layer].get_next_layer_node_index(ret.back().front());
 	}
