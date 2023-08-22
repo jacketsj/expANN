@@ -85,6 +85,8 @@ template <typename T> struct simple_hypergraph {
 	}
 	size_t get_data_index(const size_t& node_index) {
 		assert(node_index < nodes.size());
+		std::cerr << "Accessing nodes: node_index=" << node_index
+							<< "/nodes.size()=" << nodes.size() << std::endl;
 		return nodes[node_index].data_index;
 	}
 	std::vector<size_t> get_cluster_contents(const size_t& cluster_index) {
@@ -98,6 +100,8 @@ template <typename T> struct simple_hypergraph {
 	void add_next_layer_node_index(size_t node_index,
 																 size_t next_layer_node_index) {
 		assert(node_index < nodes.size());
+		std::cerr << "Accessing nodes: node_index=" << node_index
+							<< "/nodes.size()=" << nodes.size() << std::endl;
 		assert(next_layer_node_indexes.size() == nodes.size());
 		next_layer_node_indexes[node_index] = next_layer_node_index;
 	}
@@ -141,7 +145,9 @@ struct hyper_hnsw_engine : public ann_engine<T, hyper_hnsw_engine<T>> {
 	// double cluster_count_constant;
 	size_t num_for_1nn;
 	hyper_hnsw_engine(hyper_hnsw_engine_config conf)
-			: rd(), gen(rd()), distribution(0, 1), max_depth(conf.max_depth),
+			: rd(),
+				// gen(rd()), // TODO restore this
+				gen(2), distribution(0, 1), max_depth(conf.max_depth),
 				degree_cluster(conf.degree_cluster), degree_node(conf.degree_node),
 				// cluster_count_constant(conf.cluster_count_constant),
 				num_for_1nn(conf.num_for_1nn) {}
@@ -215,7 +221,7 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 		size_t next_layer_node_index =
 				i; // for layer=0, this should be the data_index
 		for (size_t layer = 0; layer <= cur_layer && layer < kNN.size(); ++layer) {
-			size_t node_index = hypergraphs.back().add_node(i);
+			size_t node_index = hypergraphs[layer].add_node(i);
 			std::cerr << "Building data_index=" << i << ",layer=" << layer
 								<< ",node_index=" << node_index << std::endl;
 			hypergraphs[layer].add_next_layer_node_index(node_index,
@@ -253,10 +259,22 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 										<< " to cluster_index=" << cluster_index
 										<< " in layer=" << layer
 										<< ",total_layers=" << hypergraphs.size() << std::endl;
+					std::cerr << "\thypergraphs[layer].nodes.size()="
+										<< hypergraphs[layer].nodes.size() << std::endl;
+					std::cerr << "\thypergraphs[layer].clusters.size()="
+										<< hypergraphs[layer].clusters.size() << std::endl;
 					hypergraphs[layer].add_to_cluster(
 							cur_node_index, cluster_index,
 							dist2(mean, all_entries[hypergraphs[layer].get_data_index(
 															cur_node_index)]));
+					std::cerr << "Finished Cluster-Adding cur_node_index="
+										<< cur_node_index << " to cluster_index=" << cluster_index
+										<< " in layer=" << layer
+										<< ",total_layers=" << hypergraphs.size() << std::endl;
+					std::cerr << "\thypergraphs[layer].nodes.size()="
+										<< hypergraphs[layer].nodes.size() << std::endl;
+					std::cerr << "\thypergraphs[layer].clusters.size()="
+										<< hypergraphs[layer].clusters.size() << std::endl;
 				}
 			}
 		}
