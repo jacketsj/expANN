@@ -73,8 +73,6 @@ void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
 	// TODO remove debug output below
 	if (hadj[layer][i].size() < edge_count_mult ||
 			hadj[layer][i].begin()->first < -d) {
-		std::cerr << "Adding edge: (layer=" << layer << ", " << i << "->" << j
-							<< ", val=" << sqrt(d) << ")" << std::endl;
 		if (hadj[layer][i].size() < edge_count_mult)
 			std::cerr << "\"Yes\" reason: size=" << hadj[layer][i].size()
 								<< std::endl;
@@ -82,14 +80,14 @@ void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
 			std::cerr << "\"Yes\" reason: ranks top="
 								<< -hadj[layer][i].begin()->first << ", rank_val=" << d
 								<< std::endl;
+		std::cerr << "Adding edge: (layer=" << layer << ", " << i << "->" << j
+							<< ", val=" << sqrt(d) << ")" << std::endl;
 	} else {
 		std::cerr << "Not adding edge: (layer=" << layer << ", " << i << "->" << j
 							<< ", val=" << sqrt(d) << ")" << std::endl;
 	}
 	if (hadj[layer][j].size() < edge_count_mult ||
 			hadj[layer][j].begin()->first < -d) {
-		std::cerr << "Adding edge: (layer=" << layer << ", " << j << "->" << i
-							<< ", val=" << sqrt(d) << ")" << std::endl;
 		if (hadj[layer][j].size() < edge_count_mult)
 			std::cerr << "\"Yes\" reason: size=" << hadj[layer][j].size()
 								<< std::endl;
@@ -97,6 +95,8 @@ void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
 			std::cerr << "\"Yes\" reason: ranks top="
 								<< -hadj[layer][j].begin()->first << ", rank_val=" << d
 								<< std::endl;
+		std::cerr << "Adding edge: (layer=" << layer << ", " << j << "->" << i
+							<< ", val=" << sqrt(d) << ")" << std::endl;
 	} else {
 		std::cerr << "Not adding edge: (layer=" << layer << ", " << j << "->" << i
 							<< ", val=" << sqrt(d) << ")" << std::endl;
