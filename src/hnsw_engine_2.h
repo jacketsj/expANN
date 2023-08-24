@@ -32,7 +32,11 @@ struct hnsw_engine_2 : public ann_engine<T, hnsw_engine_2<T>> {
 	size_t num_for_1nn;
 	bool quick_search;
 	hnsw_engine_2(hnsw_engine_2_config conf)
-			: rd(), gen(rd()), distribution(0, 1), max_depth(conf.max_depth),
+			: rd(),
+				// TODO revert seeding to rd()
+				gen(2),
+				// gen(rd()),
+				distribution(0, 1), max_depth(conf.max_depth),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				quick_search(conf.quick_search) {}
 	std::vector<vec<T>> all_entries;
@@ -65,22 +69,37 @@ template <typename T> void hnsw_engine_2<T>::_store_vector(const vec<T>& v) {
 
 template <typename T>
 void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
-	T d = dist(all_entries[i], all_entries[j]);
+	T d = dist2(all_entries[i], all_entries[j]);
+	// TODO remove debug output below
 	if (hadj[layer][i].size() < edge_count_mult ||
 			hadj[layer][i].begin()->first < -d) {
 		std::cerr << "Adding edge: (layer=" << layer << ", " << i << "->" << j
-							<< ")" << std::endl;
+							<< ", val=" << sqrt(d) << ")" << std::endl;
+		if (hadj[layer][i].size() < edge_count_mult)
+			std::cerr << "\"Yes\" reason: size=" << hadj[layer][i].size()
+								<< std::endl;
+		else
+			std::cerr << "\"Yes\" reason: ranks top="
+								<< -hadj[layer][i].begin()->first << ", rank_val=" << d
+								<< std::endl;
 	} else {
 		std::cerr << "Not adding edge: (layer=" << layer << ", " << i << "->" << j
-							<< ")" << std::endl;
+							<< ", val=" << sqrt(d) << ")" << std::endl;
 	}
 	if (hadj[layer][j].size() < edge_count_mult ||
 			hadj[layer][j].begin()->first < -d) {
 		std::cerr << "Adding edge: (layer=" << layer << ", " << j << "->" << i
-							<< ")" << std::endl;
+							<< ", val=" << sqrt(d) << ")" << std::endl;
+		if (hadj[layer][j].size() < edge_count_mult)
+			std::cerr << "\"Yes\" reason: size=" << hadj[layer][j].size()
+								<< std::endl;
+		else
+			std::cerr << "\"Yes\" reason: ranks top="
+								<< -hadj[layer][j].begin()->first << ", rank_val=" << d
+								<< std::endl;
 	} else {
 		std::cerr << "Not adding edge: (layer=" << layer << ", " << j << "->" << i
-							<< ")" << std::endl;
+							<< ", val=" << sqrt(d) << ")" << std::endl;
 	}
 	hadj[layer][i].emplace(-d, j);
 	hadj[layer][j].emplace(-d, i);
@@ -111,7 +130,7 @@ template <typename T> void hnsw_engine_2<T>::_build() {
 				floor(-log(distribution(gen)) * 1 / log(double(edge_count_mult)));
 		size_t cur_layer = std::min(cur_layer_ub, max_depth);
 		// if it is a new layer, add a layer
-		if (cur_layer >= hadj.size())
+		while (cur_layer >= hadj.size())
 			add_layer(i);
 		// add all the neighbours as edges
 		for (size_t layer = 0; layer <= cur_layer && layer < kNN.size(); ++layer)
@@ -139,7 +158,7 @@ hnsw_engine_2<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			top_k.pop();
 		return is_good;
 	};
-	visit(dist(v, all_entries[starting_point]), starting_point);
+	visit(dist2(v, all_entries[starting_point]), starting_point);
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -149,7 +168,7 @@ hnsw_engine_2<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			break;
 		to_visit.pop();
 		for (auto& [_, u] : hadj[layer][cur]) {
-			T d_next = dist(v, all_entries[u]);
+			T d_next = dist2(v, all_entries[u]);
 			visit(d_next, u);
 		}
 	}
