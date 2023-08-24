@@ -70,10 +70,16 @@ void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
 			hadj[layer][i].begin()->first < -d) {
 		std::cerr << "Adding edge: (layer=" << layer << ", " << i << "->" << j
 							<< ")" << std::endl;
+	} else {
+		std::cerr << "Not adding edge: (layer=" << layer << ", " << i << "->" << j
+							<< ")" << std::endl;
 	}
 	if (hadj[layer][j].size() < edge_count_mult ||
 			hadj[layer][j].begin()->first < -d) {
 		std::cerr << "Adding edge: (layer=" << layer << ", " << j << "->" << i
+							<< ")" << std::endl;
+	} else {
+		std::cerr << "Not adding edge: (layer=" << layer << ", " << j << "->" << i
 							<< ")" << std::endl;
 	}
 	hadj[layer][i].emplace(-d, j);
