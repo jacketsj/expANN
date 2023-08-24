@@ -119,16 +119,22 @@ template <typename T> struct simple_hypergraph {
 		// TODO remove if statements (after no more return value) exists for
 		// debugging
 		if (clusters[cluster_index].add(node_index, rank_val, degree_cluster)) {
-			std::cerr << "Adding to cluster: (layer=" << layer
-								<< ", node_index=" << node_index
-								<< ", data_index=" << get_data_index(node_index)
-								<< ", cluster_index=" << cluster_index << ")" << std::endl;
+			std::cerr << "Adding edge: (layer=" << layer << ", "
+								<< get_data_index(node_index) << "<-C" << cluster_index << ")"
+								<< std::endl;
+			// std::cerr << "Adding to cluster: (layer=" << layer
+			//					<< ", node_index=" << node_index
+			//					<< ", data_index=" << get_data_index(node_index)
+			//					<< ", cluster_index=" << cluster_index << ")" << std::endl;
 		}
 		if (nodes[node_index].add(cluster_index, rank_val, degree_node)) {
-			std::cerr << "Adding to node: (layer=" << layer
-								<< ", node_index=" << node_index
-								<< ", data_index=" << get_data_index(node_index)
-								<< ", cluster_index=" << cluster_index << ")" << std::endl;
+			std::cerr << "Adding edge: (layer=" << layer << ", "
+								<< get_data_index(node_index) << "->C" << cluster_index << ")"
+								<< std::endl;
+			// std::cerr << "Adding to node: (layer=" << layer
+			//					<< ", node_index=" << node_index
+			//					<< ", data_index=" << get_data_index(node_index)
+			//					<< ", cluster_index=" << cluster_index << ")" << std::endl;
 		}
 	}
 };
