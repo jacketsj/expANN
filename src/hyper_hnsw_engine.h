@@ -46,6 +46,15 @@ template <typename T> struct simple_hypergraph {
 			bool should_add = adj.size() < max_degree;
 			should_add = should_add || ranks.top().first > rank_val;
 			if (should_add) {
+				// TODO remove this
+				if (max_degree == 3) {
+					if (adj.size() < max_degree)
+						std::cerr << "\"Yes\" reason: size=" << adj.size() << std::endl;
+					else
+						std::cerr << "\"Yes\" reason: ranks top=" << ranks.top().first
+											<< ", rank_val=" << rank_val << std::endl;
+				}
+				// TODO end removal region
 				size_t location = adj.size();
 				if (adj.size() >= max_degree) {
 					location = ranks.top().second;
@@ -55,14 +64,6 @@ template <typename T> struct simple_hypergraph {
 					adj.emplace_back(new_neighbour);
 				}
 				ranks.emplace(rank_val, location);
-				// TODO remove this
-				if (max_degree == 3) {
-					if (adj.size() < max_degree)
-						std::cerr << "\"Yes\" reason: size=" << adj.size() << std::endl;
-					else
-						std::cerr << "\"Yes\" reason: ranks top=" << ranks.top().first
-											<< ", rank_val=" << rank_val << std::endl;
-				}
 			}
 			// TODO remove this
 			else {
@@ -280,6 +281,8 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 				// compute mean
 				vec<T> mean;
 				mean.set_dim(all_entries[0].dim());
+				for (size_t dim_i = 0; dim_i < all_entries[0].dim(); ++dim_i)
+					mean[dim_i] = 0;
 				for (size_t cur_node_index : cluster_elems)
 					mean +=
 							all_entries[hypergraphs[layer].get_data_index(cur_node_index)];
@@ -365,8 +368,9 @@ hyper_hnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			top_k.pop();
 		return is_good;
 	};
-	visit(dist(v, all_entries[hypergraphs[layer].get_data_index(starting_point)]),
-				starting_point);
+	visit(
+			dist2(v, all_entries[hypergraphs[layer].get_data_index(starting_point)]),
+			starting_point);
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -376,7 +380,7 @@ hyper_hnsw_engine<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			break;
 		to_visit.pop();
 		for (auto& u : hypergraphs[layer].get_neighbours(cur)) {
-			T d_next = dist(v, all_entries[hypergraphs[layer].get_data_index(u)]);
+			T d_next = dist2(v, all_entries[hypergraphs[layer].get_data_index(u)]);
 			visit(d_next, u);
 		}
 	}

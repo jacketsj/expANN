@@ -83,6 +83,9 @@ void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
 		std::cerr << "Adding edge: (layer=" << layer << ", " << i << "->" << j
 							<< ", val=" << sqrt(d) << ")" << std::endl;
 	} else {
+		std::cerr << "\"No\" reason: size=" << hadj[layer][i].size()
+							<< " and ranks top=" << -hadj[layer][i].begin()->first
+							<< ", rank_val=" << d << std::endl;
 		std::cerr << "Not adding edge: (layer=" << layer << ", " << i << "->" << j
 							<< ", val=" << sqrt(d) << ")" << std::endl;
 	}
@@ -98,6 +101,9 @@ void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
 		std::cerr << "Adding edge: (layer=" << layer << ", " << j << "->" << i
 							<< ", val=" << sqrt(d) << ")" << std::endl;
 	} else {
+		std::cerr << "\"No\" reason: size=" << hadj[layer][j].size()
+							<< " and ranks top=" << -hadj[layer][j].begin()->first
+							<< ", rank_val=" << d << std::endl;
 		std::cerr << "Not adding edge: (layer=" << layer << ", " << j << "->" << i
 							<< ", val=" << sqrt(d) << ")" << std::endl;
 	}
