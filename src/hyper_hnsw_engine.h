@@ -42,7 +42,7 @@ template <typename T> struct simple_hypergraph {
 		using vertex::data_index;
 		vertex_with_ranks(size_t _data_index) : vertex::vertex(_data_index) {}
 		std::priority_queue<std::pair<T, size_t>> ranks;
-		void add(size_t new_neighbour, T rank_val, size_t max_degree) {
+		bool add(size_t new_neighbour, T rank_val, size_t max_degree) {
 			bool should_add = adj.size() < max_degree;
 			should_add = should_add || ranks.top().first > rank_val;
 			if (should_add) {
@@ -56,6 +56,8 @@ template <typename T> struct simple_hypergraph {
 				}
 				ranks.emplace(rank_val, location);
 			}
+			// TODO remove return value (exists for debugging)
+			return should_add;
 		}
 	};
 	// hypergraph represented as bipartite graph between
@@ -105,15 +107,29 @@ template <typename T> struct simple_hypergraph {
 		clusters.emplace_back(0);
 		return ret;
 	}
-	void add_to_cluster(size_t node_index, size_t cluster_index, T rank_val) {
+	// TODO remove layer param (exists for debugging)
+	void add_to_cluster(size_t node_index, size_t cluster_index, T rank_val,
+											size_t layer) {
 		if (node_index >= nodes.size()) {
 			// intentionally cause a segfault to get stack trace since abort isn't
 			// working
 			static int* thingy = NULL;
 			thingy[4] = 12;
 		}
-		clusters[cluster_index].add(node_index, rank_val, degree_cluster);
-		nodes[node_index].add(cluster_index, rank_val, degree_node);
+		// TODO remove if statements (after no more return value) exists for
+		// debugging
+		if (clusters[cluster_index].add(node_index, rank_val, degree_cluster)) {
+			std::cerr << "Adding to cluster: (layer=" << layer
+								<< ", node_index=" << node_index
+								<< ", data_index=" << get_data_index(node_index)
+								<< ", cluster_index=" << cluster_index << ")" << std::endl;
+		}
+		if (nodes[node_index].add(cluster_index, rank_val, degree_node)) {
+			std::cerr << "Adding to node: (layer=" << layer
+								<< ", node_index=" << node_index
+								<< ", data_index=" << get_data_index(node_index)
+								<< ", cluster_index=" << cluster_index << ")" << std::endl;
+		}
 	}
 };
 
@@ -245,7 +261,8 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 					hypergraphs[layer].add_to_cluster(
 							cur_node_index, cluster_index,
 							dist2(mean, all_entries[hypergraphs[layer].get_data_index(
-															cur_node_index)]));
+															cur_node_index)]),
+							layer);
 				}
 			}
 		}

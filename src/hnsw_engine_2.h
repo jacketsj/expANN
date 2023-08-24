@@ -66,6 +66,16 @@ template <typename T> void hnsw_engine_2<T>::_store_vector(const vec<T>& v) {
 template <typename T>
 void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
 	T d = dist(all_entries[i], all_entries[j]);
+	if (hadj[layer][i].size() < edge_count_mult ||
+			hadj[layer][i].begin()->first < -d) {
+		std::cerr << "Adding edge: (layer=" << layer << ", " << i << "->" << j
+							<< ")" << std::endl;
+	}
+	if (hadj[layer][j].size() < edge_count_mult ||
+			hadj[layer][j].begin()->first < -d) {
+		std::cerr << "Adding edge: (layer=" << layer << ", " << j << "->" << i
+							<< ")" << std::endl;
+	}
 	hadj[layer][i].emplace(-d, j);
 	hadj[layer][j].emplace(-d, i);
 	if (hadj[layer][i].size() > edge_count_mult)
