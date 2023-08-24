@@ -187,6 +187,7 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 		std::vector<std::vector<size_t>> kNN =
 				_query_k_internal(all_entries[i], k, true);
 		// get the layer this entry will go up to
+		// TODO change debug code back (maybe?)
 		size_t cur_layer_ub =
 				floor(-log(distribution(gen)) * 1 / log(double(degree_node)));
 		// floor(-log(distribution(gen)) * 1 /
@@ -227,11 +228,11 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 				cluster_elems.push_back(node_index);
 				for (size_t cur_neighbours_i = neighbours_i;
 						 cur_neighbours_i < kNN[layer].size() &&
-						 cur_neighbours_i < degree_cluster + neighbours_i;
+						 cur_neighbours_i < (degree_cluster - 1) + neighbours_i;
 						 ++cur_neighbours_i) {
 					cluster_elems.emplace_back(kNN[layer][cur_neighbours_i]);
 				}
-				neighbours_i += degree_cluster;
+				neighbours_i += degree_cluster - 1;
 				// compute mean
 				vec<T> mean;
 				mean.set_dim(all_entries[0].dim());
