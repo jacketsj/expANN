@@ -182,7 +182,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			// for (size_t num_for_1nn = 128; num_for_1nn <= 128; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 3; num_for_1nn <= 8; num_for_1nn += 1) {
-			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn += 1) {
+			for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 8; num_for_1nn *= 2) {
 				//  for (size_t num_for_1nn = 2; num_for_1nn <= 128; num_for_1nn *= 2) {
 				//   std::cerr << "About to start hnsw2(k=" << k << ",n4nn=" <<
@@ -232,8 +232,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// to_run.emplace_back(47, 100, 1, 16, 64);
 	// to_run.emplace_back(46, 100, 1, 4, 128);
 	if (true) {
-		for (size_t degree_cluster = 2; degree_cluster <= 64; degree_cluster *= 4) {
-			for (size_t degree_node = 2; degree_node <= 64; degree_node *= 4) {
+		// for (size_t degree_cluster = 2; degree_cluster <= 64; degree_cluster *=
+		// 4) {
+		for (size_t degree_cluster = 2; degree_cluster <= 2; degree_cluster *= 4) {
+			// for (size_t degree_node = 2; degree_node <= 64; degree_node *= 4) {
+			for (size_t degree_node = 30; degree_node <= 42; degree_node += 6) {
 				for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
 					hyper_hnsw_engine_jobs.emplace_back(hyper_hnsw_engine_config(
 							100, degree_cluster, degree_node, num_for_1nn));
