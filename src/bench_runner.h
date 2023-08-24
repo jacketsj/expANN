@@ -247,8 +247,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 
 	// temp: testing differences between hnsw_2 and (hyper_hnsw with
 	// degree_cluster=2) in theory, there should be none (at the time of writing)
-	hnsw_engine_2_jobs.emplace_back(hnsw_engine_2_config(5, 4, 2, true));
-	hyper_hnsw_engine_jobs.emplace_back(hyper_hnsw_engine_config(5, 2, 4, 2));
+	hnsw_engine_2_jobs.emplace_back(hnsw_engine_2_config(3, 3, 2, true));
+	hyper_hnsw_engine_jobs.emplace_back(hyper_hnsw_engine_config(3, 2, 3, 2));
 
 	// for (size_t K = 4; K <= 64; K += 4) {
 	//	for (size_t k = 4; k * K <= 128 * 8; k += 4) {
