@@ -232,7 +232,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// to_run.emplace_back(47, 100, 1, 16, 64);
 	// to_run.emplace_back(46, 100, 1, 4, 128);
 	if (true) {
-		for (size_t degree_cluster = 2; degree_cluster <= 64; degree_cluster *= 4) {
+		// for (size_t degree_cluster = 2; degree_cluster <= 64; degree_cluster *=
+		// 4) {
+		// for (size_t degree_cluster = 2; degree_cluster <= 2; degree_cluster *= 4)
+		// {
+		for (size_t degree_cluster = 8; degree_cluster <= 32; degree_cluster *= 4) {
 			// for (size_t degree_cluster = 2; degree_cluster <= 2; degree_cluster *=
 			// 4) { for (size_t degree_node = 2; degree_node <= 64; degree_node *= 4)
 			// {
