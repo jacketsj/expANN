@@ -37,16 +37,16 @@ int main() {
 
 	// for (size_t n = 50000 * 1; n <= 50000 * 10 * 1; n *= 10) {
 	// for (size_t n = 55000 * 1; n <= 55000 * 1 * 1; n *= 10) {
-	for (size_t n = 6 * 1; n <= 6 * 1 * 1; n *= 10) {
+	for (size_t n = 200 * 1; n <= 200 * 1 * 1; n *= 10) {
 		// size_t m = 400 * (n / 50000);
 		// size_t m = 400;
 		// size_t m = 400;
-		size_t m = 4;
+		size_t m = 100;
 		// if (n < 500000)
 		//	m = 400;
 		// size_t d = 128;
 		size_t d = 16;
-		size_t k = 1;
+		size_t k = 8;
 		// size_t k = 1;
 		auto bdm = perform_benchmarks(
 				dsl.load_synethetic_uniform_sphere_points(n, m, k, d), NUM_THREADS);

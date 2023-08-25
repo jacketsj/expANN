@@ -47,7 +47,7 @@ template <typename T> struct simple_hypergraph {
 			should_add = should_add || ranks.top().first > rank_val;
 			if (should_add) {
 				// TODO remove this
-				if (max_degree == 3) {
+				if (max_degree == 8) {
 					if (adj.size() < max_degree)
 						std::cerr << "\"Yes\" reason: size=" << adj.size() << std::endl;
 					else
@@ -261,7 +261,8 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 			size_t node_index = layer_to_node_index[layer];
 			//  TODO do k-means or something like it (b-matching?) instead of
 			//  random_shuffle
-			random_shuffle(kNN[layer].begin(), kNN[layer].end());
+			//  TODO re-enable random shuffle (disabled for debugging)
+			// random_shuffle(kNN[layer].begin(), kNN[layer].end());
 			size_t neighbours_i = 0;
 			for (size_t local_cluster_index = 0; local_cluster_index < degree_node;
 					 ++local_cluster_index) {
@@ -294,8 +295,9 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 					size_t cur_node_index = cluster_elems[0];
 					bool forward_edge = hypergraphs[layer].add_to_cluster(
 							cur_node_index, cluster_index,
-							dist2(mean, all_entries[hypergraphs[layer].get_data_index(
-															cur_node_index)]),
+							// TODO 4* is for debugging (so is all of this though)
+							4 * dist2(mean, all_entries[hypergraphs[layer].get_data_index(
+																	cur_node_index)]),
 							layer);
 					cur_node_index = cluster_elems[1];
 					size_t debug_i = hypergraphs[layer].get_data_index(cluster_elems[0]);
@@ -314,8 +316,9 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 					}
 					bool backward_edge = hypergraphs[layer].add_to_cluster(
 							cur_node_index, cluster_index,
-							dist2(mean, all_entries[hypergraphs[layer].get_data_index(
-															cur_node_index)]),
+							// TODO 4* is for debugging (so is all of this though)
+							4 * dist2(mean, all_entries[hypergraphs[layer].get_data_index(
+																	cur_node_index)]),
 							layer);
 					if (backward_edge) {
 						std::cerr << "Adding edge: (layer=" << layer << ", " << debug_j
