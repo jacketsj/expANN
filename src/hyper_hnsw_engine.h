@@ -243,8 +243,7 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 					hypergraphs[layer].add_to_cluster(
 							cur_node_index, cluster_index,
 							dist2(mean, all_entries[hypergraphs[layer].get_data_index(
-															cur_node_index)]),
-							layer);
+															cur_node_index)]));
 				}
 			}
 		}
