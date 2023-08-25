@@ -42,19 +42,10 @@ template <typename T> struct simple_hypergraph {
 		using vertex::data_index;
 		vertex_with_ranks(size_t _data_index) : vertex::vertex(_data_index) {}
 		std::priority_queue<std::pair<T, size_t>> ranks;
-		bool add(size_t new_neighbour, T rank_val, size_t max_degree) {
+		void add(size_t new_neighbour, T rank_val, size_t max_degree) {
 			bool should_add = adj.size() < max_degree;
 			should_add = should_add || ranks.top().first > rank_val;
 			if (should_add) {
-				// TODO remove this
-				if (max_degree == 8) {
-					if (adj.size() < max_degree)
-						std::cerr << "\"Yes\" reason: size=" << adj.size() << std::endl;
-					else
-						std::cerr << "\"Yes\" reason: ranks top=" << ranks.top().first
-											<< ", rank_val=" << rank_val << std::endl;
-				}
-				// TODO end removal region
 				size_t location = adj.size();
 				if (adj.size() >= max_degree) {
 					location = ranks.top().second;
@@ -65,14 +56,6 @@ template <typename T> struct simple_hypergraph {
 				}
 				ranks.emplace(rank_val, location);
 			}
-			// TODO remove this
-			else {
-				std::cerr << "\"No\" reason: size=" << adj.size()
-									<< " and ranks top=" << ranks.top().first
-									<< ", rank_val=" << rank_val << std::endl;
-			}
-			// TODO remove return value (exists for debugging)
-			return should_add;
 		}
 	};
 	// hypergraph represented as bipartite graph between
@@ -122,39 +105,9 @@ template <typename T> struct simple_hypergraph {
 		clusters.emplace_back(0);
 		return ret;
 	}
-	// TODO remove layer param (exists for debugging)
-	// TODO remove return value
-	bool add_to_cluster(size_t node_index, size_t cluster_index, T rank_val,
-											size_t layer) {
-		if (node_index >= nodes.size()) {
-			// intentionally cause a segfault to get stack trace since abort isn't
-			// working
-			static int* thingy = NULL;
-			thingy[4] = 12;
-		}
-		// TODO remove if statements (after no more return value) the output exists
-		// for debugging
-		bool ret = false;
-		if (clusters[cluster_index].add(node_index, rank_val, degree_cluster)) {
-			// std::cerr << "Adding edge: (layer=" << layer << ", "
-			//					<< get_data_index(node_index) << "<-C" << cluster_index
-			//					<< ", val=" << sqrt(rank_val) << ")" << std::endl;
-		} else {
-			// std::cerr << "Not adding edge: (layer=" << layer << ", "
-			//					<< get_data_index(node_index) << "<-C" << cluster_index
-			//					<< ", val=" << sqrt(rank_val) << ")" << std::endl;
-		}
-		if (nodes[node_index].add(cluster_index, rank_val, degree_node)) {
-			// std::cerr << "Adding edge: (layer=" << layer << ", "
-			//					<< get_data_index(node_index) << "->C" << cluster_index
-			//					<< ", val=" << sqrt(rank_val) << ")" << std::endl;
-			ret = true;
-		} else {
-			// std::cerr << "Not adding edge: (layer=" << layer << ", "
-			//					<< get_data_index(node_index) << "->C" << cluster_index
-			//					<< ", val=" << sqrt(rank_val) << ")" << std::endl;
-		}
-		return ret;
+	void add_to_cluster(size_t node_index, size_t cluster_index, T rank_val) {
+		clusters[cluster_index].add(node_index, rank_val, degree_cluster);
+		nodes[node_index].add(cluster_index, rank_val, degree_node);
 	}
 };
 
@@ -170,11 +123,7 @@ struct hyper_hnsw_engine : public ann_engine<T, hyper_hnsw_engine<T>> {
 	// double cluster_count_constant;
 	size_t num_for_1nn;
 	hyper_hnsw_engine(hyper_hnsw_engine_config conf)
-			: rd(),
-				// TODO revert seeding to rd()
-				gen(2),
-				// gen(rd()),
-				distribution(0, 1), max_depth(conf.max_depth),
+			: rd(), gen(rd()), distribution(0, 1), max_depth(conf.max_depth),
 				degree_cluster(conf.degree_cluster), degree_node(conf.degree_node),
 				// cluster_count_constant(conf.cluster_count_constant),
 				num_for_1nn(conf.num_for_1nn) {}
@@ -261,8 +210,7 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 			size_t node_index = layer_to_node_index[layer];
 			//  TODO do k-means or something like it (b-matching?) instead of
 			//  random_shuffle
-			//  TODO re-enable random shuffle (disabled for debugging)
-			// random_shuffle(kNN[layer].begin(), kNN[layer].end());
+			random_shuffle(kNN[layer].begin(), kNN[layer].end());
 			size_t neighbours_i = 0;
 			for (size_t local_cluster_index = 0; local_cluster_index < degree_node;
 					 ++local_cluster_index) {
@@ -282,6 +230,8 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 				// compute mean
 				vec<T> mean;
 				mean.set_dim(all_entries[0].dim());
+				// major bug that was tested out: mean is not initialized by default, so
+				// do it manually below
 				for (size_t dim_i = 0; dim_i < all_entries[0].dim(); ++dim_i)
 					mean[dim_i] = 0;
 				for (size_t cur_node_index : cluster_elems)
@@ -289,54 +239,12 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 							all_entries[hypergraphs[layer].get_data_index(cur_node_index)];
 				mean /= T(cluster_elems.size());
 				size_t cluster_index = hypergraphs[layer].add_cluster();
-				// TODO remove debug code below (enclosing previous code in an else
-				// statement)
-				if (true) {
-					size_t cur_node_index = cluster_elems[0];
-					bool forward_edge = hypergraphs[layer].add_to_cluster(
+				for (size_t cur_node_index : cluster_elems) {
+					hypergraphs[layer].add_to_cluster(
 							cur_node_index, cluster_index,
-							// TODO 4* is for debugging (so is all of this though)
-							4 * dist2(mean, all_entries[hypergraphs[layer].get_data_index(
-																	cur_node_index)]),
+							dist2(mean, all_entries[hypergraphs[layer].get_data_index(
+															cur_node_index)]),
 							layer);
-					cur_node_index = cluster_elems[1];
-					size_t debug_i = hypergraphs[layer].get_data_index(cluster_elems[0]);
-					size_t debug_j = hypergraphs[layer].get_data_index(cluster_elems[1]);
-					T debug_d = dist2(
-							all_entries[hypergraphs[layer].get_data_index(cluster_elems[0])],
-							all_entries[hypergraphs[layer].get_data_index(cluster_elems[1])]);
-					if (forward_edge) {
-						std::cerr << "Adding edge: (layer=" << layer << ", " << debug_i
-											<< "->" << debug_j << ", val=" << sqrt(debug_d) << ")"
-											<< std::endl;
-					} else {
-						std::cerr << "Not adding edge: (layer=" << layer << ", " << debug_i
-											<< "->" << debug_j << ", val=" << sqrt(debug_d) << ")"
-											<< std::endl;
-					}
-					bool backward_edge = hypergraphs[layer].add_to_cluster(
-							cur_node_index, cluster_index,
-							// TODO 4* is for debugging (so is all of this though)
-							4 * dist2(mean, all_entries[hypergraphs[layer].get_data_index(
-																	cur_node_index)]),
-							layer);
-					if (backward_edge) {
-						std::cerr << "Adding edge: (layer=" << layer << ", " << debug_j
-											<< "->" << debug_i << ", val=" << sqrt(debug_d) << ")"
-											<< std::endl;
-					} else {
-						std::cerr << "Not adding edge: (layer=" << layer << ", " << debug_j
-											<< "->" << debug_i << ", val=" << sqrt(debug_d) << ")"
-											<< std::endl;
-					}
-				} else {
-					for (size_t cur_node_index : cluster_elems) {
-						hypergraphs[layer].add_to_cluster(
-								cur_node_index, cluster_index,
-								dist2(mean, all_entries[hypergraphs[layer].get_data_index(
-																cur_node_index)]),
-								layer);
-					}
 				}
 			}
 		}

@@ -32,11 +32,7 @@ struct hnsw_engine_2 : public ann_engine<T, hnsw_engine_2<T>> {
 	size_t num_for_1nn;
 	bool quick_search;
 	hnsw_engine_2(hnsw_engine_2_config conf)
-			: rd(),
-				// TODO revert seeding to rd()
-				gen(2),
-				// gen(rd()),
-				distribution(0, 1), max_depth(conf.max_depth),
+			: rd(), gen(rd()), distribution(0, 1), max_depth(conf.max_depth),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				quick_search(conf.quick_search) {}
 	std::vector<vec<T>> all_entries;
@@ -70,43 +66,6 @@ template <typename T> void hnsw_engine_2<T>::_store_vector(const vec<T>& v) {
 template <typename T>
 void hnsw_engine_2<T>::add_edge(size_t layer, size_t i, size_t j) {
 	T d = dist2(all_entries[i], all_entries[j]);
-	// TODO remove debug output below
-	if (hadj[layer][i].size() < edge_count_mult ||
-			hadj[layer][i].begin()->first < -d) {
-		if (hadj[layer][i].size() < edge_count_mult)
-			std::cerr << "\"Yes\" reason: size=" << hadj[layer][i].size()
-								<< std::endl;
-		else
-			std::cerr << "\"Yes\" reason: ranks top="
-								<< -hadj[layer][i].begin()->first << ", rank_val=" << d
-								<< std::endl;
-		std::cerr << "Adding edge: (layer=" << layer << ", " << i << "->" << j
-							<< ", val=" << sqrt(d) << ")" << std::endl;
-	} else {
-		std::cerr << "\"No\" reason: size=" << hadj[layer][i].size()
-							<< " and ranks top=" << -hadj[layer][i].begin()->first
-							<< ", rank_val=" << d << std::endl;
-		std::cerr << "Not adding edge: (layer=" << layer << ", " << i << "->" << j
-							<< ", val=" << sqrt(d) << ")" << std::endl;
-	}
-	if (hadj[layer][j].size() < edge_count_mult ||
-			hadj[layer][j].begin()->first < -d) {
-		if (hadj[layer][j].size() < edge_count_mult)
-			std::cerr << "\"Yes\" reason: size=" << hadj[layer][j].size()
-								<< std::endl;
-		else
-			std::cerr << "\"Yes\" reason: ranks top="
-								<< -hadj[layer][j].begin()->first << ", rank_val=" << d
-								<< std::endl;
-		std::cerr << "Adding edge: (layer=" << layer << ", " << j << "->" << i
-							<< ", val=" << sqrt(d) << ")" << std::endl;
-	} else {
-		std::cerr << "\"No\" reason: size=" << hadj[layer][j].size()
-							<< " and ranks top=" << -hadj[layer][j].begin()->first
-							<< ", rank_val=" << d << std::endl;
-		std::cerr << "Not adding edge: (layer=" << layer << ", " << j << "->" << i
-							<< ", val=" << sqrt(d) << ")" << std::endl;
-	}
 	hadj[layer][i].emplace(-d, j);
 	hadj[layer][j].emplace(-d, i);
 	if (hadj[layer][i].size() > edge_count_mult)

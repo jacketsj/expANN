@@ -231,11 +231,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	// to_run.emplace_back(56, 100, 1, 16, 32);
 	// to_run.emplace_back(47, 100, 1, 16, 64);
 	// to_run.emplace_back(46, 100, 1, 4, 128);
-	if (false) {
-		// for (size_t degree_cluster = 2; degree_cluster <= 64; degree_cluster *=
-		// 4) {
-		for (size_t degree_cluster = 2; degree_cluster <= 2; degree_cluster *= 4) {
-			// for (size_t degree_node = 2; degree_node <= 64; degree_node *= 4) {
+	if (true) {
+		for (size_t degree_cluster = 2; degree_cluster <= 64; degree_cluster *= 4) {
+			// for (size_t degree_cluster = 2; degree_cluster <= 2; degree_cluster *=
+			// 4) { for (size_t degree_node = 2; degree_node <= 64; degree_node *= 4)
+			// {
 			for (size_t degree_node = 30; degree_node <= 42; degree_node += 6) {
 				for (size_t num_for_1nn = 4; num_for_1nn <= 8; num_for_1nn *= 2) {
 					hyper_hnsw_engine_jobs.emplace_back(hyper_hnsw_engine_config(
@@ -244,11 +244,6 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			}
 		}
 	}
-
-	// temp: testing differences between hnsw_2 and (hyper_hnsw with
-	// degree_cluster=2) in theory, there should be none (at the time of writing)
-	hnsw_engine_2_jobs.emplace_back(hnsw_engine_2_config(10, 8, 2, true));
-	hyper_hnsw_engine_jobs.emplace_back(hyper_hnsw_engine_config(10, 2, 8, 2));
 
 	// for (size_t K = 4; K <= 64; K += 4) {
 	//	for (size_t k = 4; k * K <= 128 * 8; k += 4) {
