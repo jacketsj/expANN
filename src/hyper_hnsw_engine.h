@@ -210,6 +210,8 @@ template <typename T> void hyper_hnsw_engine<T>::_build() {
 			size_t node_index = layer_to_node_index[layer];
 			//  TODO do k-means or something like it (b-matching?) instead of
 			//  random_shuffle
+			//  TODO should probably just get mean point of each cluster, then query
+			//  again (can do this before editing the graph)
 			random_shuffle(kNN[layer].begin(), kNN[layer].end());
 			size_t neighbours_i = 0;
 			for (size_t local_cluster_index = 0; local_cluster_index < degree_node;

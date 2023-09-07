@@ -1,7 +1,7 @@
 goal
 
 
-Step 1. Make a graph representation supporting the following
+Step 1. Make an (on-disk) graph representation supporting the following
 
 needs to represent:
 
@@ -115,3 +115,8 @@ How to define "closest" for choosing the "best" adjacent clusters:
 -- Once k clusters have been added, stop.
 -- This should be doable with a greedy recursive strategy similar to the one that exists in the code now -- the old cluster is bumped andthen we try to re-insert it (maybe up to a limited number of times, unless cycling can be proven to be impossible or sufficiently small).
 
+
+For fast implementation:
+- True and predictive objective functions should be well coordinated with data stored alongside clusters.
+- Care should be taken to choose clusters, based on filters. It might be good to have a different set of clusters for each filter.
+  It might be better to allow clusters to match any possible filter. It might be better to have a combination of both types.
