@@ -1,0 +1,117 @@
+goal
+
+
+Step 1. Make a graph representation supporting the following
+
+needs to represent:
+
+vertex {
+data based on vertex type
+other data for filtering
+outgoing edges
+incoming edges [only helpful for online updates, but online updates should also exist for offline index building]
+}
+
+greedy_search(starting_vertex_set, objective_function, [optional]predictive_objective_function, search_size, filter_fn_list)
+// uses greedy local search to find the approximate top search_size items in the graph matching each filter in filter_fn_list
+// works regardless of if a filter has a corresponding index (since indices are transparent) --- mixes the to_visit lists of each
+// list though, and adds to the to_visit list if it's a potentially good item for ANY filter in the list
+// (may result in extended search time if many filters are present)
+//
+// whether search_size represents the number of things returned, vs if it represents something weaker
+// (and all visited vertexs are returned) is up to the user
+// 
+// if it exists, it is assumed that predictive_objective_function has lower latency,
+// and objective_function is performed asynchronously (with the same throughput, maybe?)
+// 
+// canonical example is: objective_function is true comparison, predictive_objective_function is a random projection
+//   (possibly just taking a random subset of coordinates, but also possibly a random stored projection onto a lower space)
+// objective function should be used for pruning things that are too far, and visiting things that were falsely labelled as too far
+// objective function could be implemented with a second dedicated cpu core (or several),
+//   or another type of dedicated hardware (e.g. gpu, fpga)
+// alternatively could be called: synchronous_objective_function and async_objective_function
+      (only the latter being optional in that case)
+// this is only helpful because most of the query time is spent on distance comparisons
+// search termination should occur if the (true) objective function
+//   determines there was a point in time where nothing was worth considering
+
+
+add_vertex(vertex data + relevant filter data)
+// adds a vertex without adding any edges
+
+add_edge(vertex_id1, vertex_id2, metadata)
+// adds an edge from vertex_id1 to vertex_id2 with additional metadata (probably the bucket id)
+remove_edge(vertex_id1, vertex_id2)
+
+get_outgoing_edges(vertex_id)
+// gets the edges, either with or without metadata
+
+get_incoming_edges(vertex_id)
+// gets the edges, either with or without metadata
+
+edit_vertex(vertex_id, new vertex data/filter data)
+// allows one to edit a vertex's internal data (not the edges)
+// examples of things that one might want to perform:
+// - add a label to a vertex for a new filter
+// - mark a vertex for future deletion
+
+assign_initial_vertex(vertex_id)
+// remember not to call this before you add the outgoing edges for the vertex
+
+
+
+Step 2. Make an engine with the following usage
+
+Two broad types of vertices:
+Vertices representing (small) clusters
+Vertices representing actual vectors from the dataset
+Generally speaking, the underlying graph(s) should be bipartite, with these two types of vertices as the two parts
+Every vector should be part of at least one cluster for this to be possible
+
+Every vertex should have many outgoing edges, separated into several bins.
+- Each bin represents some combination of filters.
+- These filters may be user-defined, or implementation defined, or a combination of both.
+- Each bin only permits a certain subset of the edges (which can be defined by a filter, or combination of filters).
+- For each bin, it is desirable to have the best set of edges permitted for that bin
+  (that is, the "closest" vertices).
+- Each bin has a "minimum" size -- it may start out with a smaller number than this initial size,
+  but edges cannot be removed if it is at or below this minimum size.
+- Among all bins, there should still be a maximum degree.
+
+It may be helpful to store distances for each outgoing edge, to aid in triangle-inequality (or similar) based pruning
+in the objective function (maybe predictive) implementation.
+
+Several of the important filters to add to bins are:
+- Require that the edges form the bipartite graph
+- Assign every vertex a fixed number of random bits to form a cut matching game. Each one should be a different bin filter.
+  Edges from cluster vertices to vector vectices should keep the same id (that is, clusters are on one side of the cut).
+  Different bins should exist for edges from vector vertices to cluster vertices: One should invert the cut side, the other should
+  keep it the same (the latter should also potentially not exist).
+- For HNSW-like graphs, add bins for levels, and have different maximum degree for different vertices.
+
+For constructing clusters:
+- Either use an extrenal mechanism to construct them
+- Or use the graph itself to make them, by sampling points from your dataset and doing kNN.
+
+For deleting vertices representing clusters:
+- Call edit_vertex to add a "to_be_deleted" label
+- Call get_incoming_edges and add all the resulting vertices representing vectors to a to_be_recomputed list
+- When querying, filter out "to_be_deleted" results (but have multiple filters, so that traversals still pass through these deleted clusters)
+- After enough deletions (or just asynchronously), batch recompute the nearest vertices for everything on the to_be_recomputed list (for every filter), not including anything labelled to_be_deleted
+
+For deleting vertices representing vectors:
+- Call edit_vertex to add a "to_be_deleted" label
+- Call get_incoming_edges to get all the clusters containing this vertex
+- Add all the clusters to a to_be_recomputed list
+- After enough deletions (or just asynchronously), create new clusters (i.e. call kNN on each of the seed locations again) to replace the old, then batch delete the clusters (using the routine above)
+
+How to define "closest" for choosing the "best" adjacent clusters:
+- For a potential set of clusters, of which only k can be chosen, want to choose the "closest"
+- If the clusters have no overlap: Check which one has the closest element (and add it if there is still <k chosen), then 2nd closest, etc.
+- In general they do have overlap, so do the following greedy strategy:
+-- Sort all the relevant clusters (i.e. those matching the same filters as the new one to be added) by some canonical order (e.g. in-degree + more canonical tiebreaking)
+-- Sort the union of all points in all the clusters
+-- Iterate through the points in the union, eliminating the first cluster in the sorted list containing it every time (and all the other points it contains)
+-- Once k clusters have been added, stop.
+-- This should be doable with a greedy recursive strategy similar to the one that exists in the code now -- the old cluster is bumped andthen we try to re-insert it (maybe up to a limited number of times, unless cycling can be proven to be impossible or sufficiently small).
+
