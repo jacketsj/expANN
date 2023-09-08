@@ -105,6 +105,13 @@ For deleting vertices representing vectors:
 - Add all the clusters to a to_be_recomputed list
 - After enough deletions (or just asynchronously), create new clusters (i.e. call kNN on each of the seed locations again) to replace the old, then batch delete the clusters (using the routine above)
 
+Alternative cluster replacement routine:
+- After adding new clusters, mark old clusters for deletion
+- For each vector vertex with an edge to an old cluster, list off all its (1-transitive) incident vector vertices
+- List off all the clusters covering any of those vertices
+- Do some heuristical covering of those vertices using the non-deleted clusters
+This is probably worse overall for stability, but decent for static cases
+
 How to define "closest" for choosing the "best" adjacent clusters:
 - For a potential set of clusters, of which only k can be chosen, want to choose the "closest"
 - If the clusters have no overlap: Check which one has the closest element (and add it if there is still <k chosen), then 2nd closest, etc.
