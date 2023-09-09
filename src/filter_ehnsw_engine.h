@@ -61,7 +61,7 @@ struct filter_ehnsw_engine : public ann_engine<T, filter_ehnsw_engine<T>> {
 			e_labels; // vertex -> cut labels (*num_cuts)
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const std::vector<size_t>
+	const std::vector<std::vector<size_t>>
 	_query_k_at_layer(const vec<T>& v, size_t k, size_t starting_point,
 										size_t layer,
 										std::vector<std::function<bool(size_t)>> filters);
@@ -69,7 +69,7 @@ struct filter_ehnsw_engine : public ann_engine<T, filter_ehnsw_engine<T>> {
 	void add_edge_directional(size_t layer, size_t i, size_t j);
 	const std::vector<std::vector<size_t>>
 	_query_k_internal(const vec<T>& v, size_t k, size_t full_search_top_layer,
-										std::vector<std::function<bool(size_t)>>& filters =
+										std::vector<std::function<bool(size_t)>> filters =
 												std::vector<std::function<bool(size_t)>>({[](size_t) {
 													return true;
 												}}));
@@ -204,7 +204,8 @@ template <typename T> void filter_ehnsw_engine<T>::_build() {
 	}
 }
 template <typename T>
-const std::vector<size_t> filter_ehnsw_engine<T>::_query_k_at_layer(
+const std::vector<std::vector<size_t>>
+filter_ehnsw_engine<T>::_query_k_at_layer(
 		const vec<T>& v, size_t k, size_t starting_point, size_t layer,
 		std::vector<std::function<bool(size_t)>> filters) {
 	assert(filters.size() > 0);
@@ -260,12 +261,17 @@ const std::vector<size_t> filter_ehnsw_engine<T>::_query_k_at_layer(
 			visit(d_next, u);
 		}
 	}
-	std::vector<size_t> ret;
-	while (!top_k.empty()) {
-		ret.push_back(top_k.top().second);
-		top_k.pop();
+	std::vector<std::vector<size_t>> ret;
+	for (size_t filter = 0; filter < filters.size(); ++filter) {
+		std::vector<size_t> ret_filter;
+		while (!top_k[filter].empty()) {
+			ret.push_back(top_k[filter].top().second);
+			top_k[filter].pop();
+		}
+		reverse(ret_filter.begin(),
+						ret_filter.end()); // sort from closest to furthest
+		ret.emplace_back(ret_filter);
 	}
-	reverse(ret.begin(), ret.end()); // sort from closest to furthest
 	return ret;
 }
 
@@ -273,7 +279,7 @@ template <typename T>
 const std::vector<std::vector<size_t>>
 filter_ehnsw_engine<T>::_query_k_internal(
 		const vec<T>& v, size_t k, size_t full_search_top_layer,
-		std::vector<std::function<bool(size_t)>>& filters) {
+		std::vector<std::function<bool(size_t)>> filters) {
 	auto current = starting_vertex;
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::vector<size_t>> ret;
@@ -282,7 +288,14 @@ filter_ehnsw_engine<T>::_query_k_internal(
 		size_t layer_k = k;
 		if (layer > int(full_search_top_layer))
 			layer_k = 1;
-		ret.push_back(_query_k_at_layer(v, layer_k, current, layer, filters));
+		auto returned_list = _query_k_at_layer(v, layer_k, current, layer, filters);
+		std::vector<size_t> returned_list_concat;
+		for (auto& l : returned_list) {
+			for (auto& value : l)
+				returned_list_concat.emplace_back(value);
+		}
+		ret.push_back(returned_list_concat);
+		// ret.push_back(_query_k_at_layer(v, layer_k, current, layer, filters));
 		current = ret.back().front();
 	}
 	reverse(ret.begin(), ret.end());
