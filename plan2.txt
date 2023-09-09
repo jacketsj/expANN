@@ -1,0 +1,28 @@
+I don't need multiple different types of nodes, I only need one kind.
+Each cluster should store all the relevant information for its vertices, including vector values, or information on where to retrieve those values.
+Hence only one type of vertex: Cluster vertices
+Add/remove/filter system should still be done as before probably
+and an api is also good
+but preliminary implementation can just be done with some static clustering probably (use some other DS to query and generate potentially overlapping clusters)
+
+preliminary implementation can literally be done as follows:
+copy ehnsw_engine_2 (or hnsw_engine_2)
+Replace vec<T> with something like vector<pair<size_t, vec<T>> (where the size_t represents the data_index)
+- should make a file/class for this type probably
+add a custom distance function
+add a cluster dimension parameter to the new config
+- keep a separate set of outgoing edges for each vertex in each cluster (need to make changes in query_k_at_layer as well)
+--keep in mind that vectors in other clusters are only helpful if they're not in the current cluster
+- modify the add_edge_directional routine to add edges specific to a particular vertex within a cluster, heading to an entire other cluster
+- modify the original add_edge_directional function signature to call the new routine for each vertex in the outgoing cluster
+- modify query_k to take the top_k clusters (or something like that, maybe allowing num_for_1nn to no longer be a multiplier, call it num_for_knn), and convert it to a top_k vectors using a top_k data structure
+
+easy temp sampling strategy: build another index.
+While there are vectors contained in <=R clusters, find the (approx) k closest elements to that vector and form a cluster with them (use R=1 or 2 probably)
+
+
+slightly different approach for implementation simplicity:
+query_k (and similar) still returns top k vectors
+have inverse lookup for vectors->clusters with it
+edges go from vector->cluster
+only new param: cluster size
