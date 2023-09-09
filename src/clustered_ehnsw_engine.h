@@ -39,17 +39,21 @@ struct layer {
 	// data index -> adjacent cluster indeces
 	robin_hood::unordered_flat_map<size_t, std::vector<size_t>> cadj;
 	// cluster index -> contained data indeces
-	std::vector<size_t, std::vector<size_t>> ccont;
+	std::vector<std::vector<size_t>> ccont;
 	// data index -> containing cluster indeces
 	robin_hood::unordered_flat_map<size_t, std::vector<size_t>> ccont_inv;
 	// data index -> cut bin (or num_cuts for no cut) -> edges in that bin
 	robin_hood::unordered_flat_map<size_t, std::vector<std::vector<size_t>>>
 			edge_bins;
+	// TODO remove edge_ranks maybe (stub based on ehnsw2 for initial testing)
+	robin_hood::unordered_flat_map<
+			size_t, std::vector<std::set<std::pair<float, size_t>>>>
+			edge_ranks;
 	layer() {}
-	void add_vertex(size_t data_index) {
+	void add_vertex(size_t data_index, size_t num_bins) {
 		cadj[data_index] = std::vector<size_t>();
 		ccont_inv[data_index] = std::vector<size_t>();
-		edge_bins[data_index] = std::vector<std::vector<size_t>>();
+		edge_bins[data_index] = std::vector<std::vector<size_t>>(num_bins);
 	}
 	size_t add_cluster() {
 		size_t ret = ccont.size();
@@ -57,8 +61,8 @@ struct layer {
 		return ret;
 	}
 	void add_to_cluster(size_t data_index, size_t cluster_index) {
-		ccont_inv[data_index].push_back(cluster_index);
-		ccont[cluster_index].push_back(data_index);
+		ccont_inv[data_index].emplace_back(cluster_index);
+		ccont[cluster_index].emplace_back(data_index);
 	}
 };
 
@@ -90,19 +94,19 @@ struct clustered_ehnsw_engine
 				quick_build(conf.quick_build) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<layer> layers;
-	std::vector<size_t> top_layer_index; // data_index -> top layer it appears on
-	robin_hood::unordered_flat_map<size_t, std::vector<bool>>
+	std::vector<size_t> top_layers; // data_index -> top layer it appears on
+	std::vector<std::vector<bool>>
 			e_labels; // data index -> cut labels [*num_cuts]
 	void _store_vector(const vec<T>& v);
 	void _build();
 	const std::vector<size_t> _query_k_at_layer(const vec<T>& v, size_t k,
 																							size_t starting_point,
 																							const layer& ly);
-	void add_edge(size_t layer, size_t i, size_t j);
-	void add_edge_directional_to_cluster(size_t layer, size_t data_index,
+	void add_edge(layer& lr, size_t i, size_t j);
+	void add_edge_directional_to_cluster(layer& lr, size_t data_index,
 																			 size_t cluster_index);
-	void add_edge_directional(size_t layer, size_t data_index_1,
-														size_t data_index_2);
+	void add_edge_directional(layer& lr, size_t data_index_from,
+														size_t data_index_to);
 	const std::vector<std::vector<size_t>>
 	_query_k_internal(const vec<T>& v, size_t k, size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
@@ -140,6 +144,9 @@ template <typename T>
 void clustered_ehnsw_engine<T>::add_edge_directional(layer& lr,
 																										 size_t data_index_from,
 																										 size_t data_index_to) {
+	// TODO check that no cluster containing data_index_to is in the adjacent set
+	// already (mabye also containing set) (and that data_index_from !=
+	// data_index_to)
 	for (size_t cluster_index : lr.ccont_inv[data_index_to])
 		add_edge_directional_to_cluster(lr, data_index_from, cluster_index);
 }
@@ -148,11 +155,16 @@ template <typename T>
 void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
 		layer& lr, size_t data_index, size_t cluster_index) {
 	// TODO make this use the clustered structure
+	// TODO check that cluster_index does not contain data_index and cluster_index
+	// is not in the adjacent set already
+	//
 	// currently: stub version that assumes cluster sizes of 1 (currently true)
 	size_t i = data_index;
 	size_t j = lr.ccont[cluster_index][0];
 
-	T d = dist(all_entries[i], all_entries[j]);
+	// TODO check that j != i and j is not in the adjacent set already
+
+	T d = dist2(all_entries[i], all_entries[j]);
 	std::vector<size_t> cuts;
 	for (size_t cut = 0; cut <= num_cuts; ++cut)
 		cuts.push_back(cut);
@@ -169,14 +181,15 @@ void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
 	// not below min_per_cut, and pick out the one with the longest edge
 	size_t max_cut = 0;
 	T max_cut_val = std::numeric_limits<T>::max();
-	size_t deleted_j = i; // nothing deleted if deleted_j == i
-	if (hadj[layer][i].size() + 1 > edge_count_mult) {
+	int deleted_cluster_index =
+			-1; // nothing deleted if deleted_cluster_index == -1
+	if (lr.cadj[i].size() + 1 > edge_count_mult) {
 		for (size_t cut : cuts) {
-			size_t sz = edge_ranks[layer][i][cut].size();
+			size_t sz = lr.edge_ranks[i][cut].size();
 			if (cut == found_cut)
 				sz++;
 			if (sz > min_per_cut) {
-				T cur_cut_val = edge_ranks[layer][i][cut].begin()->first;
+				T cur_cut_val = lr.edge_ranks[i][cut].begin()->first;
 				if (cur_cut_val < max_cut_val) {
 					max_cut_val = cur_cut_val;
 					max_cut = cut;
@@ -185,27 +198,29 @@ void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
 		}
 		// if that longest edge is longer than our candidate edge, make the swap
 		if (-max_cut_val > d) {
-			auto iter = edge_ranks[layer][i][max_cut].begin();
+			auto iter = lr.edge_ranks[i][max_cut].begin();
 			size_t edge_index = iter->second;
-			deleted_j = hadj[layer][i][edge_index];
-			hadj[layer][i][edge_index] = j;
-			edge_ranks[layer][i][max_cut].erase(iter);
-			edge_ranks[layer][i][found_cut].emplace(-d, edge_index);
+			deleted_cluster_index = lr.cadj[i][edge_index];
+			lr.cadj[i][edge_index] = cluster_index;
+			// deleted_j = hadj[layer][i][edge_index];
+			// hadj[layer][i][edge_index] = j;
+			lr.edge_ranks[i][max_cut].erase(iter);
+			lr.edge_ranks[i][found_cut].emplace(-d, edge_index);
 		}
 	} else {
-		hadj[layer][i].emplace_back(j);
-		edge_ranks[layer][i][found_cut].emplace(-d, hadj[layer][i].size() - 1);
+		lr.cadj[i].emplace_back(cluster_index);
+		lr.edge_ranks[i][found_cut].emplace(-d, lr.cadj[i].size() - 1);
 	}
 	// try to bump a bigger edge until stability is reached (if bumping is
 	// enabled)
-	if (deleted_j != i && bumping)
-		add_edge_directional(layer, i, deleted_j);
+	if (deleted_cluster_index >= 0 && bumping)
+		add_edge_directional(lr, i, size_t(deleted_cluster_index));
 }
 
 template <typename T>
-void clustered_ehnsw_engine<T>::add_edge(size_t layer, size_t i, size_t j) {
-	add_edge_directional(layer, i, j);
-	add_edge_directional(layer, j, i);
+void clustered_ehnsw_engine<T>::add_edge(layer& lr, size_t i, size_t j) {
+	add_edge_directional(lr, i, j);
+	add_edge_directional(lr, j, i);
 }
 
 template <typename T> void clustered_ehnsw_engine<T>::_build() {
@@ -223,9 +238,10 @@ template <typename T> void clustered_ehnsw_engine<T>::_build() {
 	// TODO do clustering on each layer here
 	assert(cluster_size == 1);
 	assert(min_cluster_membership == 1);
+	size_t num_bins = num_cuts + 1;
 	for (size_t vind = 0; vind < all_entries.size(); ++vind) {
 		for (size_t layer_index = 0; layer_index <= max_depth; ++layer_index) {
-			layers[layer_index].add_vertex(vind);
+			layers[layer_index].add_vertex(vind, num_bins);
 			// as a stub routine (for testing), make clusters of size 1
 			size_t cluster_index = layers[layer_index].add_cluster();
 			layers[layer_index].add_to_cluster(vind, cluster_index);
@@ -235,7 +251,7 @@ template <typename T> void clustered_ehnsw_engine<T>::_build() {
 	std::vector<size_t> data_indeces_to_process;
 	for (size_t i = 0; i < all_entries.size(); ++i) {
 		if (i != highest_vertex_index)
-			data_indexes_to_process.emplace_back(i);
+			data_indeces_to_process.emplace_back(i);
 	}
 	for (size_t cdi : data_indeces_to_process) {
 		// if (cdi % 5000 == 0)
@@ -253,12 +269,12 @@ template <typename T> void clustered_ehnsw_engine<T>::_build() {
 		if (quick_build)
 			full_search_top_layer = cur_layer;
 		std::vector<std::vector<size_t>> kNN = _query_k_internal(
-				all_entries[i], edge_count_mult, full_search_top_layer);
+				all_entries[cdi], edge_count_mult, full_search_top_layer);
 		// add all the neighbours as edges
-		for (size_t layer = 0; layer <= cur_layer && layer < kNN.size(); ++layer) {
-			edge_ranks[layer][i].resize(num_cuts + 1);
-			for (size_t j : kNN[layer]) {
-				add_edge(layer, i, j);
+		for (size_t layer_index = 0;
+				 layer_index <= cur_layer && layer_index < kNN.size(); ++layer_index) {
+			for (size_t j : kNN[layer_index]) {
+				add_edge(layers[layer_index], cdi, j);
 			}
 		}
 	}
@@ -291,7 +307,8 @@ const std::vector<size_t> clustered_ehnsw_engine<T>::_query_k_at_layer(
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
-		for (const auto& cluster_index : lr.cadj[cur])
+		// TODO also iterate through lr.ccont_inv maybe
+		for (const auto& cluster_index : lr.cadj.at(cur))
 			for (const auto& next_di : lr.ccont[cluster_index]) {
 				T d_next = dist(v, all_entries[next_di]);
 				visit(d_next, next_di);
@@ -317,7 +334,7 @@ clustered_ehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::vector<size_t>> ret;
 	// for each layer, in decreasing depth
-	for (int layer_index = hadj.size() - 1; layer_index >= 0; --layer_index) {
+	for (int layer_index = layers.size() - 1; layer_index >= 0; --layer_index) {
 		size_t layer_k = k;
 		if (layer_index > int(full_search_top_layer))
 			layer_k = 1;
