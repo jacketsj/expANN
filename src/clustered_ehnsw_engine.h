@@ -312,8 +312,8 @@ template <typename T> void clustered_ehnsw_engine<T>::_build() {
 	assert(min_cluster_membership == 1);
 	size_t num_bins = num_cuts + 1;
 	for (size_t data_index = 0; data_index < all_entries.size(); ++data_index) {
-		for (size_t layer_index = 0; layer_index <= top_layers[data_index];;
-		++layer_index {
+		for (size_t layer_index = 0; layer_index <= top_layers[data_index];
+				 ++layer_index) {
 			// for (size_t layer_index = 0; layer_index <= max_depth; ++layer_index) {
 			layers[layer_index].add_vertex(data_index, num_bins);
 			// as a stub routine (for testing), make clusters of size 1
