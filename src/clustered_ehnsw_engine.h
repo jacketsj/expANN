@@ -54,6 +54,7 @@ struct layer {
 		cadj[data_index] = std::vector<size_t>();
 		ccont_inv[data_index] = std::vector<size_t>();
 		edge_bins[data_index] = std::vector<std::vector<size_t>>(num_bins);
+		edge_ranks[data_index].resize(num_bins);
 	}
 	size_t add_cluster() {
 		size_t ret = ccont.size();
