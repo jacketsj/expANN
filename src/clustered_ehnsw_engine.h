@@ -74,7 +74,8 @@ template <typename T> struct layer {
 		// cadj[data_index] = std::vector<size_t>();
 		ccont_inv[data_index] = std::vector<CIndex>();
 		edge_bins[data_index] = std::vector<std::vector<size_t>>(num_bins);
-		edge_ranks[data_index].resize(num_bins);
+		edge_ranks[data_index] =
+				std::vector<std::set<std::pair<float, size_t>>>(num_bins);
 	}
 	size_t add_cluster() {
 		size_t ret = ccont.size();
@@ -133,7 +134,7 @@ struct clustered_ehnsw_engine
 										const layer<T>& ly);
 	void add_edge(layer<T>& lr, size_t i, size_t j);
 	void add_edge_directional_to_cluster(layer<T>& lr, size_t data_index,
-																			 size_t cluster_index);
+																			 CIndex cluster_index);
 	void add_edge_directional(layer<T>& lr, size_t data_index_from,
 														size_t data_index_to);
 	const std::vector<std::vector<size_t>>
@@ -176,13 +177,13 @@ void clustered_ehnsw_engine<T>::add_edge_directional(layer<T>& lr,
 	// TODO check that no cluster containing data_index_to is in the adjacent set
 	// already (mabye also containing set) (and that data_index_from !=
 	// data_index_to)
-	for (size_t cluster_index : lr.ccont_inv[data_index_to])
+	for (CIndex cluster_index : lr.ccont_inv[data_index_to])
 		add_edge_directional_to_cluster(lr, data_index_from, cluster_index);
 }
 
 template <typename T>
 void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
-		layer<T>& lr, size_t data_index, size_t cluster_index) {
+		layer<T>& lr, size_t data_index, CIndex cluster_index) {
 	// TODO make this use the clustered structure
 	// TODO check that cluster_index is not in the adjacent set already
 	//
@@ -204,6 +205,7 @@ void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
 			cluster_distances.begin(),
 			std::min_element(cluster_distances.begin(), cluster_distances.end()));
 	size_t j = lr.ccont[cluster_index][best_member_index];
+	// size_t j = lr.ccont[cluster_index][0];
 
 	// TODO check that j != i and j is not in the adjacent set already
 
@@ -229,11 +231,11 @@ void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
 			-1; // nothing deleted if deleted_cluster_index == -1
 	if (lr.cadj(i).size() + 1 > edge_count_mult) {
 		for (size_t cut : cuts) {
-			size_t sz = lr.edge_ranks[i][cut].size();
+			size_t sz = lr.edge_ranks[data_index][cut].size();
 			if (cut == found_cut)
 				sz++;
 			if (sz > min_per_cut) {
-				T cur_cut_val = lr.edge_ranks[i][cut].begin()->first;
+				T cur_cut_val = lr.edge_ranks[data_index][cut].begin()->first;
 				if (cur_cut_val < max_cut_val) {
 					max_cut_val = cur_cut_val;
 					max_cut = cut;
@@ -242,23 +244,24 @@ void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
 		}
 		// if that longest edge is longer than our candidate edge, make the swap
 		if (-max_cut_val > d) {
-			auto iter = lr.edge_ranks[i][max_cut].begin();
+			auto iter = lr.edge_ranks[data_index][max_cut].begin();
 			size_t edge_index = iter->second;
 			deleted_cluster_index = lr.cadj(i)[edge_index];
 			lr.cadj_mut(i)[edge_index] = cluster_index;
 			// deleted_j = hadj[layer][i][edge_index];
 			// hadj[layer][i][edge_index] = j;
-			lr.edge_ranks[i][max_cut].erase(iter);
-			lr.edge_ranks[i][found_cut].emplace(-d, edge_index);
+			lr.edge_ranks[data_index][max_cut].erase(iter);
+			lr.edge_ranks[data_index][found_cut].emplace(-d, edge_index);
 		}
 	} else {
 		lr.cadj_mut(i).emplace_back(cluster_index);
-		lr.edge_ranks[i][found_cut].emplace(-d, lr.cadj(i).size() - 1);
+		lr.edge_ranks[data_index][found_cut].emplace(-d, lr.cadj(i).size() - 1);
 	}
 	// try to bump a bigger edge until stability is reached (if bumping is
 	// enabled)
 	if (deleted_cluster_index >= 0 && bumping)
-		add_edge_directional(lr, i, size_t(deleted_cluster_index));
+		add_edge_directional_to_cluster(lr, data_index,
+																		size_t(deleted_cluster_index));
 }
 
 template <typename T>

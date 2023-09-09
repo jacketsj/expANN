@@ -295,7 +295,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						//		100, k, num_for_1nn, K, min_per_cut, true, true, true));
 						// ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 						//		100, k, num_for_1nn, K, min_per_cut, true, true));
-						if (false) {
+						if (true) {
 							ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 									100, k, num_for_1nn, K, min_per_cut, true, true, false));
 						}
