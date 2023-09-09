@@ -149,6 +149,7 @@ struct clustered_ehnsw_engine
 		add_param(pl, num_cuts);
 		add_param(pl, min_per_cut);
 		add_param(pl, cluster_size);
+		add_param(pl, min_cluster_membership);
 		add_param(pl, quick_search);
 		add_param(pl, bumping);
 		add_param(pl, quick_build);
