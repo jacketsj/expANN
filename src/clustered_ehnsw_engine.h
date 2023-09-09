@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "ann_engine.h"
+#include "ehnsw_engine_2.h"
 #include "robin_hood.h"
 
 struct clustered_ehnsw_engine_config {
@@ -122,12 +123,14 @@ struct clustered_ehnsw_engine
 			e_labels; // data index -> cut labels [*num_cuts]
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const std::vector<size_t> _query_k_at_layer_di(const vec<T>& v, size_t k,
-																								 size_t starting_point,
-																								 const layer<T>& ly);
-	const std::vector<VIndex> _query_k_at_layer(const vec<T>& v, size_t k,
-																							VIndex starting_vindex,
-																							const layer<T>& ly);
+	const std::vector<size_t>
+	_query_k_at_layer_di(const vec<T>& v, size_t k,
+											 const std::vector<size_t>& starting_points,
+											 const layer<T>& ly);
+	const std::vector<VIndex>
+	_query_k_at_layer(const vec<T>& v, size_t k,
+										const std::vector<VIndex>& starting_points,
+										const layer<T>& ly);
 	void add_edge(layer<T>& lr, size_t i, size_t j);
 	void add_edge_directional_to_cluster(layer<T>& lr, size_t data_index,
 																			 size_t cluster_index);
@@ -181,12 +184,26 @@ template <typename T>
 void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
 		layer<T>& lr, size_t data_index, size_t cluster_index) {
 	// TODO make this use the clustered structure
-	// TODO check that cluster_index does not contain data_index and cluster_index
-	// is not in the adjacent set already
+	// TODO check that cluster_index is not in the adjacent set already
 	//
+	// TODO consider other distance metrics
 	// currently: stub version that assumes cluster sizes of 1 (currently true)
 	size_t i = lr.get_vindex(data_index);
-	size_t j = lr.ccont[cluster_index][0];
+	// j is the closest element among all elements of the cluster to i, not
+	// including i itself
+	std::vector<T> cluster_distances;
+	for (auto& cluster_elem : lr.ccont[cluster_index]) {
+		if (i == cluster_elem)
+			cluster_distances.emplace_back(std::numeric_limits<T>::max());
+		else
+			cluster_distances.emplace_back(
+					dist(all_entries[lr.get_data_index(i)],
+							 all_entries[lr.get_data_index(cluster_elem)]));
+	}
+	size_t best_member_index = std::distance(
+			cluster_distances.begin(),
+			std::min_element(cluster_distances.begin(), cluster_distances.end()));
+	size_t j = lr.ccont[cluster_index][best_member_index];
 
 	// TODO check that j != i and j is not in the adjacent set already
 
@@ -262,11 +279,41 @@ template <typename T> void clustered_ehnsw_engine<T>::_build() {
 		layers.emplace_back();
 	}
 
+	/*
 	// TODO do clustering on each layer here
+	auto do_clustering = [&](const std::vector<vec<T>>& entries) {
+		// build another ANN engine to do clustering
+		ehnsw_engine_2 clustering_engine(
+				ehnsw_engine_2_config(max_depth, edge_count_mult, num_for_1nn, num_cuts,
+															min_per_cut, quick_search, bumping, quick_build));
+		for (const auto& v : entries)
+			clustering_engine.store_vector(v);
+		clustering_engine.build();
+		// now do clustering
+		// each vector should be present in at least M clusters
+		size_t M = 2;
+		std::vector<std::vector<size_t>> clusters;
+		std::vector<size_t> presence_counts(entries.size());
+		for (size_t m_i = 0; m_i < M; ++m_i) {
+			for (size_t local_data_index = 0; local_data_index < all_entries.size();
+					 ++local_data_index) {
+				if (presence_counts[local_data_index] < M) {
+					auto cluster = clustering_engine.query_k(entries.at(local_data_index),
+																									 cluster_size);
+					clusters.emplace_back(cluster);
+					for (auto entry_index : cluster)
+						presence_counts[entry_index]++;
+				}
+			}
+		}
+	};
+	*/
 	assert(cluster_size == 1);
 	assert(min_cluster_membership == 1);
 	size_t num_bins = num_cuts + 1;
 	for (size_t data_index = 0; data_index < all_entries.size(); ++data_index) {
+		// for (size_t layer_index = 0; layer_index <= top_layers[data_index];;
+		// ++layer_index {
 		for (size_t layer_index = 0; layer_index <= max_depth; ++layer_index) {
 			layers[layer_index].add_vertex(data_index, num_bins);
 			// as a stub routine (for testing), make clusters of size 1
@@ -309,8 +356,12 @@ template <typename T> void clustered_ehnsw_engine<T>::_build() {
 }
 template <typename T>
 const std::vector<size_t> clustered_ehnsw_engine<T>::_query_k_at_layer_di(
-		const vec<T>& v, size_t k, size_t starting_point, const layer<T>& lr) {
-	auto ret_vind = _query_k_at_layer(v, k, lr.get_vindex(starting_point), lr);
+		const vec<T>& v, size_t k, const std::vector<size_t>& starting_points,
+		const layer<T>& lr) {
+	std::vector<VIndex> starting_vindeces;
+	for (auto& data_index : starting_points)
+		starting_vindeces.emplace_back(lr.get_vindex(data_index));
+	auto ret_vind = _query_k_at_layer(v, k, starting_vindeces, lr);
 	std::vector<size_t> ret;
 	for (auto& vind : ret_vind)
 		ret.emplace_back(lr.get_data_index(vind));
@@ -318,7 +369,8 @@ const std::vector<size_t> clustered_ehnsw_engine<T>::_query_k_at_layer_di(
 }
 template <typename T>
 const std::vector<VIndex> clustered_ehnsw_engine<T>::_query_k_at_layer(
-		const vec<T>& v, size_t k, VIndex starting_vindex, const layer<T>& lr) {
+		const vec<T>& v, size_t k, const std::vector<VIndex>& starting_vindeces,
+		const layer<T>& lr) {
 	// TODO this should be taking a vector of starting points
 	std::priority_queue<std::pair<T, VIndex>> top_k;
 	std::priority_queue<std::pair<T, VIndex>> to_visit;
@@ -335,8 +387,9 @@ const std::vector<VIndex> clustered_ehnsw_engine<T>::_query_k_at_layer(
 			top_k.pop();
 		return is_good;
 	};
-	visit(dist(v, all_entries[lr.get_data_index(starting_vindex)]),
-				starting_vindex);
+	for (const auto& starting_vindex : starting_vindeces)
+		visit(dist(v, all_entries[lr.get_data_index(starting_vindex)]),
+					starting_vindex);
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -372,10 +425,9 @@ template <typename T>
 const std::vector<std::vector<size_t>>
 clustered_ehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 																						 size_t full_search_top_layer) {
-	// TODO use a vector of starting vertices, replaced with the top layer_k each
-	// time
 	// TODO add a search_k param for before the top full_search_top_layer (e.g. 3)
-	auto current = starting_vertex;
+	size_t max_current_size = 1; // TODO make this 1, or some param, or something
+	std::vector<size_t> current = {starting_vertex};
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::vector<size_t>> ret;
 	// for each layer, in decreasing depth
@@ -385,7 +437,9 @@ clustered_ehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 			layer_k = 1;
 		ret.push_back(
 				_query_k_at_layer_di(v, layer_k, current, layers[layer_index]));
-		current = ret.back().front();
+		current = ret.back();
+		if (current.size() > max_current_size)
+			current.resize(max_current_size);
 	}
 	reverse(ret.begin(), ret.end());
 	return ret;
