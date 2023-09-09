@@ -184,11 +184,8 @@ void clustered_ehnsw_engine<T>::add_edge_directional(layer<T>& lr,
 template <typename T>
 void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
 		layer<T>& lr, size_t data_index, CIndex cluster_index) {
-	// TODO make this use the clustered structure
 	// TODO check that cluster_index is not in the adjacent set already
-	//
 	// TODO consider other distance metrics
-	// currently: stub version that assumes cluster sizes of 1 (currently true)
 	size_t i = lr.get_vindex(data_index);
 	// j is the closest element among all elements of the cluster to i, not
 	// including i itself
@@ -205,9 +202,6 @@ void clustered_ehnsw_engine<T>::add_edge_directional_to_cluster(
 			cluster_distances.begin(),
 			std::min_element(cluster_distances.begin(), cluster_distances.end()));
 	size_t j = lr.ccont[cluster_index][best_member_index];
-	// size_t j = lr.ccont[cluster_index][0];
-
-	// TODO check that j != i and j is not in the adjacent set already
 
 	T d = dist(all_entries[lr.get_data_index(i)],
 						 all_entries[lr.get_data_index(j)]);
@@ -282,47 +276,77 @@ template <typename T> void clustered_ehnsw_engine<T>::_build() {
 		layers.emplace_back();
 	}
 
-	/*
-	// TODO do clustering on each layer here
-	auto do_clustering = [&](const std::vector<vec<T>>& entries) {
-		// build another ANN engine to do clustering
-		ehnsw_engine_2 clustering_engine(
-				ehnsw_engine_2_config(max_depth, edge_count_mult, num_for_1nn, num_cuts,
-															min_per_cut, quick_search, bumping, quick_build));
-		for (const auto& v : entries)
-			clustering_engine.store_vector(v);
-		clustering_engine.build();
-		// now do clustering
-		// each vector should be present in at least M clusters
-		size_t M = 2;
-		std::vector<std::vector<size_t>> clusters;
-		std::vector<size_t> presence_counts(entries.size());
-		for (size_t m_i = 0; m_i < M; ++m_i) {
-			for (size_t local_data_index = 0; local_data_index < all_entries.size();
-					 ++local_data_index) {
-				if (presence_counts[local_data_index] < M) {
-					auto cluster = clustering_engine.query_k(entries.at(local_data_index),
-																									 cluster_size);
-					clusters.emplace_back(cluster);
-					for (auto entry_index : cluster)
-						presence_counts[entry_index]++;
-				}
-			}
-		}
-	};
-	*/
-	assert(cluster_size == 1);
-	assert(min_cluster_membership == 1);
+	// assert(cluster_size == 1);
+	// assert(min_cluster_membership == 1);
 	size_t num_bins = num_cuts + 1;
 	for (size_t data_index = 0; data_index < all_entries.size(); ++data_index) {
 		for (size_t layer_index = 0; layer_index <= top_layers[data_index];
 				 ++layer_index) {
 			// for (size_t layer_index = 0; layer_index <= max_depth; ++layer_index) {
 			layers[layer_index].add_vertex(data_index, num_bins);
+			// TODO remove this commented code
 			// as a stub routine (for testing), make clusters of size 1
+			// size_t cluster_index = layers[layer_index].add_cluster();
+			// layers[layer_index].add_to_cluster(data_index, all_entries[data_index],
+			// 																	 cluster_index);
+		}
+	}
+
+	// TODO do clustering on each layer here
+	auto do_clustering = [&](const std::vector<vec<T>>& entries) {
+		// build another ANN engine to do clustering
+		ehnsw_engine_2<T> clustering_engine(
+				ehnsw_engine_2_config(max_depth, edge_count_mult, num_for_1nn, num_cuts,
+															min_per_cut, quick_search, bumping, quick_build));
+		for (const auto& v : entries)
+			clustering_engine.store_vector(v);
+		clustering_engine.build();
+		// each vector should be present in at least min_cluster_membership clusters
+		std::vector<std::vector<size_t>> clusters;
+		std::vector<size_t> presence_counts(entries.size());
+		for (size_t m_i = 0; m_i < min_cluster_membership; ++m_i) {
+			for (size_t local_data_index = 0; local_data_index < entries.size();
+					 ++local_data_index) {
+				if (presence_counts[local_data_index] < min_cluster_membership) {
+					auto cluster = clustering_engine.query_k(entries.at(local_data_index),
+																									 cluster_size);
+					// add local_data_index itself to the cluster, if not already present
+					bool cur_in_cluster = false;
+					for (auto entry_index : cluster) {
+						if (entry_index == local_data_index) {
+							cur_in_cluster = true;
+						}
+					}
+					if (!cur_in_cluster) {
+						cluster.pop_back(); // remove furthest element
+						cluster.push_back(local_data_index);
+					}
+					clusters.emplace_back(cluster);
+					for (auto entry_index : cluster)
+						presence_counts[entry_index]++;
+				}
+			}
+		}
+		return clusters;
+	};
+	for (size_t layer_index = 0; layer_index <= max_depth; ++layer_index) {
+		std::vector<vec<T>> layer_entries;
+		robin_hood::unordered_flat_map<size_t, size_t> local_to_global_index;
+		for (size_t data_index = 0; data_index < all_entries.size(); ++data_index) {
+			if (top_layers[data_index] >= layer_index) {
+				local_to_global_index[layer_entries.size()] = data_index;
+				layer_entries.emplace_back(all_entries[data_index]);
+			}
+		}
+		std::vector<std::vector<size_t>> layer_clusters =
+				do_clustering(layer_entries);
+		for (auto& cluster : layer_clusters) {
 			size_t cluster_index = layers[layer_index].add_cluster();
-			layers[layer_index].add_to_cluster(data_index, all_entries[data_index],
-																				 cluster_index);
+			for (size_t local_index : cluster) {
+				size_t global_data_index = local_to_global_index[local_index];
+				layers[layer_index].add_to_cluster(
+						global_data_index, all_entries[global_data_index], cluster_index);
+			}
 		}
 	}
 

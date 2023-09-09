@@ -300,12 +300,19 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 									100, k, num_for_1nn, K, min_per_cut, true, true, false));
 						}
 						if (true) {
-							size_t cluster_size = 1;
-							size_t min_cluster_membership = 1;
-							clustered_ehnsw_engine_jobs.emplace_back(
-									clustered_ehnsw_engine_config(
-											100, k, num_for_1nn, K, min_per_cut, cluster_size,
-											min_cluster_membership, true, true, false));
+							// size_t cluster_size = 1;
+							// size_t min_cluster_membership = 1;
+							for (size_t cluster_size = 1; cluster_size <= 16;
+									 cluster_size *= 2) {
+								for (size_t min_cluster_membership = 1;
+										 min_cluster_membership <= 16;
+										 min_cluster_membership *= 2) {
+									clustered_ehnsw_engine_jobs.emplace_back(
+											clustered_ehnsw_engine_config(
+													100, k, num_for_1nn, K, min_per_cut, cluster_size,
+													min_cluster_membership, true, true, false));
+								}
+							}
 						}
 						if (false) {
 							bool create_index = true;
