@@ -11,7 +11,9 @@ set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin)
 include_directories("${SRC}")
 
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -mavx -fopenmp -g -fsanitize=address")
-set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -mavx -ggdb3 ${OpenMP_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -mavx -ggdb3 ${OpenMP_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -fno-omit-frame-pointer -ggdb3 ${OpenMP_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ggdb3 ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Og -mavx -ggdb3 ${OpenMP_CXX_FLAGS}")
 
 include(./cmake/CPM.cmake)  # Package manager for simple requirements.
