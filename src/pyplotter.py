@@ -97,6 +97,7 @@ datavec = json.load(f)
 
 engines = set()
 for benchdata in datavec:
+    #engines.add(benchdata['engine_name'] + "=" + benchdata['param_list']['max_depth'])
     engines.add(benchdata['engine_name'])
 
 #annotations = {}
@@ -111,6 +112,8 @@ for eng in engines:
     s = []
     #annotations[eng] = []
     for benchdata in datavec:
+        #bd_name = benchdata['engine_name'] + "=" + benchdata['param_list']['max_depth']
+        #if eng == bd_name:
         if eng == benchdata['engine_name']:
             xi = benchdata['recall']
             yi = benchdata['time_per_query_ns']
