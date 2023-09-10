@@ -262,11 +262,11 @@ filter_ehnsw_engine<T>::_query_k_at_layer(
 		}
 	}
 	std::vector<std::vector<size_t>> ret;
-	for (size_t filter = 0; filter < filters.size(); ++filter) {
+	for (size_t filter_index = 0; filter_index < filters.size(); ++filter_index) {
 		std::vector<size_t> ret_filter;
-		while (!top_k[filter].empty()) {
-			ret.push_back(top_k[filter].top().second);
-			top_k[filter].pop();
+		while (!top_k[filter_index].empty()) {
+			ret_filter.push_back(top_k[filter_index].top().second);
+			top_k[filter_index].pop();
 		}
 		reverse(ret_filter.begin(),
 						ret_filter.end()); // sort from closest to furthest
