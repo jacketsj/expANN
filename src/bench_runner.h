@@ -16,6 +16,7 @@
 #include "disk_ehnsw_engine.h"
 #include "ehnsw_engine.h"
 #include "ehnsw_engine_2.h"
+#include "filter_ehnsw_engine.h"
 #include "hier_arrangement_engine.h"
 #include "hnsw_engine.h"
 #include "hnsw_engine_2.h"
@@ -122,6 +123,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	std::vector<job<ehnsw_engine<float>, ehnsw_engine_config>> ehnsw_engine_jobs;
 	std::vector<job<ehnsw_engine_2<float>, ehnsw_engine_2_config>>
 			ehnsw_engine_2_jobs;
+	std::vector<job<filter_ehnsw_engine<float>, filter_ehnsw_engine_config>>
+			filter_ehnsw_engine_jobs;
 	std::vector<job<clustered_ehnsw_engine<float>, clustered_ehnsw_engine_config>>
 			clustered_ehnsw_engine_jobs;
 	std::vector<job<disk_ehnsw_engine<float>, disk_ehnsw_engine_config>>
@@ -271,15 +274,21 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 70; k <= 95; k += 6) {
 		// for (size_t k = 40; k <= 40; k += 6) {
 		// for (size_t k = 88; k <= 88; k += 6) {
-		for (size_t max_depth : {1, 2, 4, 20, 50, 100})
+		// for (size_t max_depth : {1, 2, 4, 20, 50, 100})
+		for (size_t max_depth : {1, 20, 50, 100})
 			for (size_t k = 50; k <= 60 + 54; k += 16) {
 				for (size_t num_for_1nn = 2; num_for_1nn <= 4; num_for_1nn *= 2) {
-					for (size_t K = 15; K <= k; K += 8) {
-						for (size_t min_per_cut : {1, 2}) {
+					for (size_t K = k - 40; K <= k; K += 12) {
+						for (size_t min_per_cut : {1}) {
 							if (true) {
 								ehnsw_engine_2_jobs.emplace_back(
 										ehnsw_engine_2_config(max_depth, k, num_for_1nn, K,
 																					min_per_cut, true, true, false));
+							}
+							if (true) {
+								filter_ehnsw_engine_jobs.emplace_back(
+										filter_ehnsw_engine_config(max_depth, k, num_for_1nn, K,
+																							 min_per_cut, true, true, false));
 							}
 						}
 					}
@@ -493,20 +502,21 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	perform_benchmarks_with_threads(
 			basic_benchmarker, num_threads, hnsw_engine_jobs, hnsw_engine_2_jobs,
 			arrangement_engine_jobs, ehnsw_engine_jobs, ehnsw_engine_2_jobs,
+			filter_ehnsw_engine_jobs, clustered_ehnsw_engine_jobs,
+			hier_arrangement_engine_jobs, hnsw_engine_hybrid_jobs,
+			tree_arrangement_engine_jobs, tree_arrangement_engine_if_jobs,
+			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
+			disk_ehnsw_engine_jobs, hyper_hnsw_engine_jobs);
+
+	bench_data_manager bdm(ds.name);
+	store_benchmark_results(
+			bdm, hnsw_engine_jobs, hnsw_engine_2_jobs, arrangement_engine_jobs,
+			ehnsw_engine_jobs, ehnsw_engine_2_jobs, filter_ehnsw_engine_jobs,
 			clustered_ehnsw_engine_jobs, hier_arrangement_engine_jobs,
 			hnsw_engine_hybrid_jobs, tree_arrangement_engine_jobs,
 			tree_arrangement_engine_if_jobs, projection_hnsw_engine_2_jobs,
 			projection_ehnsw_engine_2_jobs, disk_ehnsw_engine_jobs,
 			hyper_hnsw_engine_jobs);
-
-	bench_data_manager bdm(ds.name);
-	store_benchmark_results(
-			bdm, hnsw_engine_jobs, hnsw_engine_2_jobs, arrangement_engine_jobs,
-			ehnsw_engine_jobs, ehnsw_engine_2_jobs, clustered_ehnsw_engine_jobs,
-			hier_arrangement_engine_jobs, hnsw_engine_hybrid_jobs,
-			tree_arrangement_engine_jobs, tree_arrangement_engine_if_jobs,
-			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
-			disk_ehnsw_engine_jobs, hyper_hnsw_engine_jobs);
 
 	return bdm;
 }
