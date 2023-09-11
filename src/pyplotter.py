@@ -96,10 +96,23 @@ f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/latest.jso
 
 datavec = json.load(f)
 
+# TODO come up with a better name for this
+enable_sprinkles = True
+sprinkle_param = 'elabel_prob'
+
 engines = set()
 for benchdata in datavec:
     #engines.add(benchdata['engine_name'] + "=" + benchdata['param_list']['max_depth'])
-    engines.add(benchdata['engine_name'])
+    if enable_sprinkles:
+        sprinkle = ""
+        if sprinkle_param in benchdata['param_list']:
+            sprinkle = benchdata['param_list'][sprinkle_param]
+        engines.add(benchdata['engine_name'] + "=" + sprinkle)
+    else:
+        engines.add(benchdata['engine_name'])
+
+from colour import Color
+cols = list(Color('blue').range_to(Color('red'), len(engines)))
 
 #annotations = {}
 
@@ -107,15 +120,22 @@ fig, ax = plt.subplots()
 xall = []
 yall = []
 annotationsall = []
-for eng in engines:
+#for eng in sorted(engines):
+for eng, col in zip(sorted(engines), cols):
     x = []
     y = []
     s = []
     #annotations[eng] = []
     for benchdata in datavec:
         #bd_name = benchdata['engine_name'] + "=" + benchdata['param_list']['max_depth']
-        #if eng == bd_name:
-        if eng == benchdata['engine_name']:
+        #if eng == benchdata['engine_name']:
+        bd_name = benchdata['engine_name']
+        if enable_sprinkles:
+            sprinkle = ""
+            if sprinkle_param in benchdata['param_list']:
+                sprinkle = benchdata['param_list'][sprinkle_param]
+            bd_name = benchdata['engine_name'] + "=" + sprinkle
+        if eng == bd_name:
             xi = benchdata['recall']
             yi = benchdata['time_per_query_ns']
             x.append(xi)
@@ -128,7 +148,10 @@ for eng in engines:
             #annotations[(xi, yi)] = str(benchdata)
             annotationsall.append(pprint.pformat(benchdata))
             # annotations[eng].append(str(benchdata))
-    plt.scatter(x, y, s, label=eng, picker=True)
+    if enable_sprinkles:
+        plt.scatter(x, y, s, label=eng, picker=True, color='{}'.format(col))
+    else:
+        plt.scatter(x, y, s, label=eng, picker=True)
 
 plt.xlabel("Recall")
 #plt.ylabel("Query time (ns)")
