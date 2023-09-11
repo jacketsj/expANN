@@ -97,7 +97,7 @@ f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/latest.jso
 datavec = json.load(f)
 
 # TODO come up with a better name for this
-enable_sprinkles = True
+enable_sprinkles = False
 sprinkle_param = 'elabel_prob'
 
 engines = set()
