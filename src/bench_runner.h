@@ -278,9 +278,12 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t max_depth : {1, 20, 50, 100})
 		for (size_t max_depth : {1})
 			// for (size_t k = 50; k <= 64; k += 12) {
-			for (size_t k = 50; k <= 86; k += 9) {
+			// for (size_t k = 50; k <= 86; k += 9) {
+			// for (size_t k = 60; k <= 100; k += 20) {
+			for (size_t k = 100; k <= 100; k += 20) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 4; num_for_1nn *= 2) {
-				for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
+				// for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
+				for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
 					if (true) {
 						if (max_depth > 50) {
 							hnsw_engine_2_jobs.emplace_back(
@@ -292,14 +295,19 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								hnsw_engine_2_config(100, k, num_for_1nn, true));
 					}
 					// for (size_t K = k - 40; K <= k; K += 12) {
-					for (size_t K = k - 5; K <= k; K += 2) {
+					for (size_t K = k - 1; K <= k; K += 4) {
 						for (size_t min_per_cut : {1}) {
 							if (true) {
-								ehnsw_engine_2_jobs.emplace_back(
-										ehnsw_engine_2_config(max_depth, k, num_for_1nn, K,
-																					min_per_cut, true, true, false));
+								// for (size_t elabel_prob_den = 2; elabel_prob_den < 80;
+								//		 elabel_prob_den += 4)
+								size_t elabel_prob_num = 4;
+								for (float elabel_prob_den = elabel_prob_num * 2;
+										 elabel_prob_den < 400; elabel_prob_den *= 1.2f)
+									ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
+											max_depth, k, num_for_1nn, K, min_per_cut, true, true,
+											false, float(elabel_prob_num) / float(elabel_prob_den)));
 							}
-							if (true) {
+							if (false) {
 								filter_ehnsw_engine_jobs.emplace_back(
 										filter_ehnsw_engine_config(max_depth, k, num_for_1nn, K,
 																							 min_per_cut, true, true, false));
