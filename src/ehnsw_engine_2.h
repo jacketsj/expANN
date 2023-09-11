@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <limits>
 #include <queue>
+#include <random>
 #include <set>
 #include <string>
 #include <vector>
@@ -19,14 +20,16 @@ struct ehnsw_engine_2_config {
 	bool quick_search;
 	bool bumping;
 	bool quick_build;
+	float elabel_prob;
 	ehnsw_engine_2_config(size_t _max_depth, size_t _edge_count_mult,
 												size_t _num_for_1nn, size_t _num_cuts,
 												size_t _min_per_cut, bool _quick_search, bool _bumping,
-												bool _quick_build)
+												bool _quick_build, float _elabel_prob = 0.5f)
 			: max_depth(_max_depth), edge_count_mult(_edge_count_mult),
 				num_for_1nn(_num_for_1nn), num_cuts(_num_cuts),
 				min_per_cut(_min_per_cut), quick_search(_quick_search),
-				bumping(_bumping), quick_build(_quick_build) {}
+				bumping(_bumping), quick_build(_quick_build),
+				elabel_prob(_elabel_prob) {}
 };
 
 template <typename T>
@@ -35,6 +38,7 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
 	std::uniform_int_distribution<> int_distribution;
+	std::bernoulli_distribution elabel_distribution;
 	size_t starting_vertex;
 	size_t max_depth;
 	size_t edge_count_mult;
@@ -44,12 +48,14 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 	bool quick_search;
 	bool bumping;
 	bool quick_build;
+	float elabel_prob;
 	ehnsw_engine_2(ehnsw_engine_2_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
-				max_depth(conf.max_depth), edge_count_mult(conf.edge_count_mult),
-				num_for_1nn(conf.num_for_1nn), num_cuts(conf.num_cuts),
-				min_per_cut(conf.min_per_cut), quick_search(conf.quick_search),
-				bumping(conf.bumping), quick_build(conf.quick_build) {}
+				elabel_distribution(conf.elabel_prob), max_depth(conf.max_depth),
+				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
+				num_cuts(conf.num_cuts), min_per_cut(conf.min_per_cut),
+				quick_search(conf.quick_search), bumping(conf.bumping),
+				quick_build(conf.quick_build), elabel_prob(conf.elabel_prob) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<robin_hood::unordered_flat_map<size_t, std::vector<size_t>>> hadj;
 	std::vector<robin_hood::unordered_flat_map<
@@ -79,8 +85,10 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 		add_param(pl, quick_search);
 		add_param(pl, bumping);
 		add_param(pl, quick_build);
+		add_param(pl, elabel_prob);
 		return pl;
 	}
+	bool generate_elabel() { return elabel_distribution(gen); }
 };
 
 template <typename T> void ehnsw_engine_2<T>::_store_vector(const vec<T>& v) {
@@ -158,7 +166,7 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 	// add one layer to start, with first vertex
 	add_layer(0);
 	for (size_t cut = 0; cut < num_cuts; ++cut)
-		e_labels[0].emplace_back(int_distribution(gen));
+		e_labels[0].emplace_back(generate_elabel());
 	for (size_t i = 1; i < all_entries.size(); ++i) {
 
 		if (i % 5000 == 0)
@@ -166,7 +174,7 @@ template <typename T> void ehnsw_engine_2<T>::_build() {
 								<< "%" << std::endl;
 
 		for (size_t cut = 0; cut < num_cuts; ++cut)
-			e_labels[i].emplace_back(int_distribution(gen));
+			e_labels[i].emplace_back(generate_elabel());
 		// get the layer this entry will go up to
 		size_t cur_layer_ub =
 				floor(-log(distribution(gen)) * 1 / log(double(edge_count_mult)));
