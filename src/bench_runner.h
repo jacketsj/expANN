@@ -303,18 +303,22 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							if (true) {
 								// for (size_t elabel_prob_den = 2; elabel_prob_den < 80;
 								//		 elabel_prob_den += 4)
-								size_t elabel_prob_num = 4;
+								size_t elabel_prob_num = 1;
+								// for (float elabel_prob_den = elabel_prob_num * 2;
+								//		 elabel_prob_den < 240; elabel_prob_den += 3,
+								//					 (elabel_prob_den > 40 && (elabel_prob_den += 5))) {
 								for (float elabel_prob_den = elabel_prob_num * 2;
-										 elabel_prob_den < 240; elabel_prob_den += 3,
-													 (elabel_prob_den > 40 && (elabel_prob_den += 5))) {
+										 elabel_prob_den <= 2; elabel_prob_den += 3) {
 									ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 											max_depth, k, num_for_1nn, K, min_per_cut, true, true,
 											false, float(elabel_prob_num) / float(elabel_prob_den)));
 								}
 							}
 							if (true) {
-								for (float prune_coeff = 1.0f; prune_coeff < 2.0f;
-										 prune_coeff += 0.1f) {
+								// for (float prune_coeff = 1.0f; prune_coeff < 200.0f;
+								//		 prune_coeff += 10.0f) {
+								for (float prune_coeff = 1.0f; prune_coeff < 18.0f;
+										 prune_coeff += 0.4f) {
 									jamana_ehnsw_engine_jobs.emplace_back(
 											jamana_ehnsw_engine_config(max_depth, k, num_for_1nn, K,
 																								 min_per_cut, true, true, false,
