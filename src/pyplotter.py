@@ -98,7 +98,7 @@ datavec = json.load(f)
 
 # TODO come up with a better name for this
 enable_sprinkles = False
-sprinkle_param = 'elabel_prob'
+sprinkle_param = 'prune_coeff'
 
 engines = set()
 for benchdata in datavec:
