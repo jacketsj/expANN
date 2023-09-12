@@ -16,6 +16,7 @@
 #include "disk_ehnsw_engine.h"
 #include "ehnsw_engine.h"
 #include "ehnsw_engine_2.h"
+#include "ehnsw_engine_3.h"
 #include "filter_ehnsw_engine.h"
 #include "hier_arrangement_engine.h"
 #include "hnsw_engine.h"
@@ -124,6 +125,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	std::vector<job<ehnsw_engine<float>, ehnsw_engine_config>> ehnsw_engine_jobs;
 	std::vector<job<ehnsw_engine_2<float>, ehnsw_engine_2_config>>
 			ehnsw_engine_2_jobs;
+	std::vector<job<ehnsw_engine_3<float>, ehnsw_engine_3_config>>
+			ehnsw_engine_3_jobs;
 	std::vector<job<jamana_ehnsw_engine<float>, jamana_ehnsw_engine_config>>
 			jamana_ehnsw_engine_jobs;
 	std::vector<job<filter_ehnsw_engine<float>, filter_ehnsw_engine_config>>
@@ -282,11 +285,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		for (size_t max_depth : {1})
 			// for (size_t k = 50; k <= 64; k += 12) {
 			// for (size_t k = 50; k <= 86; k += 9) {
-			// for (size_t k = 60; k <= 100; k += 20) {
-			for (size_t k = 100; k <= 100; k += 20) {
+			// for (size_t k = 100; k <= 100; k += 20) {
+			for (size_t k = 60; k <= 100; k += 4) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 4; num_for_1nn *= 2) {
-				// for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
-				for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
+				// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
+				for (size_t num_for_1nn = 1; num_for_1nn <= 8; num_for_1nn *= 2) {
 					if (false) {
 						if (max_depth > 50) {
 							hnsw_engine_2_jobs.emplace_back(
@@ -315,6 +318,15 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								}
 							}
 							if (true) {
+								size_t elabel_prob_num = 1;
+								for (float elabel_prob_den = elabel_prob_num * 2;
+										 elabel_prob_den <= 2; elabel_prob_den += 3) {
+									ehnsw_engine_3_jobs.emplace_back(ehnsw_engine_3_config(
+											max_depth, k, num_for_1nn, K, min_per_cut, true, true,
+											false, float(elabel_prob_num) / float(elabel_prob_den)));
+								}
+							}
+							if (false) {
 								// for (float prune_coeff = 1.0f; prune_coeff < 200.0f;
 								//		 prune_coeff += 10.0f) {
 								for (float prune_coeff = 1.0f; prune_coeff < 18.0f;
@@ -542,7 +554,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	perform_benchmarks_with_threads(
 			basic_benchmarker, num_threads, hnsw_engine_jobs, hnsw_engine_2_jobs,
 			arrangement_engine_jobs, ehnsw_engine_jobs, ehnsw_engine_2_jobs,
-			jamana_ehnsw_engine_jobs, filter_ehnsw_engine_jobs,
+			ehnsw_engine_3_jobs, jamana_ehnsw_engine_jobs, filter_ehnsw_engine_jobs,
 			clustered_ehnsw_engine_jobs, hier_arrangement_engine_jobs,
 			hnsw_engine_hybrid_jobs, tree_arrangement_engine_jobs,
 			tree_arrangement_engine_if_jobs, projection_hnsw_engine_2_jobs,
@@ -552,12 +564,13 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	bench_data_manager bdm(ds.name);
 	store_benchmark_results(
 			bdm, hnsw_engine_jobs, hnsw_engine_2_jobs, arrangement_engine_jobs,
-			ehnsw_engine_jobs, ehnsw_engine_2_jobs, jamana_ehnsw_engine_jobs,
-			filter_ehnsw_engine_jobs, clustered_ehnsw_engine_jobs,
-			hier_arrangement_engine_jobs, hnsw_engine_hybrid_jobs,
-			tree_arrangement_engine_jobs, tree_arrangement_engine_if_jobs,
-			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
-			disk_ehnsw_engine_jobs, hyper_hnsw_engine_jobs);
+			ehnsw_engine_jobs, ehnsw_engine_2_jobs, ehnsw_engine_3_jobs,
+			jamana_ehnsw_engine_jobs, filter_ehnsw_engine_jobs,
+			clustered_ehnsw_engine_jobs, hier_arrangement_engine_jobs,
+			hnsw_engine_hybrid_jobs, tree_arrangement_engine_jobs,
+			tree_arrangement_engine_if_jobs, projection_hnsw_engine_2_jobs,
+			projection_ehnsw_engine_2_jobs, disk_ehnsw_engine_jobs,
+			hyper_hnsw_engine_jobs);
 
 	return bdm;
 }

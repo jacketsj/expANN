@@ -76,7 +76,7 @@ struct ehnsw_engine_3 : public ann_engine<T, ehnsw_engine_3<T>> {
 	_query_k_internal(const vec<T>& v, size_t k, size_t full_search_top_layer,
 										bool include_visited);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine 2"; }
+	const std::string _name() { return "EHNSW Engine 3"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, max_depth);
@@ -207,6 +207,10 @@ const std::vector<size_t>
 ehnsw_engine_3<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 																		 std::vector<size_t>& starting_points,
 																		 size_t layer, bool include_visited) {
+	// TODO add an option to restrict size of to_visit, default to
+	// all_entries.size() (causing greedy dfs if it is size=1 basically)
+	// TODO then call this function twice in a row, the first time with both the
+	// above flag and include_visited, the second time with neither flag
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::priority_queue<std::pair<T, size_t>> to_visit;
 	robin_hood::unordered_flat_set<size_t> visited;
