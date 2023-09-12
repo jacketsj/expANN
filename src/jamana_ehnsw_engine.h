@@ -79,7 +79,7 @@ struct jamana_ehnsw_engine : public ann_engine<T, jamana_ehnsw_engine<T>> {
 	const std::vector<std::vector<size_t>>
 	_query_k_internal(const vec<T>& v, size_t k, size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine 2"; }
+	const std::string _name() { return "Jamana EHNSW Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, max_depth);
@@ -91,6 +91,7 @@ struct jamana_ehnsw_engine : public ann_engine<T, jamana_ehnsw_engine<T>> {
 		add_param(pl, bumping);
 		add_param(pl, quick_build);
 		add_param(pl, elabel_prob);
+		add_param(pl, prune_coeff);
 		return pl;
 	}
 	bool generate_elabel() { return elabel_distribution(gen); }
@@ -109,7 +110,8 @@ void jamana_ehnsw_engine<T>::prune_edges(size_t data_index) {
 		std::vector<size_t> final_edges;
 		for (const auto& bin : edge_ranks[layer][data_index]) {
 			std::vector<size_t> chosen_bin_edges;
-			for (const auto& [_, incident_index] : bin) {
+			for (const auto& [_, incident_index_offset] : bin) {
+				size_t incident_index = hadj[layer][data_index][incident_index_offset];
 				bool choose_this = true;
 				// TODO consider iterating through final_edges instead, after sorting
 				// all edges by distance
