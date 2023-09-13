@@ -286,10 +286,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			// for (size_t k = 50; k <= 64; k += 12) {
 			// for (size_t k = 50; k <= 86; k += 9) {
 			// for (size_t k = 100; k <= 100; k += 20) {
-			for (size_t k = 60; k <= 100; k += 4) {
+			for (size_t k = 60; k <= 100; k += 7) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 4; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
-				for (size_t num_for_1nn = 1; num_for_1nn <= 8; num_for_1nn *= 2) {
+				for (size_t num_for_1nn = 1; num_for_1nn <= 16; num_for_1nn *= 4) {
 					if (false) {
 						if (max_depth > 50) {
 							hnsw_engine_2_jobs.emplace_back(
@@ -321,9 +321,15 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								size_t elabel_prob_num = 1;
 								for (float elabel_prob_den = elabel_prob_num * 2;
 										 elabel_prob_den <= 2; elabel_prob_den += 3) {
+									/*
+									for (size_t search_seed_width = 0; search_seed_width <= 4;
+											 search_seed_width++) {
+											 */
 									ehnsw_engine_3_jobs.emplace_back(ehnsw_engine_3_config(
 											max_depth, k, num_for_1nn, K, min_per_cut, true, true,
 											false, float(elabel_prob_num) / float(elabel_prob_den)));
+									// search_seed_width));
+									//}
 								}
 							}
 							if (false) {
