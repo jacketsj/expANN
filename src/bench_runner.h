@@ -286,10 +286,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			// for (size_t k = 50; k <= 64; k += 12) {
 			// for (size_t k = 50; k <= 86; k += 9) {
 			// for (size_t k = 100; k <= 100; k += 20) {
-			for (size_t k = 60; k <= 100; k += 7) {
+			for (size_t k = 60; k <= 200; k += 24) {
 				// for (size_t num_for_1nn = 2; num_for_1nn <= 4; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
-				for (size_t num_for_1nn = 1; num_for_1nn <= 16; num_for_1nn *= 4) {
+				for (size_t num_for_1nn = 1; num_for_1nn <= 32; num_for_1nn *= 2) {
 					if (false) {
 						if (max_depth > 50) {
 							hnsw_engine_2_jobs.emplace_back(
