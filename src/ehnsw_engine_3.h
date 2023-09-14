@@ -70,14 +70,14 @@ struct ehnsw_engine_3 : public ann_engine<T, ehnsw_engine_3<T>> {
 			e_labels; // vertex -> cut labels (*num_cuts)
 	void _store_vector(const vec<T>& v);
 	void _build();
-	const std::vector<size_t>
+	const std::vector<std::pair<T, size_t>>
 	_query_k_at_layer(const vec<T>& v, size_t k,
 										std::vector<size_t>& starting_points, size_t layer,
 										bool include_visited);
 	bool is_valid_edge(size_t i, size_t j, size_t bin);
-	void add_edge(size_t layer, size_t i, size_t j);
-	void add_edge_directional(size_t layer, size_t i, size_t j);
-	const std::vector<std::vector<size_t>>
+	void add_edge(size_t layer, size_t i, size_t j, T d);
+	void add_edge_directional(size_t layer, size_t i, size_t j, T d);
+	const std::vector<std::vector<std::pair<T, size_t>>>
 	_query_k_internal(const vec<T>& v, size_t k, size_t full_search_top_layer,
 										bool include_visited);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
@@ -117,8 +117,9 @@ bool ehnsw_engine_3<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 }
 
 template <typename T>
-void ehnsw_engine_3<T>::add_edge_directional(size_t layer, size_t i, size_t j) {
-	T d = dist(all_entries[i], all_entries[j]);
+void ehnsw_engine_3<T>::add_edge_directional(size_t layer, size_t i, size_t j,
+																						 T d) {
+	// T d = dist(all_entries[i], all_entries[j]);
 	std::vector<size_t> cuts;
 	for (size_t cut = 0; cut <= num_cuts; ++cut)
 		cuts.push_back(cut);
@@ -166,13 +167,13 @@ void ehnsw_engine_3<T>::add_edge_directional(size_t layer, size_t i, size_t j) {
 	// try to bump a bigger edge until stability is reached (if bumping is
 	// enabled)
 	if (deleted_j != i && bumping)
-		add_edge_directional(layer, i, deleted_j);
+		add_edge_directional(layer, i, deleted_j, -max_cut_val);
 }
 
 template <typename T>
-void ehnsw_engine_3<T>::add_edge(size_t layer, size_t i, size_t j) {
-	add_edge_directional(layer, i, j);
-	add_edge_directional(layer, j, i);
+void ehnsw_engine_3<T>::add_edge(size_t layer, size_t i, size_t j, T d) {
+	add_edge_directional(layer, i, j, d);
+	add_edge_directional(layer, j, i, d);
 }
 
 template <typename T> void ehnsw_engine_3<T>::_build() {
@@ -205,7 +206,7 @@ template <typename T> void ehnsw_engine_3<T>::_build() {
 		size_t full_search_top_layer = hadj.size() - 1;
 		if (quick_build)
 			full_search_top_layer = cur_layer;
-		std::vector<std::vector<size_t>> kNN = _query_k_internal(
+		std::vector<std::vector<std::pair<T, size_t>>> kNN = _query_k_internal(
 				all_entries[i], edge_count_mult, full_search_top_layer, true);
 		// if it is a new layer, add a layer (important that this happens AFTER kNN
 		// at each layer)
@@ -216,14 +217,14 @@ template <typename T> void ehnsw_engine_3<T>::_build() {
 			edge_ranks[layer][i].resize(num_cuts + 1);
 			// TODO consider looking at previous layers too, but probably doesn't
 			// matter since using one layer normally anyway
-			for (size_t j : kNN[layer]) {
-				add_edge(layer, i, j);
+			for (auto [d, j] : kNN[layer]) {
+				add_edge(layer, i, j, d);
 			}
 		}
 	}
 }
 template <typename T>
-const std::vector<size_t>
+const std::vector<std::pair<T, size_t>>
 ehnsw_engine_3<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 																		 std::vector<size_t>& starting_points,
 																		 size_t layer, bool include_visited) {
@@ -233,11 +234,11 @@ ehnsw_engine_3<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 	// above flag and include_visited, the second time with neither flag
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::priority_queue<std::pair<T, size_t>> to_visit;
-	robin_hood::unordered_flat_set<size_t> visited;
+	robin_hood::unordered_flat_map<size_t, T> visited;
 	auto visit = [&](T d, size_t u) {
 		bool is_good =
 				!visited.contains(u) && (top_k.size() < k || top_k.top().first > d);
-		visited.insert(u);
+		visited[u] = d;
 		if (is_good) {
 			top_k.emplace(d, u);		 // top_k is a max heap
 			to_visit.emplace(-d, u); // to_visit is a min heap
@@ -261,29 +262,29 @@ ehnsw_engine_3<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			visit(d_next, u);
 		}
 	}
-	std::vector<size_t> ret;
+	std::vector<std::pair<T, size_t>> ret;
 	while (!top_k.empty()) {
-		ret.push_back(top_k.top().second);
+		ret.push_back(top_k.top());
 		top_k.pop();
 	}
 	if (include_visited) {
 		ret.clear();
-		for (size_t visited_index : visited)
-			ret.push_back(visited_index);
+		for (auto [node, d] : visited)
+			ret.emplace_back(d, node);
 	}
 	reverse(ret.begin(), ret.end()); // sort from closest to furthest
 	return ret;
 }
 
 template <typename T>
-const std::vector<std::vector<size_t>>
+const std::vector<std::vector<std::pair<T, size_t>>>
 ehnsw_engine_3<T>::_query_k_internal(const vec<T>& v, size_t k,
 																		 size_t full_search_top_layer,
 																		 bool include_visited) {
 	std::vector<size_t> current = {starting_vertex};
 	// auto current = starting_vertex;
 	std::priority_queue<std::pair<T, size_t>> top_k;
-	std::vector<std::vector<size_t>> ret;
+	std::vector<std::vector<std::pair<T, size_t>>> ret;
 	// for each layer, in decreasing depth
 	for (int layer = hadj.size() - 1; layer >= 0; --layer) {
 		size_t layer_k = k;
@@ -293,7 +294,7 @@ ehnsw_engine_3<T>::_query_k_internal(const vec<T>& v, size_t k,
 				_query_k_at_layer(v, layer_k, current, layer, include_visited));
 		// TODO let current = ret.back() instead too, maybe doesn't matter since I'm
 		// only using one layer usually though
-		current = {ret.back().front()};
+		current = {ret.back().front().second};
 	}
 	reverse(ret.begin(), ret.end());
 	return ret;
@@ -301,7 +302,10 @@ ehnsw_engine_3<T>::_query_k_internal(const vec<T>& v, size_t k,
 
 template <typename T>
 std::vector<size_t> ehnsw_engine_3<T>::_query_k(const vec<T>& v, size_t k) {
-	auto ret = _query_k_internal(v, k * num_for_1nn, 0, false)[0];
-	ret.resize(std::min(k, ret.size()));
+	auto ret_combined = _query_k_internal(v, k * num_for_1nn, 0, false)[0];
+	ret_combined.resize(std::min(k, ret_combined.size()));
+	auto ret = std::vector<size_t>(ret_combined.size());
+	for (size_t i = 0; i < ret.size(); ++i)
+		ret[i] = ret_combined[i].second;
 	return ret;
 }
