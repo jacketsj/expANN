@@ -81,7 +81,7 @@ struct ehnsw_engine_3 : public ann_engine<T, ehnsw_engine_3<T>> {
 	_query_k_internal(const vec<T>& v, size_t k, size_t full_search_top_layer,
 										bool include_visited);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine 3"; }
+	const std::string _name() { return "EHNSW Engine 3 (sorted)"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, max_depth);
@@ -217,6 +217,10 @@ template <typename T> void ehnsw_engine_3<T>::_build() {
 			edge_ranks[layer][i].resize(num_cuts + 1);
 			// TODO consider looking at previous layers too, but probably doesn't
 			// matter since using one layer normally anyway
+			sort(kNN[layer].begin(),
+					 kNN[layer].end()); // hopefully improve build time w/o perf tradeoff
+			// sort(kNN[layer].rbegin(), kNN[layer].rend()); // TODO test this too, to
+			// improve build time (sort backwards)
 			for (auto [d, j] : kNN[layer]) {
 				add_edge(layer, i, j, d);
 			}
