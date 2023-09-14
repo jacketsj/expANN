@@ -98,8 +98,8 @@ f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/latest.jso
 datavec = json.load(f)
 
 # TODO come up with a better name for this
-enable_sprinkles = False
-sprinkle_param = 'prune_coeff'
+enable_sprinkles = True
+sprinkle_param = 'cut_run_length'
 
 engines = set()
 for benchdata in datavec:
