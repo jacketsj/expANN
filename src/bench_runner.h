@@ -107,6 +107,17 @@ void store_benchmark_results(bench_data_manager& bdm,
 	store_benchmark_results(bdm, args...);
 }
 
+template <typename BenchType, typename... Args>
+auto& perform_and_store_benchmark_results(std::string dsname,
+																					size_t num_threads,
+																					BenchType& basic_benchmarker,
+																					Args&... args) {
+	perform_benchmarks_with_threads(basic_benchmarker, num_threads, args...);
+	bench_data_manager bdm(dsname);
+	store_benchmark_results(bdm, args...);
+	return bdm;
+}
+
 template <typename test_dataset_t>
 bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	basic_bench<float, test_dataset_t> basic_benchmarker(ds);
@@ -564,6 +575,16 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			}
 		}
 	}
+	return perform_and_store_benchmark_results(
+			ds.name, num_threads, basic_benchmarker, hnsw_engine_jobs,
+			hnsw_engine_2_jobs, arrangement_engine_jobs, ehnsw_engine_jobs,
+			ehnsw_engine_2_jobs, ehnsw_engine_3_jobs, jamana_ehnsw_engine_jobs,
+			filter_ehnsw_engine_jobs, clustered_ehnsw_engine_jobs,
+			hier_arrangement_engine_jobs, hnsw_engine_hybrid_jobs,
+			tree_arrangement_engine_jobs, tree_arrangement_engine_if_jobs,
+			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
+			disk_ehnsw_engine_jobs, hyper_hnsw_engine_jobs);
+	/*
 	perform_benchmarks_with_threads(
 			basic_benchmarker, num_threads, hnsw_engine_jobs, hnsw_engine_2_jobs,
 			arrangement_engine_jobs, ehnsw_engine_jobs, ehnsw_engine_2_jobs,
@@ -586,4 +607,5 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			hyper_hnsw_engine_jobs);
 
 	return bdm;
+	*/
 }
