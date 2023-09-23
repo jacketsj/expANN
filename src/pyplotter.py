@@ -89,9 +89,9 @@ class AnnoteFinder(object):
 #f = open('./data/synthetic_uniform_sphere_n50000_dim16_m400_k1/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n30000_dim16_m300_k10/data/all.json')
 #f = open('./data/sift1m_full/data/all.json')
-#f = open('./data/sift1m_full_k10/data/all.json')
+f = open('./data/sift1m_full_k10/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n90000_dim16_m600_k10/data/all.json')
-f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/latest.json')
+#f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/latest.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/some-combined-stuff.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/hnsw2_vs_ehnsw2_vs_filterehnsw.json')
 
