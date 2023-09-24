@@ -35,7 +35,7 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	robin_hood::unordered_flat_map<size_t, std::vector<size_t>>
 			adj; // vertex -> cut -> outgoing_edge data_index
 	robin_hood::unordered_flat_map<size_t,
-																 std::set<std::tuple<T, size_t, size_t>>>
+																 std::vector<std::tuple<T, size_t, size_t>>>
 			edge_ranks; // vertex -> closest connected [distance, bin, edge_index]
 	robin_hood::unordered_flat_map<size_t, std::vector<bool>>
 			e_labels; // vertex -> cut labels (*num_cuts=edge_count_mult-1)
@@ -86,11 +86,10 @@ void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
 	for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
 		used_bins.insert(bin);
 		if (d < other_d && is_valid_edge(i, j, bin)) {
-			size_t other_j = adj[i][edge_index];
-			// (i,j) is a better edge than (i, other_j) for the current bin, so swap
-			adj[i][edge_index] = j;
-			j = other_j;
-			d = other_d;
+			// (i,j) is a better edge than (i, adj[i][edge_index]) for the current
+			// bin, so swap
+			std::swap(j, adj[i][edge_index]);
+			std::swap(d, other_d);
 		}
 	}
 	// iterate through all unused bins, use one of them if it is compatible
@@ -98,9 +97,11 @@ void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
 		if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
 			size_t edge_index = adj[i].size();
 			adj[i].emplace_back(j);
-			edge_ranks[i].emplace(d, bin, edge_index);
+			edge_ranks[i].emplace_back(d, bin, edge_index);
 			break;
 		}
+	// sort edge ranks by increasing distance again
+	std::sort(edge_ranks[i].begin(), edge_ranks[i].end());
 
 	/*
 	std::vector<size_t> cuts;
@@ -161,7 +162,7 @@ template <typename T> void ensg_engine<T>::add_edge(size_t i, size_t j, T d) {
 template <typename T> void ensg_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 	auto add_vertex_base = [&](size_t v) {
-		edge_ranks[v] = std::set<std::tuple<T, size_t, size_t>>();
+		edge_ranks[v] = std::vector<std::tuple<T, size_t, size_t>>();
 		for (size_t cut = 0; cut < num_cuts; ++cut)
 			e_labels[v].emplace_back(generate_elabel());
 	};
