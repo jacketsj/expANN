@@ -35,8 +35,8 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	robin_hood::unordered_flat_map<size_t, std::vector<size_t>>
 			adj; // vertex -> cut -> outgoing_edge data_index
 	robin_hood::unordered_flat_map<size_t,
-																 std::vector<std::set<std::pair<T, size_t>>>>
-			edge_ranks; // vertex -> furthest connected
+																 std::set<std::tuple<T, size_t, size_t>>>
+			edge_ranks; // vertex -> closest connected [distance, bin, edge_index]
 	robin_hood::unordered_flat_map<size_t, std::vector<bool>>
 			e_labels; // vertex -> cut labels (*num_cuts=edge_count_mult-1)
 	void _store_vector(const vec<T>& v);
@@ -51,7 +51,7 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	const std::vector<std::pair<T, size_t>>
 	_query_k_internal_wrapper(const vec<T>& v, size_t k, bool include_visited);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "ENSG Engine (Slow initial impl)"; }
+	const std::string _name() { return "ENSG Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, edge_count_mult);
@@ -78,8 +78,31 @@ template <typename T>
 void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
 	// TODO refactor this to be sane
 	// no randomness needed here
-	//
-	// T d = dist(all_entries[i], all_entries[j]);
+
+	// keep track of all bins that have been used already
+	std::set<size_t> used_bins;
+	// iterate through all the edges, smallest to biggest, while maintaining a
+	// current edge. Greedily improve the currently visited bin each time.
+	for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
+		used_bins.insert(bin);
+		if (d < other_d && is_valid_edge(i, j, bin)) {
+			size_t other_j = adj[i][edge_index];
+			// (i,j) is a better edge than (i, other_j) for the current bin, so swap
+			adj[i][edge_index] = j;
+			j = other_j;
+			d = other_d;
+		}
+	}
+	// iterate through all unused bins, use one of them if it is compatible
+	for (size_t bin = 0; bin < num_cuts + 1; ++bin)
+		if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
+			size_t edge_index = adj[i].size();
+			adj[i].emplace_back(j);
+			edge_ranks[i].emplace(d, bin, edge_index);
+			break;
+		}
+
+	/*
 	std::vector<size_t> cuts;
 	for (size_t cut = 0; cut <= num_cuts; ++cut)
 		cuts.push_back(cut);
@@ -127,6 +150,7 @@ void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
 	// try to bump a bigger edge until stability is reached
 	if (deleted_j != i)
 		add_edge_directional(i, deleted_j, -max_cut_val);
+	*/
 }
 
 template <typename T> void ensg_engine<T>::add_edge(size_t i, size_t j, T d) {
@@ -137,7 +161,7 @@ template <typename T> void ensg_engine<T>::add_edge(size_t i, size_t j, T d) {
 template <typename T> void ensg_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 	auto add_vertex_base = [&](size_t v) {
-		edge_ranks[v] = std::vector<std::set<std::pair<T, size_t>>>(num_cuts + 1);
+		edge_ranks[v] = std::set<std::tuple<T, size_t, size_t>>();
 		for (size_t cut = 0; cut < num_cuts; ++cut)
 			e_labels[v].emplace_back(generate_elabel());
 	};
