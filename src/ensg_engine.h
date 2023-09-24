@@ -83,25 +83,30 @@ void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
 	std::set<size_t> used_bins;
 	// iterate through all the edges, smallest to biggest, while maintaining a
 	// current edge. Greedily improve the currently visited bin each time.
-	for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
-		used_bins.insert(bin);
-		if (d < other_d && is_valid_edge(i, j, bin)) {
-			// (i,j) is a better edge than (i, adj[i][edge_index]) for the current
-			// bin, so swap
-			std::swap(j, adj[i][edge_index]);
-			std::swap(d, other_d);
+	// don't bother if nothing will get modified
+	if (edge_ranks[i].size() < edge_count_mult ||
+			d < std::get<0>(edge_ranks[i].back())) {
+		for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
+			used_bins.insert(bin);
+			if (d < other_d && is_valid_edge(i, j, bin)) {
+				// (i,j) is a better edge than (i, adj[i][edge_index]) for the current
+				// bin, so swap
+				std::swap(j, adj[i][edge_index]);
+				std::swap(d, other_d);
+			}
 		}
+		// iterate through all unused bins, use one of them if it is compatible
+		if (used_bins.size() < edge_count_mult)
+			for (size_t bin = 0; bin < num_cuts + 1; ++bin)
+				if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
+					size_t edge_index = adj[i].size();
+					adj[i].emplace_back(j);
+					edge_ranks[i].emplace_back(d, bin, edge_index);
+					break;
+				}
+		// sort edge ranks by increasing distance again
+		std::sort(edge_ranks[i].begin(), edge_ranks[i].end());
 	}
-	// iterate through all unused bins, use one of them if it is compatible
-	for (size_t bin = 0; bin < num_cuts + 1; ++bin)
-		if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
-			size_t edge_index = adj[i].size();
-			adj[i].emplace_back(j);
-			edge_ranks[i].emplace_back(d, bin, edge_index);
-			break;
-		}
-	// sort edge ranks by increasing distance again
-	std::sort(edge_ranks[i].begin(), edge_ranks[i].end());
 
 	/*
 	std::vector<size_t> cuts;
