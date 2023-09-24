@@ -50,7 +50,7 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	const std::vector<std::pair<T, size_t>>
 	_query_k_internal_wrapper(const vec<T>& v, size_t k, bool include_visited);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "ENSG Engine"; }
+	const std::string _name() { return "ENSG Engine (Slow initial impl)"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, edge_count_mult);
@@ -145,11 +145,11 @@ template <typename T> void ensg_engine<T>::_build() {
 	auto improve_vertex_edges = [&](size_t v) {
 		// get current approx kNN
 		std::vector<std::pair<T, size_t>> kNN =
-				_query_k_internal_wrapper(all_entries[i], edge_count_mult, true);
+				_query_k_internal_wrapper(all_entries[v], edge_count_mult, true);
 		// add all the found neighbours as edges (if they are good)
 		sort(kNN.begin(), kNN.end());
-		for (auto [d, j] : kNN) {
-			add_edge(i, j, d);
+		for (auto [d, u] : kNN) {
+			add_edge(v, u, d);
 		}
 	};
 
