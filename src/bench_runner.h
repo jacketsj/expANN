@@ -109,10 +109,9 @@ void store_benchmark_results(bench_data_manager& bdm,
 }
 
 template <typename BenchType, typename... Args>
-auto& perform_and_store_benchmark_results(std::string dsname,
-																					size_t num_threads,
-																					BenchType& basic_benchmarker,
-																					Args&... args) {
+auto perform_and_store_benchmark_results(std::string dsname, size_t num_threads,
+																				 BenchType& basic_benchmarker,
+																				 Args&... args) {
 	perform_benchmarks_with_threads(basic_benchmarker, num_threads, args...);
 	bench_data_manager bdm(dsname);
 	store_benchmark_results(bdm, args...);
