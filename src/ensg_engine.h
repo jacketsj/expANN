@@ -76,9 +76,6 @@ bool ensg_engine<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 
 template <typename T>
 void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
-	// TODO refactor this to be sane
-	// no randomness needed here
-
 	// keep track of all bins that have been used already
 	std::set<size_t> used_bins;
 	// iterate through all the edges, smallest to biggest, while maintaining a
@@ -107,56 +104,6 @@ void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
 		// sort edge ranks by increasing distance again
 		std::sort(edge_ranks[i].begin(), edge_ranks[i].end());
 	}
-
-	/*
-	std::vector<size_t> cuts;
-	for (size_t cut = 0; cut <= num_cuts; ++cut)
-		cuts.push_back(cut);
-	std::shuffle(cuts.begin(), cuts.end(), gen);
-	// choose a random sequence of cuts until a cut that allows for (i,j) is found
-	size_t found_cut = num_cuts;
-	for (size_t cut : cuts) {
-		// if (cut == num_cuts || e_labels[i][cut] != e_labels[j][cut]) {
-		if (is_valid_edge(i, j, cut)) {
-			found_cut = cut;
-			break;
-		}
-	}
-	// if the total number of edges would be too large, find all non-empty cuts,
-	// and pick out the one with the longest edge
-	size_t max_cut = 0;
-	T max_cut_val = std::numeric_limits<T>::max();
-	size_t deleted_j = i; // nothing deleted if deleted_j == i
-	if (adj[i].size() + 1 > edge_count_mult) {
-		for (size_t cut : cuts) {
-			size_t sz = edge_ranks[i][cut].size();
-			if (cut == found_cut)
-				sz++;
-			if (sz > 1) {
-				T cur_cut_val = edge_ranks[i][cut].begin()->first;
-				if (cur_cut_val < max_cut_val) {
-					max_cut_val = cur_cut_val;
-					max_cut = cut;
-				}
-			}
-		}
-		// if that longest edge is longer than our candidate edge, make the swap
-		if (-max_cut_val > d) {
-			auto iter = edge_ranks[i][max_cut].begin();
-			size_t edge_index = iter->second;
-			deleted_j = adj[i][edge_index];
-			adj[i][edge_index] = j;
-			edge_ranks[i][max_cut].erase(iter);
-			edge_ranks[i][found_cut].emplace(-d, edge_index);
-		}
-	} else {
-		adj[i].emplace_back(j);
-		edge_ranks[i][found_cut].emplace(-d, adj[i].size() - 1);
-	}
-	// try to bump a bigger edge until stability is reached
-	if (deleted_j != i)
-		add_edge_directional(i, deleted_j, -max_cut_val);
-	*/
 }
 
 template <typename T> void ensg_engine<T>::add_edge(size_t i, size_t j, T d) {
