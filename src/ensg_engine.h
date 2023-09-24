@@ -43,7 +43,8 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	void _build();
 	const std::vector<std::pair<T, size_t>>
 	_query_k_internal(const vec<T>& v, size_t k,
-										std::vector<size_t>& starting_points, bool include_visited);
+										const std::vector<size_t>& starting_points,
+										bool include_visited);
 	bool is_valid_edge(size_t i, size_t j, size_t bin);
 	void add_edge(size_t i, size_t j, T d);
 	void add_edge_directional(size_t i, size_t j, T d);
@@ -172,7 +173,7 @@ template <typename T> void ensg_engine<T>::_build() {
 template <typename T>
 const std::vector<std::pair<T, size_t>>
 ensg_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
-																	std::vector<size_t>& starting_points,
+																	const std::vector<size_t>& starting_points,
 																	bool include_visited) {
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::priority_queue<std::pair<T, size_t>> to_visit;
@@ -189,7 +190,7 @@ ensg_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 			top_k.pop();
 		return is_good;
 	};
-	for (auto& sp : starting_points)
+	for (const auto& sp : starting_points)
 		visit(dist(v, all_entries[sp]), sp);
 	while (!to_visit.empty()) {
 		T nd;
@@ -227,7 +228,7 @@ ensg_engine<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
 
 template <typename T>
 std::vector<size_t> ensg_engine<T>::_query_k(const vec<T>& v, size_t k) {
-	auto ret_combined = _query_k_internal_wrapper(v, k * num_for_1nn, false)[0];
+	auto ret_combined = _query_k_internal_wrapper(v, k * num_for_1nn, false);
 	ret_combined.resize(std::min(k, ret_combined.size()));
 	auto ret = std::vector<size_t>(ret_combined.size());
 	for (size_t i = 0; i < ret.size(); ++i)
