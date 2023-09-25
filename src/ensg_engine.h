@@ -165,6 +165,8 @@ template <typename T> void ensg_engine<T>::_build() {
 		// (i.e. if existing starting point is deleted, sample another)
 		// potentially use a few different starting points, for better sampling
 	}
+	// TODO test this, does improve querytime-recall curve/does it slow down build
+	// times?
 	while (!improve_queue.empty()) {
 		improve_vertex_edges(improve_queue.front().second);
 		improve_queue.pop();
