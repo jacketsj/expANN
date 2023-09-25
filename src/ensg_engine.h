@@ -14,8 +14,11 @@
 struct ensg_engine_config {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
-	ensg_engine_config(size_t _edge_count_mult, size_t _num_for_1nn)
-			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn) {}
+	float re_improve_wait_ratio;
+	ensg_engine_config(size_t _edge_count_mult, size_t _num_for_1nn,
+										 _re_improve_wait_ratio = 1.0f)
+			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
+				re_improve_wait_ratio(_re_improve_wait_ratio) {}
 };
 
 template <typename T>
@@ -26,10 +29,12 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	size_t starting_vertex;
 	size_t edge_count_mult;
 	size_t num_for_1nn;
+	float re_improve_wait_ratio;
 	const size_t num_cuts;
 	ensg_engine(ensg_engine_config conf)
 			: rd(), gen(rd()), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
+				re_improve_wait_ratio(conf.re_improve_wait_ratio),
 				num_cuts(conf.edge_count_mult - 1) {}
 	std::vector<vec<T>> all_entries;
 	robin_hood::unordered_flat_map<size_t, std::vector<size_t>>
@@ -56,6 +61,7 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 		param_list_t pl;
 		add_param(pl, edge_count_mult);
 		add_param(pl, num_for_1nn);
+		add_param(pl, re_improve_wait_ratio);
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
@@ -141,7 +147,8 @@ template <typename T> void ensg_engine<T>::_build() {
 		for (auto [d, u] : kNN) {
 			add_edge(v, u, d);
 		}
-		improve_queue.emplace(op_count + 1 * total_size, v);
+		improve_queue.emplace(
+				op_count + size_t(re_improve_wait_ratio * total_size) + 1, v);
 	};
 
 	for (size_t i = 0; i < all_entries.size(); ++i) {
