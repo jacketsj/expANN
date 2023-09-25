@@ -85,6 +85,11 @@ void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
 			d < std::get<0>(edge_ranks[i].back())) {
 		for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
 			used_bins.insert(bin);
+			if (j == adj[i][edge_index]) {
+				// duplicate edge found, discard and return
+				// will only happen if no swaps have occurred so far
+				return;
+			}
 			if (d < other_d && is_valid_edge(i, j, bin)) {
 				// (i,j) is a better edge than (i, adj[i][edge_index]) for the current
 				// bin, so swap
@@ -113,13 +118,20 @@ template <typename T> void ensg_engine<T>::add_edge(size_t i, size_t j, T d) {
 
 template <typename T> void ensg_engine<T>::_build() {
 	assert(all_entries.size() > 0);
+	size_t op_count = 0;
+	size_t& total_size = op_count; // TODO change this for dynamic version
+
 	auto add_vertex_base = [&](size_t v) {
 		edge_ranks[v] = std::vector<std::tuple<T, size_t, size_t>>();
 		for (size_t cut = 0; cut < num_cuts; ++cut)
 			e_labels[v].emplace_back(generate_elabel());
+		++op_count;
 	};
 	starting_vertex = 0;
-	add_vertex_base(0);
+	// add_vertex_base(0);
+
+	std::queue<std::pair<size_t, size_t>> improve_queue;
+
 	auto improve_vertex_edges = [&](size_t v) {
 		// get current approx kNN
 		std::vector<std::pair<T, size_t>> kNN =
@@ -129,15 +141,20 @@ template <typename T> void ensg_engine<T>::_build() {
 		for (auto [d, u] : kNN) {
 			add_edge(v, u, d);
 		}
+		improve_queue.emplace(op_count + 1 * total_size, v);
 	};
 
-	for (size_t i = 1; i < all_entries.size(); ++i) {
+	for (size_t i = 0; i < all_entries.size(); ++i) {
 		if (i % 5000 == 0)
 			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
 								<< "%" << std::endl;
 
 		add_vertex_base(i);
 		improve_vertex_edges(i);
+		while (improve_queue.front().first < op_count) {
+			improve_vertex_edges(improve_queue.front().second);
+			improve_queue.pop();
+		}
 		// TODO for dynamic version, call improve_vertex_edges on a vertex after a
 		// number of operations following the insertion proportional to the size of
 		// the data structure at the time of the insertion
