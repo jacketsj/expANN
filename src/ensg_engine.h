@@ -16,7 +16,7 @@ struct ensg_engine_config {
 	size_t num_for_1nn;
 	float re_improve_wait_ratio;
 	ensg_engine_config(size_t _edge_count_mult, size_t _num_for_1nn,
-										 _re_improve_wait_ratio = 1.0f)
+										 float _re_improve_wait_ratio = 1.0f)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				re_improve_wait_ratio(_re_improve_wait_ratio) {}
 };
