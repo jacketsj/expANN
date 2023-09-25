@@ -134,7 +134,6 @@ template <typename T> void ensg_engine<T>::_build() {
 		++op_count;
 	};
 	starting_vertex = 0;
-	// add_vertex_base(0);
 
 	std::queue<std::pair<size_t, size_t>> improve_queue;
 
@@ -162,10 +161,6 @@ template <typename T> void ensg_engine<T>::_build() {
 			improve_vertex_edges(improve_queue.front().second);
 			improve_queue.pop();
 		}
-		// TODO for dynamic version, call improve_vertex_edges on a vertex after a
-		// number of operations following the insertion proportional to the size of
-		// the data structure at the time of the insertion
-		//
 		// TODO for dynamic version, keep a random sample point as a starting point
 		// (i.e. if existing starting point is deleted, sample another)
 		// potentially use a few different starting points, for better sampling
