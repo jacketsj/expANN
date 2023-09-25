@@ -167,10 +167,12 @@ template <typename T> void ensg_engine<T>::_build() {
 	}
 	// TODO test this, does improve querytime-recall curve/does it slow down build
 	// times?
-	while (!improve_queue.empty()) {
-		improve_vertex_edges(improve_queue.front().second);
-		improve_queue.pop();
-	}
+	// TODO this will run infinitely, need to fix it so that it doesn't re-enqueue
+	//
+	// while (!improve_queue.empty()) {
+	//	improve_vertex_edges(improve_queue.front().second);
+	//	improve_queue.pop();
+	//}
 }
 template <typename T>
 const std::vector<std::pair<T, size_t>>
