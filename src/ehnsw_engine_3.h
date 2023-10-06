@@ -246,18 +246,19 @@ ehnsw_engine_3<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 	// TODO then call this function twice in a row, the first time with both the
 	// above flag and include_visited, the second time with neither flag
 	std::priority_queue<std::pair<T, size_t>> top_k;
-	std::priority_queue<std::pair<T, size_t>> to_visit;
+	std::priority_queue<std::pair<T, size_t>> to_visit, to_visit_branch;
 	robin_hood::unordered_flat_map<size_t, T> visited;
 	auto visit = [&](T d, size_t u) {
 		bool is_good =
-				distribution(gen) < random_branch_prob ||
-				(!visited.contains(u) && (top_k.size() < k || top_k.top().first > d));
-		random_branch_prob =
-				std::max(random_branch_prob - random_branch_decay, 0.0f);
+				!visited.contains(u) && (top_k.size() < k || top_k.top().first > d);
 		visited[u] = d;
 		if (is_good) {
 			top_k.emplace(d, u);		 // top_k is a max heap
 			to_visit.emplace(-d, u); // to_visit is a min heap
+		} else if (distribution(gen) < random_branch_prob) {
+			to_visit_branch.emplace(-d, u); // to_visit_branch is a min heap
+			random_branch_prob =
+					std::max(random_branch_prob - random_branch_decay, 0.0f);
 		}
 		if (top_k.size() > k)
 			top_k.pop();
@@ -266,6 +267,12 @@ ehnsw_engine_3<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 	for (auto& sp : starting_points)
 		visit(dist(v, all_entries[sp]), sp);
 	while (!to_visit.empty()) {
+		auto visit_neighbours = [&](size_t cur) {
+			for (const auto& u : hadj[layer][cur]) {
+				T d_next = dist(v, all_entries[u]);
+				visit(d_next, u);
+			}
+		};
 		T nd;
 		size_t cur;
 		std::tie(nd, cur) = to_visit.top();
@@ -273,9 +280,10 @@ ehnsw_engine_3<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
-		for (const auto& u : hadj[layer][cur]) {
-			T d_next = dist(v, all_entries[u]);
-			visit(d_next, u);
+		visit_neighbours(cur);
+		if (!to_visit_branch.empty()) {
+			visit_neighbours(to_visit_branch.top().second);
+			to_visit_branch.pop();
 		}
 	}
 	std::vector<std::pair<T, size_t>> ret;
