@@ -279,17 +279,30 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		for (size_t k = 100; k <= 100; k += 20) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 32; num_for_1nn *= 4) {
 			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 4) {
-				if (true) {
+				if (false) {
 					ensg_engine_jobs.emplace_back(
 							ensg_engine_config(k, num_for_1nn, 1.0f));
 				}
-				if (false) {
+				if (true) {
 					ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 							100, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
 					ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 							100, k, num_for_1nn, 3, 1, true, true, false, 0.5f));
 					ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 							1, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
+				}
+				if (true) {
+					bool bumping = true;
+					for (float initial_random_branch_prob = 0.0f;
+							 initial_random_branch_prob <= 0.9f;
+							 initial_random_branch_prob += 0.4f) {
+						for (float random_branch_decay = initial_random_branch_prob;
+								 random_branch_decay >= 0.001f; random_branch_decay /= 4.0f) {
+							ehnsw_engine_3_jobs.emplace_back(ehnsw_engine_3_config(
+									1, k, num_for_1nn, k - 1, 1, true, bumping, false, 0.5f, 1,
+									initial_random_branch_prob, random_branch_decay));
+						}
+					}
 				}
 			}
 		}

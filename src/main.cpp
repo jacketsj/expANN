@@ -12,11 +12,11 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
-#define NUM_THREADS 4
+#define NUM_THREADS 11
 
 int main() {
 	dataset_loader<float> dsl;
-	if (true) {
+	if (false) {
 		// auto bdm = perform_benchmarks(dsl.load_sift1m_custom(
 		//		"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
 		//		"datasets/sift/sift_groundtruth.ivecs", 10, 8));
@@ -36,14 +36,15 @@ int main() {
 	}
 
 	// for (size_t n = 50000 * 1; n <= 50000 * 10 * 1; n *= 10) {
-	for (size_t n = 56000 * 1; n <= 56000 * 1 * 1; n *= 10) {
+	// for (size_t n = 56000 * 1; n <= 56000 * 1 * 1; n *= 10) {
+	for (size_t n = 66000 * 1; n <= 66000 * 1 * 1; n *= 10) {
 		// for (size_t n = 50000 * 1; n <= 50000 * 1 * 1; n *= 10) {
 		// size_t m = 400 * (n / 50000);
 		// size_t m = 400;
 		size_t m = 400;
 		// if (n < 500000)
 		//	m = 400;
-		size_t d = 128;
+		size_t d = 64;
 		size_t k = 10;
 		auto bdm = perform_benchmarks(
 				dsl.load_synethetic_uniform_sphere_points(n, m, k, d), NUM_THREADS);
