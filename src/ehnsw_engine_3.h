@@ -22,16 +22,22 @@ struct ehnsw_engine_3_config {
 	bool quick_build;
 	float elabel_prob;
 	size_t cut_run_length;
+	float initial_random_branch_prob;
+	float random_branch_decay;
 	ehnsw_engine_3_config(size_t _max_depth, size_t _edge_count_mult,
 												size_t _num_for_1nn, size_t _num_cuts,
 												size_t _min_per_cut, bool _quick_search, bool _bumping,
 												bool _quick_build, float _elabel_prob = 0.5f,
-												size_t _cut_run_length = 1)
+												size_t _cut_run_length = 1,
+												float _initial_random_branch_prob = 0.0f,
+												float _random_branch_decay = 1.0f)
 			: max_depth(_max_depth), edge_count_mult(_edge_count_mult),
 				num_for_1nn(_num_for_1nn), num_cuts(_num_cuts),
 				min_per_cut(_min_per_cut), quick_search(_quick_search),
 				bumping(_bumping), quick_build(_quick_build), elabel_prob(_elabel_prob),
-				cut_run_length(_cut_run_length) {}
+				cut_run_length(_cut_run_length),
+				initial_random_branch_prob(_initial_random_branch_prob),
+				random_branch_decay(_random_branch_decay) {}
 };
 
 template <typename T>
@@ -52,6 +58,8 @@ struct ehnsw_engine_3 : public ann_engine<T, ehnsw_engine_3<T>> {
 	bool quick_build;
 	float elabel_prob;
 	size_t cut_run_length;
+	float initial_random_branch_prob;
+	float random_branch_decay;
 	ehnsw_engine_3(ehnsw_engine_3_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				elabel_distribution(conf.elabel_prob), max_depth(conf.max_depth),
@@ -59,7 +67,9 @@ struct ehnsw_engine_3 : public ann_engine<T, ehnsw_engine_3<T>> {
 				num_cuts(conf.num_cuts), min_per_cut(conf.min_per_cut),
 				quick_search(conf.quick_search), bumping(conf.bumping),
 				quick_build(conf.quick_build), elabel_prob(conf.elabel_prob),
-				cut_run_length(conf.cut_run_length) {}
+				cut_run_length(conf.cut_run_length),
+				initial_random_branch_prob(conf.initial_random_branch_prob),
+				random_branch_decay(conf.random_branch_decay) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<robin_hood::unordered_flat_map<size_t, std::vector<size_t>>> hadj;
 	std::vector<robin_hood::unordered_flat_map<
@@ -94,6 +104,8 @@ struct ehnsw_engine_3 : public ann_engine<T, ehnsw_engine_3<T>> {
 		add_param(pl, quick_build);
 		add_param(pl, elabel_prob);
 		add_param(pl, cut_run_length);
+		add_param(pl, initial_random_branch_prob);
+		add_param(pl, random_branch_decay);
 		return pl;
 	}
 	bool generate_elabel() { return elabel_distribution(gen); }
@@ -228,6 +240,7 @@ const std::vector<std::pair<T, size_t>>
 ehnsw_engine_3<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 																		 std::vector<size_t>& starting_points,
 																		 size_t layer, bool include_visited) {
+	float random_branch_prob = initial_random_branch_prob;
 	// TODO add an option to restrict size of to_visit, default to
 	// all_entries.size() (causing greedy dfs if it is size=1 basically)
 	// TODO then call this function twice in a row, the first time with both the
@@ -237,7 +250,10 @@ ehnsw_engine_3<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 	robin_hood::unordered_flat_map<size_t, T> visited;
 	auto visit = [&](T d, size_t u) {
 		bool is_good =
-				!visited.contains(u) && (top_k.size() < k || top_k.top().first > d);
+				distribution(gen) < random_branch_prob ||
+				(!visited.contains(u) && (top_k.size() < k || top_k.top().first > d));
+		random_branch_prob =
+				std::max(random_branch_prob - random_branch_decay, 0.0f);
 		visited[u] = d;
 		if (is_good) {
 			top_k.emplace(d, u);		 // top_k is a max heap
