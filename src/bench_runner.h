@@ -558,32 +558,9 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 max_leaf_size *= 16) {
 				for (size_t sc = max_leaf_size / tc; sc * tc <= 8192 * 1; sc *= 16) {
 					for (size_t num_probes = 0; num_probes <= 20; num_probes += 4) {
-						// for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 *
-						// 2)
-						// {
-						//  std::cerr << "Starting tree arrangement(tc=" << tc
-						//					<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc <<
-						//")"
-						//					<< std::endl;
-						//  std::cerr << "Expected time proportional to: " << sc * tc
-						//					<< std::endl;
-						//  auto begin = std::chrono::high_resolution_clock::now();
 						tree_arrangement_engine_jobs.emplace_back(
 								tree_arrangement_engine_config(tc, max_leaf_size, sc, 3, 8, 40,
 																							 num_probes));
-						// tree_arrangement_engine<float> engine(
-						//		tree_arrangement_engine_config(tc, max_leaf_size, sc));
-						// bdm.add(basic_benchmarker.get_benchmark_data(engine));
-						// auto end = std::chrono::high_resolution_clock::now();
-						// std::cerr << "Actual time: "
-						//					<< std::chrono::duration_cast<std::chrono::nanoseconds>(
-						//								 end - begin)
-						//								 .count()
-						//					<< "ns" << std::endl;
-						// std::cerr << "Completed tree arrangement(tc=" << tc
-						//					<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc <<
-						//")"
-						//					<< std::endl;
 					}
 				}
 			}
@@ -594,28 +571,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
 					 max_leaf_size *= 4) {
 				for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
-					// std::cerr << "Starting tree arrangement_if(tc=" << tc
-					//					<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc <<
-					//")"
-					//					<< std::endl;
-					// std::cerr << "Expected time proportional to: " << sc * tc
-					//					<< std::endl;
-					// auto begin = std::chrono::high_resolution_clock::now();
 					tree_arrangement_engine_if_jobs.emplace_back(
 							tree_arrangement_engine_if_config(tc, max_leaf_size, sc));
-					// tree_arrangement_engine_if<float> engine(
-					//		tree_arrangement_engine_if_config(tc, max_leaf_size, sc));
-					// bdm.add(basic_benchmarker.get_benchmark_data(engine));
-					// auto end = std::chrono::high_resolution_clock::now();
-					// std::cerr << "Actual time: "
-					//					<< std::chrono::duration_cast<std::chrono::nanoseconds>(
-					//								 end - begin)
-					//								 .count()
-					//					<< "ns" << std::endl;
-					// std::cerr << "Completed tree arrangement_if(tc=" << tc
-					//					<< ",max_leaf_size=" << max_leaf_size << ",sc=" << sc <<
-					//")"
-					//					<< std::endl;
 				}
 			}
 		}
