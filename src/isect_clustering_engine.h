@@ -114,7 +114,8 @@ void isect_clustering_engine<T>::_store_vector(const vec<T>& v) {
 template <typename T> void isect_clustering_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 	std::random_device rd;
-	std::shared_ptr<std::mt19937> gen = std::make_shared<std::mt19937>(rd());
+	// std::shared_ptr<std::mt19937> gen = std::make_shared<std::mt19937>(rd());
+	std::mt19937 gen(rd());
 	for (size_t copy = 0; copy < tree_copies; ++copy) {
 		std::cerr << "Built " << double(copy) / double(tree_copies) * 100 << "%"
 							<< std::endl;
@@ -196,18 +197,20 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 			// tables here) recursively generate multiindexlist from multimultiindex
 			for (size_t entry_index = 0; entry_index < entries.size();
 					 ++entry_index) {
-				auto recurser = [&](auto partial_list, size_t isect_index, auto rec) {
-					if (isect_index >= num_isect) {
-						multiindexlist[entry_index].emplace_back(partial_list);
-					} else {
-						for (size_t cluster_i : multimultiindex[entry_index][isect_index]) {
-							std::vector<size_t> next_partial_list = partial_list;
-							next_partial_list.emplace_back(cluster_i);
-							rec(next_partial_list, isect_index + 1, rec);
-						}
-					}
-				};
-				recurser(clustering_location(), 0, recurser);
+				std::function<void(clustering_location, size_t)> recurser =
+						[&](clustering_location partial_list, size_t isect_index) {
+							if (isect_index >= num_isect) {
+								multiindexlist[entry_index].emplace_back(partial_list);
+							} else {
+								for (size_t cluster_i :
+										 multimultiindex[entry_index][isect_index]) {
+									clustering_location next_partial_list = partial_list;
+									next_partial_list.emplace_back(cluster_i);
+									recurser(next_partial_list, isect_index + 1);
+								}
+							}
+						};
+				recurser(clustering_location(), 0);
 			}
 
 			t.nodes[b.node_i].centres = all_centres;
