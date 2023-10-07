@@ -12,11 +12,11 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
-#define NUM_THREADS 11
+#define NUM_THREADS 3
 
 int main() {
 	dataset_loader<float> dsl;
-	if (false) {
+	if (true) {
 		// auto bdm = perform_benchmarks(dsl.load_sift1m_custom(
 		//		"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
 		//		"datasets/sift/sift_groundtruth.ivecs", 10, 8));
