@@ -580,11 +580,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	if (true) {
 		// for (size_t tc = 2; tc <= 64; tc *= 2) {
 		for (size_t tc = 64; tc <= 64; tc *= 2) {
-			for (size_t max_leaf_size = 64 * 8; max_leaf_size <= 1024 * 4;
+			for (size_t max_leaf_size = 64 * 2; max_leaf_size <= 1024 * 4;
 					 max_leaf_size *= 4) {
 				// for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
-				for (size_t sc = max_leaf_size * 16; sc * tc <= 64 * 8 * 16;
-						 sc *= 16 * 2) {
+				for (size_t sc = max_leaf_size; sc * tc <= 64 * 64 * 8 * 16; sc *= 16) {
 					for (size_t num_isect = 1; num_isect <= 8; ++num_isect) {
 						size_t cluster_overlap = 2;
 						isect_clustering_engine_jobs.emplace_back(
