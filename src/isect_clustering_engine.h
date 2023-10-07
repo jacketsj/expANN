@@ -114,7 +114,6 @@ void isect_clustering_engine<T>::_store_vector(const vec<T>& v) {
 template <typename T> void isect_clustering_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 	std::random_device rd;
-	// std::shared_ptr<std::mt19937> gen = std::make_shared<std::mt19937>(rd());
 	std::mt19937 gen(rd());
 	for (size_t copy = 0; copy < tree_copies; ++copy) {
 		std::cerr << "Built " << double(copy) / double(tree_copies) * 100 << "%"
