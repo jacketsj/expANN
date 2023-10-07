@@ -155,7 +155,7 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 			for (size_t isect_index = 0; isect_index < num_isect; ++isect_index) {
 				std::vector<vec<T>> centres;
 				for (size_t i = 0; i < local_cluster_count; ++i) {
-					std::uniform_int_distribution<> distribution(i, entries.size());
+					std::uniform_int_distribution<> distribution(i, entries.size() - 1);
 					size_t k = distribution(gen);
 					std::swap(entries[i], entries[k]);
 					centres.emplace_back(entries[i]);
