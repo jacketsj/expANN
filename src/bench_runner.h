@@ -276,7 +276,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			}
 		}
 	}
-	if (true) {
+	if (false) {
 		// for (size_t k = 80; k <= 100; k += 10) {
 		// for (size_t k = 80; k <= 100; k += 20) {
 		// for (size_t k = 80; k <= 80; k += 20) {
@@ -573,6 +573,17 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
 					tree_arrangement_engine_if_jobs.emplace_back(
 							tree_arrangement_engine_if_config(tc, max_leaf_size, sc));
+				}
+			}
+		}
+	}
+	if (true) {
+		for (size_t tc = 2; tc <= 64; tc *= 2) {
+			for (size_t max_leaf_size = 64; max_leaf_size <= 1024 * 4;
+					 max_leaf_size *= 4) {
+				for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
+					isect_clustering_engine_jobs.emplace_back(
+							isect_clustering_engine_config(tc, max_leaf_size, sc));
 				}
 			}
 		}
