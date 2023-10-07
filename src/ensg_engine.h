@@ -25,6 +25,7 @@ template <typename T>
 struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	std::random_device rd;
 	std::mt19937 gen;
+	std::uniform_real_distribution<> distribution;
 	std::uniform_int_distribution<> int_distribution;
 	size_t starting_vertex;
 	size_t edge_count_mult;
@@ -32,16 +33,19 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	float re_improve_wait_ratio;
 	const size_t num_cuts;
 	ensg_engine(ensg_engine_config conf)
-			: rd(), gen(rd()), int_distribution(0, 1),
+			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				re_improve_wait_ratio(conf.re_improve_wait_ratio),
 				num_cuts(conf.edge_count_mult - 1) {}
 	std::vector<vec<T>> all_entries;
+	// TODO make these vectors, not hash maps
 	robin_hood::unordered_flat_map<size_t, std::vector<size_t>>
 			adj; // vertex -> cut -> outgoing_edge data_index
 	robin_hood::unordered_flat_map<size_t,
 																 std::vector<std::tuple<T, size_t, size_t>>>
 			edge_ranks; // vertex -> closest connected [distance, bin, edge_index]
+	robin_hood::unordered_flat_map<size_t, size_t>
+			vertex_heights; // vertex -> max_height
 	robin_hood::unordered_flat_map<size_t, std::vector<bool>>
 			e_labels; // vertex -> cut labels (*num_cuts=edge_count_mult-1)
 	void _store_vector(const vec<T>& v);
@@ -56,7 +60,7 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	const std::vector<std::pair<T, size_t>>
 	_query_k_internal_wrapper(const vec<T>& v, size_t k, bool include_visited);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "ENSG Engine"; }
+	const std::string _name() { return "ENSG*H Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, edge_count_mult);
@@ -76,6 +80,9 @@ bool ensg_engine<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 	// the last bin permits any edge
 	if (bin == num_cuts)
 		return true;
+	if (bin <= vertex_heights[i]) {
+		return bin <= vertex_heights[j] && e_labels[i][bin] != e_labels[j][bin];
+	}
 	// an edge is permitted in a bin if it crosses the cut for that bin
 	return e_labels[i][bin] != e_labels[j][bin];
 }
@@ -129,11 +136,16 @@ template <typename T> void ensg_engine<T>::_build() {
 
 	auto add_vertex_base = [&](size_t v) {
 		edge_ranks[v] = std::vector<std::tuple<T, size_t, size_t>>();
+		vertex_heights[v] = std::min(
+				size_t(floor(-log(distribution(gen)) / log(double(edge_count_mult)))),
+				num_cuts - 1);
+
 		for (size_t cut = 0; cut < num_cuts; ++cut)
 			e_labels[v].emplace_back(generate_elabel());
 		++op_count;
 	};
 	starting_vertex = 0;
+	vertex_heights[0] = num_cuts - 1; // make sure vertex 0 is on top level
 
 	std::queue<std::pair<size_t, size_t>> improve_queue;
 
