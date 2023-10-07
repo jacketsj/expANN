@@ -60,7 +60,7 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	const std::vector<std::pair<T, size_t>>
 	_query_k_internal_wrapper(const vec<T>& v, size_t k, bool include_visited);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "ENSG*H Engine"; }
+	const std::string _name() { return "ENSG*H/S Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, edge_count_mult);
@@ -192,33 +192,42 @@ ensg_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 																	const std::vector<size_t>& starting_points,
 																	bool include_visited) {
 	std::priority_queue<std::pair<T, size_t>> top_k;
-	std::priority_queue<std::pair<T, size_t>> to_visit;
+	std::vector<std::priority_queue<std::pair<T, size_t>>>
+			to_visit; // layer -> to_visit_pq
 	robin_hood::unordered_flat_map<size_t, T> visited;
-	auto visit = [&](T d, size_t u) {
+	auto visit = [&](T d, size_t u, size_t layer) {
 		bool is_good =
 				!visited.contains(u) && (top_k.size() < k || top_k.top().first > d);
 		visited[u] = d;
 		if (is_good) {
-			top_k.emplace(d, u);		 // top_k is a max heap
-			to_visit.emplace(-d, u); // to_visit is a min heap
+			top_k.emplace(d, u); // top_k is a max heap
+			// visit the seen vertex when once we reach the correct layer
+			to_visit[std::min(layer, vertex_heights[u])].emplace(
+					-d, u); // to_visit[layer] is a min heap
 		}
 		if (top_k.size() > k)
 			top_k.pop();
 		return is_good;
 	};
+	size_t max_height = 0;
 	for (const auto& sp : starting_points)
-		visit(dist(v, all_entries[sp]), sp);
-	while (!to_visit.empty()) {
-		T nd;
-		size_t cur;
-		std::tie(nd, cur) = to_visit.top();
-		if (top_k.size() == k && -nd > top_k.top().first)
-			// everything neighbouring current best set is already evaluated
-			break;
-		to_visit.pop();
-		for (const auto& u : adj[cur]) {
-			T d_next = dist(v, all_entries[u]);
-			visit(d_next, u);
+		max_height = vertex_heights[sp];
+	to_visit.resize(max_height + 1);
+	for (const auto& sp : starting_points)
+		visit(dist(v, all_entries[sp]), sp, max_height);
+	for (int layer = max_height; layer >= 0; --layer) {
+		while (!to_visit[layer].empty()) {
+			T nd;
+			size_t cur;
+			std::tie(nd, cur) = to_visit[layer].top();
+			if (top_k.size() == k && -nd > top_k.top().first)
+				// everything neighbouring current best set is already evaluated
+				break;
+			to_visit[layer].pop();
+			for (const auto& u : adj[cur]) {
+				T d_next = dist(v, all_entries[u]);
+				visit(d_next, u, layer);
+			}
 		}
 	}
 	std::vector<std::pair<T, size_t>> ret;
