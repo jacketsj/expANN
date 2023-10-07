@@ -577,18 +577,24 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			}
 		}
 	}
-	if (true) {
+	if (false) {
 		// for (size_t tc = 2; tc <= 64; tc *= 2) {
 		for (size_t tc = 64; tc <= 64; tc *= 2) {
+			// for (size_t tc = 4; tc <= 4; tc *= 2) {
 			for (size_t max_leaf_size = 64 * 2; max_leaf_size <= 1024 * 4;
 					 max_leaf_size *= 4) {
 				// for (size_t sc = max_leaf_size; sc * tc <= 8192 * 8; sc *= 16 * 2) {
-				for (size_t sc = max_leaf_size; sc * tc <= 64 * 64 * 8 * 16; sc *= 16) {
-					for (size_t num_isect = 1; num_isect <= 8; ++num_isect) {
-						size_t cluster_overlap = 2;
-						isect_clustering_engine_jobs.emplace_back(
-								isect_clustering_engine_config(tc, max_leaf_size, sc, 8,
-																							 num_isect, 40, cluster_overlap));
+				for (size_t sc = max_leaf_size; sc <= 64 * 64 * 8 * 16; sc *= 16) {
+					// for (size_t num_isect = 1; num_isect <= 8; ++num_isect) {
+					for (size_t num_isect = 8; num_isect <= 32; num_isect += 8) {
+						// for (size_t num_isect = 4; num_isect <= 8; num_isect += 1) {
+						for (size_t cluster_overlap = 1; cluster_overlap <= 1;
+								 cluster_overlap *= 2) {
+							isect_clustering_engine_jobs.emplace_back(
+									isect_clustering_engine_config(tc, max_leaf_size, sc, 8,
+																								 num_isect, 40,
+																								 cluster_overlap));
+						}
 					}
 				}
 			}
