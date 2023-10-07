@@ -17,9 +17,9 @@ struct isect_clustering_engine_config {
 			num_isect, max_depth, cluster_overlap;
 	isect_clustering_engine_config(size_t _tree_copies, size_t _max_leaf_size,
 																 size_t _search_count_per_copy,
-																 size_t _num_clusters = 3,
+																 size_t _num_clusters = 8,
 																 size_t _num_isect = 8, size_t _max_depth = 40,
-																 size_t _cluster_overlap = 4)
+																 size_t _cluster_overlap = 2)
 			: tree_copies(_tree_copies), max_leaf_size(_max_leaf_size),
 				search_count_per_copy(_search_count_per_copy),
 				num_clusters(_num_clusters), num_isect(_num_isect),
@@ -28,11 +28,10 @@ struct isect_clustering_engine_config {
 
 typedef gch::small_vector<unsigned short> clustering_location;
 
-// idea: create a tree of arrangements. Each cell with too many points becomes a
-// child.
-// should have multiple copies of the tree (with different seeds) to avoid edge
-// problems
-// this is similar to using random quadtrees
+// idea: create a tree of intersection clusterings. Each cell with too many
+// points becomes a child. should have multiple copies of the tree (with
+// different seeds) to avoid edge problems this is similar to using random
+// quadtrees
 template <typename T>
 struct isect_clustering_engine
 		: public ann_engine<T, isect_clustering_engine<T>> {
@@ -45,11 +44,11 @@ struct isect_clustering_engine
 				max_depth(conf.max_depth), cluster_overlap(conf.cluster_overlap) {}
 	std::vector<vec<T>> all_entries;
 	struct tree_node {
-		arrangement<T> arrange;
+		std::vector<std::vector<vec<T>>> centres;
 		struct VectorHasher {
 			size_t operator()(const clustering_location& V) const {
 				int concat_val = 0;
-				size_t num_vals_possible = 4; // TODO this needs to match up with
+				size_t num_vals_possible = 8; // TODO this needs to match up with
 																			// num_clusters, should generalize code
 				for (size_t i = 0; i < V.size(); ++i) {
 					concat_val = concat_val * num_vals_possible + V[i];
@@ -62,6 +61,24 @@ struct isect_clustering_engine
 				// return hash;
 			}
 		};
+		clustering_location compute_multiindex(const vec<T>& v) const {
+			clustering_location ans;
+			for (size_t isect_index = 0; isect_index < centres.size();
+					 ++isect_index) {
+				size_t best_cluster = 0;
+				T best_dist = dist2(v, centres[isect_index][0]);
+				for (size_t cluster_index = 0;
+						 cluster_index < centres[isect_index].size(); ++cluster_index) {
+					T cur_dist = dist2(v, centres[isect_index][cluster_index]);
+					if (best_dist > cur_dist) {
+						best_cluster = cluster_index;
+						best_dist = cur_dist;
+					}
+				}
+				ans.emplace_back(best_cluster);
+			}
+			return ans;
+		}
 		robin_hood::unordered_flat_map<clustering_location, std::vector<size_t>,
 																	 VectorHasher>
 				tables;
@@ -75,7 +92,7 @@ struct isect_clustering_engine
 	void _store_vector(const vec<T>& v);
 	void _build();
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "Tree Arrangement Engine"; }
+	const std::string _name() { return "ISect Clustering Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, tree_copies);
@@ -133,14 +150,16 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 					entries.size(),
 					std::vector<std::vector<size_t>>(
 							num_isect, std::vector<size_t>(local_cluster_overlap, 0)));
+			std::vector<std::vector<vec<T>>> all_centres;
 			for (size_t isect_index = 0; isect_index < num_isect; ++isect_index) {
 				std::vector<vec<T>> centres;
 				for (size_t i = 0; i < local_cluster_count; ++i) {
 					std::uniform_int_distribution<> distribution(i, entries.size());
 					size_t k = distribution(gen);
 					std::swap(entries[i], entries[k]);
-					centres.push_back(entries[i]);
+					centres.emplace_back(entries[i]);
 				}
+				all_centres.emplace_back(centres);
 				for (size_t entry_index = 0; entry_index < entries.size();
 						 ++entry_index) {
 					std::vector<std::pair<T, size_t>> ranked_clusters;
@@ -191,6 +210,7 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 				recurser(clustering_location(), 0, recurser);
 			}
 
+			t.nodes[b.node_i].centres = all_centres;
 			std::vector<clustering_location> to_be_children;
 			for (size_t entry_index = 0; entry_index < entries.size();
 					 ++entry_index) {
@@ -255,13 +275,13 @@ std::vector<size_t> isect_clustering_engine<T>::_query_k(const vec<T>& v,
 		// populate all nodes to check
 		{
 			size_t cur = 0;
-			auto mi = t.nodes[cur].arrange.compute_multiindex(v);
+			auto mi = t.nodes[cur].compute_multiindex(v);
 			tables_to_check.push_back(t.nodes[cur].tables[mi]);
 			while (t.nodes[cur].subtree_tables.count(mi) > 0) {
 				if (t.nodes[cur].subtree_tables.count(mi) == 0)
 					break;
 				cur = t.nodes[cur].subtree_tables[mi];
-				mi = t.nodes[cur].arrange.compute_multiindex(v);
+				mi = t.nodes[cur].compute_multiindex(v);
 				tables_to_check.push_back(t.nodes[cur].tables[mi]);
 			}
 			reverse(tables_to_check.begin(), tables_to_check.end());

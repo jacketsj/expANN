@@ -24,6 +24,7 @@
 #include "hnsw_engine_2.h"
 #include "hnsw_engine_hybrid.h"
 #include "hyper_hnsw_engine.h"
+//#include "isect_clustering_engine.h"
 #include "jamana_ehnsw_engine.h"
 #include "projection_engine.h"
 #include "tree_arrangement_engine.h"
