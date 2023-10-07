@@ -153,7 +153,7 @@ template <typename T> void ensg_engine<T>::_build() {
 	auto improve_vertex_edges = [&](size_t v) {
 		// get current approx kNN
 		std::vector<std::pair<T, size_t>> kNN = _query_k_internal_wrapper(
-				all_entries[v], edge_count_mult, true, vertex_heights[v]);
+				all_entries[v], edge_count_mult, true, num_cuts - 1);
 		// add all the found neighbours as edges (if they are good)
 		sort(kNN.begin(), kNN.end());
 		for (auto [d, u] : kNN) {
