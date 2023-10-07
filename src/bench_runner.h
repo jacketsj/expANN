@@ -24,7 +24,7 @@
 #include "hnsw_engine_2.h"
 #include "hnsw_engine_hybrid.h"
 #include "hyper_hnsw_engine.h"
-//#include "isect_clustering_engine.h"
+#include "isect_clustering_engine.h"
 #include "jamana_ehnsw_engine.h"
 #include "projection_engine.h"
 #include "tree_arrangement_engine.h"
@@ -162,6 +162,9 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	std::vector<
 			job<tree_arrangement_engine_if<float>, tree_arrangement_engine_if_config>>
 			tree_arrangement_engine_if_jobs;
+	std::vector<
+			job<isect_clustering_engine<float>, isect_clustering_engine_config>>
+			isect_clustering_engine_jobs;
 
 	using namespace std::chrono_literals;
 
@@ -624,7 +627,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			jamana_ehnsw_engine_jobs, filter_ehnsw_engine_jobs,
 			clustered_ehnsw_engine_jobs, hier_arrangement_engine_jobs,
 			hnsw_engine_hybrid_jobs, tree_arrangement_engine_jobs,
-			tree_arrangement_engine_if_jobs, projection_hnsw_engine_2_jobs,
-			projection_ehnsw_engine_2_jobs, disk_ehnsw_engine_jobs,
-			hyper_hnsw_engine_jobs);
+			tree_arrangement_engine_if_jobs, isect_clustering_engine_jobs,
+			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
+			disk_ehnsw_engine_jobs, hyper_hnsw_engine_jobs);
 }
