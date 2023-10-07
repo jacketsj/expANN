@@ -26,6 +26,8 @@ struct isect_clustering_engine_config {
 				max_depth(_max_depth), cluster_overlap(_cluster_overlap) {}
 };
 
+typedef gch::small_vector<unsigned short> clustering_location;
+
 // idea: create a tree of arrangements. Each cell with too many points becomes a
 // child.
 // should have multiple copies of the tree (with different seeds) to avoid edge
@@ -45,7 +47,7 @@ struct isect_clustering_engine
 	struct tree_node {
 		arrangement<T> arrange;
 		struct VectorHasher {
-			size_t operator()(const arrangement_location& V) const {
+			size_t operator()(const clustering_location& V) const {
 				int concat_val = 0;
 				size_t num_vals_possible = 4; // TODO this needs to match up with
 																			// num_clusters, should generalize code
@@ -60,10 +62,10 @@ struct isect_clustering_engine
 				// return hash;
 			}
 		};
-		robin_hood::unordered_flat_map<arrangement_location, std::vector<size_t>,
+		robin_hood::unordered_flat_map<clustering_location, std::vector<size_t>,
 																	 VectorHasher>
 				tables;
-		robin_hood::unordered_flat_map<arrangement_location, size_t, VectorHasher>
+		robin_hood::unordered_flat_map<clustering_location, size_t, VectorHasher>
 				subtree_tables;
 	};
 	struct tree {
@@ -122,12 +124,38 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 			for (auto& i : b.ivals)
 				entries.push_back(all_entries[i]);
 
+			size_t local_cluster_count = std::min(num_clusters, entries.size());
+			size_t local_cluster_overlap =
+					std::min(cluster_overlap, local_cluster_count);
+
+			// entry_index -> isect_index -> rank -> cluster_index
+			std::vector<std::vector<std::vector<size_t>>> multimultiindex(
+					entries.size(),
+					std::vector<std::vector<size_t>>(
+							num_isect, std::vector<size_t>(local_cluster_overlap, 0)));
 			for (size_t isect_index = 0; isect_index < num_isect; ++isect_index) {
-				size_t local_cluster_count = std::min(num_clusters, entries.size());
+				std::vector<vec<T>> centres;
 				for (size_t i = 0; i < local_cluster_count; ++i) {
 					std::uniform_int_distribution<> distribution(i, entries.size());
 					size_t k = distribution(gen);
 					std::swap(entries[i], entries[k]);
+					centres.push_back(entries[i]);
+				}
+				for (size_t entry_index = 0; entry_index < entries.size();
+						 ++entry_index) {
+					std::vector<std::pair<T, size_t>> ranked_clusters;
+					for (size_t cluster_index = 0; cluster_index < centres.size();
+							 ++cluster_index) {
+						ranked_clusters.emplace_back(
+								dist2(entries[entry_index], centres[cluster_index]),
+								cluster_index);
+					}
+					std::sort(ranked_clusters.begin(), ranked_clusters.end());
+					for (size_t cluster_index = 0; cluster_index < local_cluster_overlap;
+							 ++cluster_index) {
+						multimultiindex[entry_index][isect_index][cluster_index] =
+								ranked_clusters[cluster_i].second;
+					}
 				}
 				// TODO
 				// cluster centres are entries[0,...,local_cluster_count-1]
@@ -137,19 +165,59 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 				//     ranked_clusters.emplace_back(distance to cluster cluster_i,
 				//     cluster_i)
 				//   sort(ranked_clusters)
-				//   multiindex[current entry][isect_index] = ranked_clusters[0].second
-				//   TODO maybe give up on the overlapping cluster stuff below and use
-				//   num_probes
-				//   for cluster_i from 0 to cluster_overlap-1:
-				//     add to cluster cluster_i (add a label that in isect_index,
-				//     cluster_i is a valid label)
+				//   // multiindex[current entry][isect_index] =
+				//   ranked_clusters[0].second for cluster_i from 0 to
+				//   cluster_overlap-1: 	 multimultiindex[current
+				//   entry][isect_index][cluster_i] = ranked_clusters[cluster_i].second
+			}
+			// entry_index -> list of isect_index lists
+			std::vector<std::vector<clustering_location>> multiindexlist(
+					entries.size());
+			// computing this explicitly is technically unnecessary (we could fill the
+			// tables here) recursively generate multiindexlist from multimultiindex
+			for (size_t entry_index = 0; entry_index < entries.size();
+					 ++entry_index) {
+				auto recurser = [&](auto partial_list, size_t isect_index, auto rec) {
+					if (isect_index >= num_isect) {
+						multimultiindexlist[entry_index].emplace_back(partial_list);
+					} else {
+						for (size_t cluster_i : multimultiindex[entry_index][isect_index]) {
+							std::vector<size_t> next_partial_list = partial_list;
+							next_partial_list.emplace_back(cluster_i);
+							rec(next_partial_list, isect_index + 1, rec);
+						}
+					}
+				};
+				recurser(clustering_location(), 0, recurser);
 			}
 
+			std::vector<clustering_location> to_be_children;
+			for (size_t entry_index = 0; entry_index < entries.size();
+					 ++entry_index) {
+				size_t i = b.ivals[entry_index];
+				for (const auto& mi : multiindexlist[entry_index]) {
+					auto& table = t.nodes[b.node_i].tables[mi];
+					table.push_back(i);
+					if (table.size() == max_leaf_size + 1)
+						to_be_children.push_back(mi); // triggers at most once per table
+				}
+			}
+			if (b.depth < max_depth)
+				for (auto mi : to_be_children) {
+					t.nodes.emplace_back();
+					t.nodes[b.node_i].subtree_tables[mi] = t.nodes.size() - 1;
+					// if num_probes were to be used (instead of overlapping clusters),
+					// would do it right here
+					to_build.emplace(t.nodes.size() - 1, t.nodes[b.node_i].tables[mi],
+													 b.depth + 1);
+				}
+
+			/*
 			arragement_generator<T> arrange_gen(all_entries[0].size(), num_clusters,
 																					num_isect, gen);
 			vecset vs(entries);
 			t.nodes[b.node_i].arrange = arrange_gen(vs);
-			std::vector<arrangement_location> to_be_children;
+			std::vector<clustering_location> to_be_children;
 			for (auto& i : b.ivals) {
 				auto mi = t.nodes[b.node_i].arrange.compute_multiindex(all_entries[i]);
 				auto& table = t.nodes[b.node_i].tables[mi];
@@ -163,7 +231,7 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 					t.nodes[b.node_i].subtree_tables[mi] = t.nodes.size() - 1;
 					// get cluster_overlap close cells and add them to the set to be
 					// propogated
-					std::vector<arrangement_location> close_cells =
+					std::vector<clustering_location> close_cells =
 							t.nodes[b.node_i].arrange.random_probes(mi, cluster_overlap,
 																											*gen);
 					std::vector<size_t> close_cells_contents;
@@ -173,6 +241,7 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 					to_build.emplace(t.nodes.size() - 1, close_cells_contents,
 													 b.depth + 1);
 				}
+			*/
 		}
 	}
 }
