@@ -296,7 +296,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					bool bumping = true;
 					for (size_t layers : {1, 100})
 						for (float initial_random_branch_prob = 0.4f;
-								 initial_random_branch_prob > 0.4f;
+								 initial_random_branch_prob > 0.2f;
 								 // initial_random_branch_prob > 0.0001f;
 								 initial_random_branch_prob /= 2.0f) {
 							for (float random_branch_decay = initial_random_branch_prob;
