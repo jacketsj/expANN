@@ -136,6 +136,9 @@ std::vector<size_t> projection_engine<T, SubEngine>::_query_k(const vec<T>& v,
 																															size_t k) {
 	topk_t<T> tk(k);
 
+	// TODO a larger number than k should be queried for in the subengines
+	// (parametized by 'num_for_1nn')
+
 	auto v_projected = perform_projections(v);
 	for (size_t projection_i = 0; projection_i < num_projections;
 			 ++projection_i) {

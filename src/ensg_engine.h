@@ -53,12 +53,13 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	const std::vector<std::pair<T, size_t>>
 	_query_k_internal(const vec<T>& v, size_t k,
 										const std::vector<size_t>& starting_points,
-										bool include_visited);
+										bool include_visited, size_t full_search_top_layer);
 	bool is_valid_edge(size_t i, size_t j, size_t bin);
 	void add_edge(size_t i, size_t j, T d);
 	void add_edge_directional(size_t i, size_t j, T d);
 	const std::vector<std::pair<T, size_t>>
-	_query_k_internal_wrapper(const vec<T>& v, size_t k, bool include_visited);
+	_query_k_internal_wrapper(const vec<T>& v, size_t k, bool include_visited,
+														size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "ENSG*H/S Engine"; }
 	const param_list_t _param_list() {
@@ -151,8 +152,8 @@ template <typename T> void ensg_engine<T>::_build() {
 
 	auto improve_vertex_edges = [&](size_t v) {
 		// get current approx kNN
-		std::vector<std::pair<T, size_t>> kNN =
-				_query_k_internal_wrapper(all_entries[v], edge_count_mult, true);
+		std::vector<std::pair<T, size_t>> kNN = _query_k_internal_wrapper(
+				all_entries[v], edge_count_mult, true, vertex_heights[v]);
 		// add all the found neighbours as edges (if they are good)
 		sort(kNN.begin(), kNN.end());
 		for (auto [d, u] : kNN) {
@@ -187,10 +188,9 @@ template <typename T> void ensg_engine<T>::_build() {
 	//}
 }
 template <typename T>
-const std::vector<std::pair<T, size_t>>
-ensg_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
-																	const std::vector<size_t>& starting_points,
-																	bool include_visited) {
+const std::vector<std::pair<T, size_t>> ensg_engine<T>::_query_k_internal(
+		const vec<T>& v, size_t k, const std::vector<size_t>& starting_points,
+		bool include_visited, size_t full_search_top_layer) {
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::vector<std::priority_queue<std::pair<T, size_t>>>
 			to_visit; // layer -> to_visit_pq
@@ -205,7 +205,11 @@ ensg_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 			to_visit[std::min(layer, vertex_heights[u])].emplace(
 					-d, u); // to_visit[layer] is a min heap
 		}
-		if (top_k.size() > k)
+		// "quick search" logic below
+		size_t current_k = k;
+		if (layer > full_search_top_layer)
+			current_k = 1;
+		if (top_k.size() > current_k)
 			top_k.pop();
 		return is_good;
 	};
@@ -247,13 +251,15 @@ ensg_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 template <typename T>
 const std::vector<std::pair<T, size_t>>
 ensg_engine<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
-																					bool include_visited) {
-	return _query_k_internal(v, k, {starting_vertex}, include_visited);
+																					bool include_visited,
+																					size_t full_search_top_layer) {
+	return _query_k_internal(v, k, {starting_vertex}, include_visited,
+													 full_search_top_layer);
 }
 
 template <typename T>
 std::vector<size_t> ensg_engine<T>::_query_k(const vec<T>& v, size_t k) {
-	auto ret_combined = _query_k_internal_wrapper(v, k * num_for_1nn, false);
+	auto ret_combined = _query_k_internal_wrapper(v, k * num_for_1nn, false, 0);
 	ret_combined.resize(std::min(k, ret_combined.size()));
 	auto ret = std::vector<size_t>(ret_combined.size());
 	for (size_t i = 0; i < ret.size(); ++i)
