@@ -288,13 +288,15 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 6; num_for_1nn += 1) {
 			for (size_t num_for_1nn = 3; num_for_1nn <= 4; num_for_1nn += 1) {
 				// for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 4) {
-				if (true) {
+				if (false) {
 					ensg_engine_jobs.emplace_back(
 							ensg_engine_config(k, num_for_1nn, 1.0f));
 				}
-				if (false) {
+				if (true) {
 					ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 							100, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
+				}
+				if (false) {
 					ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 							100, k, num_for_1nn, 3, 1, true, true, false, 0.5f));
 					ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
