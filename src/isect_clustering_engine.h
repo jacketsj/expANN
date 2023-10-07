@@ -173,7 +173,7 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 					for (size_t cluster_index = 0; cluster_index < local_cluster_overlap;
 							 ++cluster_index) {
 						multimultiindex[entry_index][isect_index][cluster_index] =
-								ranked_clusters[cluster_i].second;
+								ranked_clusters[cluster_index].second;
 					}
 				}
 				// TODO
@@ -198,7 +198,7 @@ template <typename T> void isect_clustering_engine<T>::_build() {
 					 ++entry_index) {
 				auto recurser = [&](auto partial_list, size_t isect_index, auto rec) {
 					if (isect_index >= num_isect) {
-						multimultiindexlist[entry_index].emplace_back(partial_list);
+						multiindexlist[entry_index].emplace_back(partial_list);
 					} else {
 						for (size_t cluster_i : multimultiindex[entry_index][isect_index]) {
 							std::vector<size_t> next_partial_list = partial_list;
