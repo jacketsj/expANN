@@ -101,7 +101,7 @@ datavec = json.load(f)
 
 # TODO come up with a better name for this
 enable_sprinkles = True
-sprinkle_param = 'max_depth'
+sprinkle_param = 'edge_count_mult'
 
 engines = set()
 for benchdata in datavec:
