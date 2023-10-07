@@ -277,14 +277,16 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		}
 	}
 	if (true) {
-		for (size_t k = 80; k <= 120; k += 5) {
+		// for (size_t k = 80; k <= 120; k += 5) {
+		for (size_t k = 100; k <= 120; k += 20) {
 			// for (size_t k = 80; k <= 100; k += 20) {
 			// for (size_t k = 80; k <= 80; k += 20) {
 			// for (size_t k = 100; k <= 100; k += 20) {
 			// for (size_t k = 50; k <= 50; k += 20) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 32; num_for_1nn *= 4) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 16; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 1; num_for_1nn <= 6; num_for_1nn += 1) {
+			// for (size_t num_for_1nn = 1; num_for_1nn <= 6; num_for_1nn += 1) {
+			for (size_t num_for_1nn = 3; num_for_1nn <= 4; num_for_1nn += 1) {
 				// for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 4) {
 				if (true) {
 					ensg_engine_jobs.emplace_back(
