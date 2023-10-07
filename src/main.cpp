@@ -44,7 +44,7 @@ int main() {
 		size_t m = 400;
 		// if (n < 500000)
 		//	m = 400;
-		size_t d = 64;
+		size_t d = 128;
 		size_t k = 10;
 		auto bdm = perform_benchmarks(
 				dsl.load_synethetic_uniform_sphere_points(n, m, k, d), NUM_THREADS);
