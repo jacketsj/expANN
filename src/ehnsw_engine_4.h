@@ -20,19 +20,22 @@ struct ehnsw_engine_4_config {
 	bool run_improves;
 	bool cut_off_visited_if_long;
 	size_t cut_off_visited_if_long_ratio;
+	bool include_visited_only_higher;
 	ehnsw_engine_4_config(size_t _edge_count_mult, size_t _num_for_1nn,
 												size_t _max_depth = 100,
 												float _re_improve_wait_ratio = 1.0f,
 												bool _include_visited_during_build = false,
 												bool _run_improves = true,
-												bool _cut_off_visited_if_long = false,
-												size_t _cut_off_visited_if_long_ratio = 1)
+												bool _cut_off_visited_if_long = true,
+												size_t _cut_off_visited_if_long_ratio = 2,
+												bool _include_visited_only_higher = false)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				max_depth(_max_depth), re_improve_wait_ratio(_re_improve_wait_ratio),
 				include_visited_during_build(_include_visited_during_build),
 				run_improves(_run_improves),
 				cut_off_visited_if_long(_cut_off_visited_if_long),
-				cut_off_visited_if_long_ratio(_cut_off_visited_if_long_ratio) {}
+				cut_off_visited_if_long_ratio(_cut_off_visited_if_long_ratio),
+				include_visited_only_higher(_include_visited_only_higher) {}
 };
 
 template <typename T>
@@ -50,6 +53,7 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 	bool run_improves;
 	bool cut_off_visited_if_long;
 	size_t cut_off_visited_if_long_ratio;
+	bool include_visited_only_higher;
 	const size_t num_cuts;
 	ehnsw_engine_4(ehnsw_engine_4_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
@@ -60,6 +64,7 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 				run_improves(conf.run_improves),
 				cut_off_visited_if_long(conf.cut_off_visited_if_long),
 				cut_off_visited_if_long_ratio(conf.cut_off_visited_if_long_ratio),
+				include_visited_only_higher(conf.include_visited_only_higher),
 				num_cuts(conf.edge_count_mult - 1) {}
 	std::vector<vec<T>> all_entries;
 	// TODO make these vectors, not hash maps
@@ -99,6 +104,7 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 		add_param(pl, run_improves);
 		add_param(pl, cut_off_visited_if_long);
 		add_param(pl, cut_off_visited_if_long_ratio);
+		add_param(pl, include_visited_only_higher);
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
@@ -211,9 +217,13 @@ template <typename T> void ehnsw_engine_4<T>::_build() {
 			for (size_t neighbour_index = 0; neighbour_index < kNNs[layer].size();
 					 ++neighbour_index) {
 				auto [d, u] = kNNs[layer][neighbour_index];
-				if (!add_edge(v, u, d, layer) && cut_off_visited_if_long &&
-						neighbour_index > cut_off_visited_if_long_ratio * edge_count_mult)
-					break;
+				if (neighbour_index <=
+								edge_count_mult * cut_off_visited_if_long_ratio ||
+						(!include_visited_only_higher || vertex_heights[u] > layer)) {
+					if (!add_edge(v, u, d, layer) && cut_off_visited_if_long &&
+							neighbour_index > cut_off_visited_if_long_ratio * edge_count_mult)
+						break;
+				}
 			}
 			// for (auto [d, u] : kNNs[layer]) {
 			//	add_edge(v, u, d, layer);
