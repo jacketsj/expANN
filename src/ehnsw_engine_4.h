@@ -17,13 +17,16 @@ struct ehnsw_engine_4_config {
 	size_t max_depth;
 	float re_improve_wait_ratio;
 	bool include_visited_during_build;
+	bool run_improves;
 	ehnsw_engine_4_config(size_t _edge_count_mult, size_t _num_for_1nn,
 												size_t _max_depth = 100,
 												float _re_improve_wait_ratio = 1.0f,
-												bool _include_visited_during_build = false)
+												bool _include_visited_during_build = false,
+												bool _run_improves = true)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				max_depth(_max_depth), re_improve_wait_ratio(_re_improve_wait_ratio),
-				include_visited_during_build(_include_visited_during_build) {}
+				include_visited_during_build(_include_visited_during_build),
+				run_improves(_run_improves) {}
 };
 
 template <typename T>
@@ -38,6 +41,7 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 	size_t max_depth;
 	float re_improve_wait_ratio;
 	bool include_visited_during_build;
+	bool run_improves;
 	const size_t num_cuts;
 	ehnsw_engine_4(ehnsw_engine_4_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
@@ -45,7 +49,7 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 				max_depth(conf.max_depth),
 				re_improve_wait_ratio(conf.re_improve_wait_ratio),
 				include_visited_during_build(conf.include_visited_during_build),
-				num_cuts(conf.edge_count_mult - 1) {}
+				run_improves(conf.run_improves), num_cuts(conf.edge_count_mult - 1) {}
 	std::vector<vec<T>> all_entries;
 	// TODO make these vectors, not hash maps
 	struct layer_data {
@@ -81,6 +85,7 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 		add_param(pl, re_improve_wait_ratio);
 		add_param(pl, max_depth);
 		add_param(pl, include_visited_during_build);
+		add_param(pl, run_improves);
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
@@ -189,8 +194,9 @@ template <typename T> void ehnsw_engine_4<T>::_build() {
 				add_edge(v, u, d, layer);
 			}
 		}
-		improve_queue.emplace(
-				op_count + size_t(re_improve_wait_ratio * total_size) + 1, v);
+		if (run_improves)
+			improve_queue.emplace(
+					op_count + size_t(re_improve_wait_ratio * total_size) + 1, v);
 	};
 
 	for (size_t i = 0; i < all_entries.size(); ++i) {
