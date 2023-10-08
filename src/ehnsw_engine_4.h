@@ -265,7 +265,7 @@ template <typename T> void ehnsw_engine_4<T>::_build() {
 
 		add_vertex_base(i);
 		improve_vertex_edges(i);
-		while (improve_queue.front().first < op_count) {
+		while (!improve_queue.empty() && improve_queue.front().first < op_count) {
 			improve_vertex_edges(improve_queue.front().second);
 			improve_queue.pop();
 		}
