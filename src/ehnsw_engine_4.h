@@ -216,7 +216,8 @@ template <typename T> void ehnsw_engine_4<T>::_build() {
 	}
 	// TODO test this, does improve querytime-recall curve/does it slow down build
 	// times?
-	// TODO this will run infinitely, need to fix it so that it doesn't re-enqueue
+	// TODO this will run infinitely, need to fix it so that it doesn't
+	// re-enqueue, or so that it terminates
 	//
 	// while (!improve_queue.empty()) {
 	//	improve_vertex_edges(improve_queue.front().second);
