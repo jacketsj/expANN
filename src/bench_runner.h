@@ -281,7 +281,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	}
 	if (true) {
 		// for (size_t k = 80; k <= 120; k += 5) {
-		for (size_t k = 100; k <= 120; k += 20) {
+		// for (size_t k = 100; k <= 120; k += 20) {
+		for (size_t k = 120; k <= 120; k += 20) {
 			// for (size_t k = 100; k <= 100; k += 20) {
 			//  for (size_t k = 80; k <= 100; k += 20) {
 			//  for (size_t k = 80; k <= 80; k += 20) {
@@ -302,8 +303,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							100, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
 				}
 				if (true) {
-					for (bool include_visited_during_build : {false, true}) {
-						for (bool run_improves : {false, true}) {
+					for (bool include_visited_during_build : {false}) {
+						// for (bool include_visited_during_build : {false, true}) {
+						for (bool run_improves : {false}) {
+							// for (bool run_improves : {false, true}) {
 							ehnsw_engine_4_jobs.emplace_back(ehnsw_engine_4_config(
 									k, num_for_1nn, 100, 1.0f, include_visited_during_build,
 									run_improves));
