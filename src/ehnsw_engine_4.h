@@ -21,6 +21,9 @@ struct ehnsw_engine_4_config {
 	bool cut_off_visited_if_long;
 	size_t cut_off_visited_if_long_ratio;
 	bool include_visited_only_higher;
+	bool use_pruning;
+	float pruning_factor;
+	size_t edge_count_search_factor;
 	ehnsw_engine_4_config(size_t _edge_count_mult, size_t _num_for_1nn,
 												size_t _max_depth = 100,
 												float _re_improve_wait_ratio = 1.0f,
@@ -28,14 +31,18 @@ struct ehnsw_engine_4_config {
 												bool _run_improves = true,
 												bool _cut_off_visited_if_long = false,
 												size_t _cut_off_visited_if_long_ratio = 4,
-												bool _include_visited_only_higher = true)
+												bool _include_visited_only_higher = true,
+												bool _use_pruning = false, float _pruning_factor = 1.2f,
+												size_t _edge_count_search_factor = 1)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				max_depth(_max_depth), re_improve_wait_ratio(_re_improve_wait_ratio),
 				include_visited_during_build(_include_visited_during_build),
 				run_improves(_run_improves),
 				cut_off_visited_if_long(_cut_off_visited_if_long),
 				cut_off_visited_if_long_ratio(_cut_off_visited_if_long_ratio),
-				include_visited_only_higher(_include_visited_only_higher) {}
+				include_visited_only_higher(_include_visited_only_higher),
+				use_pruning(_use_pruning), pruning_factor(_pruning_factor),
+				edge_count_search_factor(_edge_count_search_factor) {}
 };
 
 template <typename T>
@@ -54,6 +61,9 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 	bool cut_off_visited_if_long;
 	size_t cut_off_visited_if_long_ratio;
 	bool include_visited_only_higher;
+	bool use_pruning;
+	float pruning_factor;
+	size_t edge_count_search_factor;
 	const size_t num_cuts;
 	ehnsw_engine_4(ehnsw_engine_4_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
@@ -65,6 +75,8 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 				cut_off_visited_if_long(conf.cut_off_visited_if_long),
 				cut_off_visited_if_long_ratio(conf.cut_off_visited_if_long_ratio),
 				include_visited_only_higher(conf.include_visited_only_higher),
+				use_pruning(conf.use_pruning), pruning_factor(conf.pruning_factor),
+				edge_count_search_factor(conf.edge_count_search_factor),
 				num_cuts(conf.edge_count_mult - 1) {}
 	std::vector<vec<T>> all_entries;
 	// TODO make these vectors, not hash maps
@@ -105,6 +117,9 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 		add_param(pl, cut_off_visited_if_long);
 		add_param(pl, cut_off_visited_if_long_ratio);
 		add_param(pl, include_visited_only_higher);
+		add_param(pl, use_pruning);
+		add_param(pl, pruning_factor);
+		add_param(pl, edge_count_search_factor);
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
@@ -150,6 +165,14 @@ bool ehnsw_engine_4<T>::add_edge_directional(size_t i, size_t j, T d,
 				// bin, so swap
 				std::swap(j, adj[i][edge_index]);
 				std::swap(d, other_d);
+			} else if (d < other_d && // TODO consider not using the first condition
+								 use_pruning &&
+								 pruning_factor *
+												 dist(all_entries[adj[i][edge_index]], all_entries[j]) >
+										 d) {
+				// the edge (i,adj[i][edge_index]) is sufficiently short so that d is
+				// blocked
+				return true;
 			}
 		}
 		// iterate through all unused bins, use one of them if it is compatible
@@ -208,7 +231,8 @@ template <typename T> void ehnsw_engine_4<T>::_build() {
 	auto improve_vertex_edges = [&](size_t v) {
 		// get current approx kNN
 		std::vector<std::vector<std::pair<T, size_t>>> kNNs =
-				_query_k_internal_wrapper(all_entries[v], edge_count_mult,
+				_query_k_internal_wrapper(all_entries[v],
+																	edge_count_mult * edge_count_search_factor,
 																	include_visited_during_build, highest_value);
 		// add all the found neighbours as edges (if they are good)
 		for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
