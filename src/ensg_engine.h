@@ -148,8 +148,6 @@ template <typename T> void ensg_engine<T>::_build() {
 	};
 	starting_vertex = 0;
 	vertex_heights[0] = num_cuts - 1; // make sure vertex 0 is on top level
-	// TODO the logic here is broken: vertex_heights being overwritten for vertex
-	// 0
 
 	std::queue<std::pair<size_t, size_t>> improve_queue;
 
