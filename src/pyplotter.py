@@ -91,7 +91,7 @@ class AnnoteFinder(object):
 #f = open('./data/sift1m_full/data/all.json')
 #f = open('./data/sift1m_full_k10/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n90000_dim16_m600_k10/data/all.json')
-f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/all.json')
+f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/latest.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim64_m400_k10/data/latest.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/some-combined-stuff.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/hnsw2_vs_ehnsw2_vs_filterehnsw.json')
@@ -101,7 +101,7 @@ datavec = json.load(f)
 
 # TODO come up with a better name for this
 enable_sprinkles = False
-sprinkle_param = 'edge_count_mult'
+sprinkle_param = 'include_visited_only_higher'
 
 engines = set()
 for benchdata in datavec:
@@ -132,6 +132,8 @@ for eng, col in zip(sorted(engines), cols):
     s = []
     #annotations[eng] = []
     for benchdata in datavec:
+        #if ('run_improves' not in benchdata['param_list']) or (benchdata['param_list']['run_improves'] != '0'):
+        #    continue
         #bd_name = benchdata['engine_name'] + "=" + benchdata['param_list']['max_depth']
         #if eng == benchdata['engine_name']:
         bd_name = benchdata['engine_name']

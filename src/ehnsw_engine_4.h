@@ -24,11 +24,11 @@ struct ehnsw_engine_4_config {
 	ehnsw_engine_4_config(size_t _edge_count_mult, size_t _num_for_1nn,
 												size_t _max_depth = 100,
 												float _re_improve_wait_ratio = 1.0f,
-												bool _include_visited_during_build = false,
+												bool _include_visited_during_build = true,
 												bool _run_improves = true,
-												bool _cut_off_visited_if_long = true,
-												size_t _cut_off_visited_if_long_ratio = 2,
-												bool _include_visited_only_higher = false)
+												bool _cut_off_visited_if_long = false,
+												size_t _cut_off_visited_if_long_ratio = 4,
+												bool _include_visited_only_higher = true)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				max_depth(_max_depth), re_improve_wait_ratio(_re_improve_wait_ratio),
 				include_visited_during_build(_include_visited_during_build),
