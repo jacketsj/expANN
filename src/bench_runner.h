@@ -303,12 +303,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							100, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
 				}
 				if (true) {
-					for (size_t cut_off_visited_if_long_ratio = 1;
-							 cut_off_visited_if_long_ratio <= 8;
-							 cut_off_visited_if_long_ratio++)
-						ehnsw_engine_4_jobs.emplace_back(ehnsw_engine_4_config(
-								k, num_for_1nn, 100, 1.0f, true, true, false,
-								cut_off_visited_if_long_ratio, true));
+					ehnsw_engine_4_jobs.emplace_back(ehnsw_engine_4_config(
+							k, num_for_1nn, 100, 1.0f, true, true, false, 4, true));
 				}
 				if (false) {
 					// for (bool include_visited_during_build : {false}) {
