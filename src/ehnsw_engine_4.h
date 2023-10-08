@@ -182,7 +182,8 @@ template <typename T> void ehnsw_engine_4<T>::_build() {
 				_query_k_internal_wrapper(all_entries[v], edge_count_mult,
 																	include_visited_during_build, highest_value);
 		// add all the found neighbours as edges (if they are good)
-		for (size_t layer = 0; layer < kNNs.size(); ++layer) {
+		for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
+				 ++layer) {
 			sort(kNNs[layer].begin(), kNNs[layer].end());
 			for (auto [d, u] : kNNs[layer]) {
 				add_edge(v, u, d, layer);
@@ -193,7 +194,7 @@ template <typename T> void ehnsw_engine_4<T>::_build() {
 	};
 
 	for (size_t i = 0; i < all_entries.size(); ++i) {
-		if (i % 1 == 0)
+		if (i % 5000 == 0)
 			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
 								<< "%" << std::endl;
 
