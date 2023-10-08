@@ -1,0 +1,13 @@
+Set perf_event_paranoid to 0:
+sudo sysctl kernel.perf_event_paranoid=0
+
+Run perf record (via macros.vim) with <leader>u
+Run hotspot to get a gui
+:term hotspot
+
+
+Alternatively:
+<leader>i for callgrind+kcachegrind (https://anti-hirnsieb.blogspot.com/2011/06/howto-profile-c-app.html)
+Maybe use this too: https://stackoverflow.com/questions/32905212/how-to-use-kcachegrind-and-callgrind-to-measure-only-parts-of-my-code
+with <leader>I
+Note that valgrind doesn't support some instructions that libeigen uses. Need to edit CMakeLists to use certain architectures.
