@@ -18,15 +18,21 @@ struct ehnsw_engine_4_config {
 	float re_improve_wait_ratio;
 	bool include_visited_during_build;
 	bool run_improves;
+	bool cut_off_visited_if_long;
+	size_t cut_off_visited_if_long_ratio;
 	ehnsw_engine_4_config(size_t _edge_count_mult, size_t _num_for_1nn,
 												size_t _max_depth = 100,
 												float _re_improve_wait_ratio = 1.0f,
 												bool _include_visited_during_build = false,
-												bool _run_improves = true)
+												bool _run_improves = true,
+												bool _cut_off_visited_if_long = false,
+												size_t _cut_off_visited_if_long_ratio = 1)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				max_depth(_max_depth), re_improve_wait_ratio(_re_improve_wait_ratio),
 				include_visited_during_build(_include_visited_during_build),
-				run_improves(_run_improves) {}
+				run_improves(_run_improves),
+				cut_off_visited_if_long(_cut_off_visited_if_long),
+				cut_off_visited_if_long_ratio(_cut_off_visited_if_long_ratio) {}
 };
 
 template <typename T>
@@ -42,6 +48,8 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 	float re_improve_wait_ratio;
 	bool include_visited_during_build;
 	bool run_improves;
+	bool cut_off_visited_if_long;
+	size_t cut_off_visited_if_long_ratio;
 	const size_t num_cuts;
 	ehnsw_engine_4(ehnsw_engine_4_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
@@ -49,7 +57,10 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 				max_depth(conf.max_depth),
 				re_improve_wait_ratio(conf.re_improve_wait_ratio),
 				include_visited_during_build(conf.include_visited_during_build),
-				run_improves(conf.run_improves), num_cuts(conf.edge_count_mult - 1) {}
+				run_improves(conf.run_improves),
+				cut_off_visited_if_long(conf.cut_off_visited_if_long),
+				cut_off_visited_if_long_ratio(conf.cut_off_visited_if_long_ratio),
+				num_cuts(conf.edge_count_mult - 1) {}
 	std::vector<vec<T>> all_entries;
 	// TODO make these vectors, not hash maps
 	struct layer_data {
@@ -71,8 +82,8 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 										const std::vector<size_t>& starting_points,
 										bool include_visited, size_t layer);
 	bool is_valid_edge(size_t i, size_t j, size_t bin);
-	void add_edge(size_t i, size_t j, T d, size_t layer);
-	void add_edge_directional(size_t i, size_t j, T d, size_t layer);
+	bool add_edge(size_t i, size_t j, T d, size_t layer);
+	bool add_edge_directional(size_t i, size_t j, T d, size_t layer);
 	const std::vector<std::vector<std::pair<T, size_t>>>
 	_query_k_internal_wrapper(const vec<T>& v, size_t k, bool include_visited,
 														size_t full_search_top_layer);
@@ -86,6 +97,8 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 		add_param(pl, max_depth);
 		add_param(pl, include_visited_during_build);
 		add_param(pl, run_improves);
+		add_param(pl, cut_off_visited_if_long);
+		add_param(pl, cut_off_visited_if_long_ratio);
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
@@ -108,7 +121,7 @@ bool ehnsw_engine_4<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 }
 
 template <typename T>
-void ehnsw_engine_4<T>::add_edge_directional(size_t i, size_t j, T d,
+bool ehnsw_engine_4<T>::add_edge_directional(size_t i, size_t j, T d,
 																						 size_t layer) {
 	auto& edge_ranks = layers[layer].edge_ranks;
 	auto& adj = layers[layer].adj;
@@ -124,7 +137,7 @@ void ehnsw_engine_4<T>::add_edge_directional(size_t i, size_t j, T d,
 			if (j == adj[i][edge_index]) {
 				// duplicate edge found, discard and return
 				// will only happen if no swaps have occurred so far
-				return;
+				return true;
 			}
 			if (d < other_d && is_valid_edge(i, j, bin)) {
 				// (i,j) is a better edge than (i, adj[i][edge_index]) for the current
@@ -144,13 +157,18 @@ void ehnsw_engine_4<T>::add_edge_directional(size_t i, size_t j, T d,
 				}
 		// sort edge ranks by increasing distance again
 		std::sort(edge_ranks[i].begin(), edge_ranks[i].end());
+		return true;
+	} else {
+		// returns false if d > all outgoing edge lengths from i
+		return false;
 	}
 }
 
 template <typename T>
-void ehnsw_engine_4<T>::add_edge(size_t i, size_t j, T d, size_t layer) {
-	add_edge_directional(i, j, d, layer);
+bool ehnsw_engine_4<T>::add_edge(size_t i, size_t j, T d, size_t layer) {
 	add_edge_directional(j, i, d, layer);
+	// returns false if d > all outgoing edge lengths from i
+	return add_edge_directional(i, j, d, layer);
 }
 
 template <typename T> void ehnsw_engine_4<T>::_build() {
@@ -190,9 +208,16 @@ template <typename T> void ehnsw_engine_4<T>::_build() {
 		for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
 				 ++layer) {
 			sort(kNNs[layer].begin(), kNNs[layer].end());
-			for (auto [d, u] : kNNs[layer]) {
-				add_edge(v, u, d, layer);
+			for (size_t neighbour_index = 0; neighbour_index < kNNs[layer].size();
+					 ++neighbour_index) {
+				auto [d, u] = kNNs[layer][neighbour_index];
+				if (!add_edge(v, u, d, layer) && cut_off_visited_if_long &&
+						neighbour_index > cut_off_visited_if_long_ratio * edge_count_mult)
+					break;
 			}
+			// for (auto [d, u] : kNNs[layer]) {
+			//	add_edge(v, u, d, layer);
+			// }
 		}
 		if (run_improves)
 			improve_queue.emplace(

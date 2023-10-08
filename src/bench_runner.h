@@ -303,13 +303,23 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							100, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
 				}
 				if (true) {
-					for (bool include_visited_during_build : {false}) {
-						// for (bool include_visited_during_build : {false, true}) {
-						for (bool run_improves : {false}) {
-							// for (bool run_improves : {false, true}) {
-							ehnsw_engine_4_jobs.emplace_back(ehnsw_engine_4_config(
-									k, num_for_1nn, 100, 1.0f, include_visited_during_build,
-									run_improves));
+					// for (bool include_visited_during_build : {false}) {
+					for (bool include_visited_during_build : {false, true}) {
+						// for (bool run_improves : {false}) {
+						for (bool run_improves : {false, true}) {
+							size_t cut_off_visited_if_long_ratio = 4;
+							if (include_visited_during_build) {
+								for (bool cut_off_visited_if_long : {false, true}) {
+									ehnsw_engine_4_jobs.emplace_back(ehnsw_engine_4_config(
+											k, num_for_1nn, 100, 1.0f, include_visited_during_build,
+											run_improves, cut_off_visited_if_long,
+											cut_off_visited_if_long_ratio));
+								}
+							} else {
+								ehnsw_engine_4_jobs.emplace_back(ehnsw_engine_4_config(
+										k, num_for_1nn, 100, 1.0f, include_visited_during_build,
+										run_improves, false, cut_off_visited_if_long_ratio));
+							}
 						}
 					}
 				}
