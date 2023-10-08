@@ -61,7 +61,7 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	_query_k_internal_wrapper(const vec<T>& v, size_t k, bool include_visited,
 														size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "ENSG*H/S Engine"; }
+	const std::string _name() { return "ENSG*H/S Engine(fixed)"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, edge_count_mult);
@@ -137,9 +137,10 @@ template <typename T> void ensg_engine<T>::_build() {
 
 	auto add_vertex_base = [&](size_t v) {
 		edge_ranks[v] = std::vector<std::tuple<T, size_t, size_t>>();
-		vertex_heights[v] = std::min(
-				size_t(floor(-log(distribution(gen)) / log(double(edge_count_mult)))),
-				num_cuts - 1);
+		if (v != 0) // TODO come up with a better bugfix solution
+			vertex_heights[v] = std::min(
+					size_t(floor(-log(distribution(gen)) / log(double(edge_count_mult)))),
+					num_cuts - 1);
 
 		for (size_t cut = 0; cut < num_cuts; ++cut)
 			e_labels[v].emplace_back(generate_elabel());
@@ -147,6 +148,8 @@ template <typename T> void ensg_engine<T>::_build() {
 	};
 	starting_vertex = 0;
 	vertex_heights[0] = num_cuts - 1; // make sure vertex 0 is on top level
+	// TODO the logic here is broken: vertex_heights being overwritten for vertex
+	// 0
 
 	std::queue<std::pair<size_t, size_t>> improve_queue;
 
