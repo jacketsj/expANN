@@ -89,9 +89,9 @@ class AnnoteFinder(object):
 #f = open('./data/synthetic_uniform_sphere_n50000_dim16_m400_k1/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n30000_dim16_m300_k10/data/all.json')
 #f = open('./data/sift1m_full/data/all.json')
-#f = open('./data/sift1m_full_k10/data/all.json')
+f = open('./data/sift1m_full_k10/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n90000_dim16_m600_k10/data/all.json')
-f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/latest.json')
+#f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim64_m400_k10/data/latest.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/some-combined-stuff.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/hnsw2_vs_ehnsw2_vs_filterehnsw.json')
@@ -106,8 +106,8 @@ sprinkle_param = 'pruning_factor'
 engines = set()
 for benchdata in datavec:
     #engines.add(benchdata['engine_name'] + "=" + benchdata['param_list']['max_depth'])
-    #if benchdata['engine_name'] != "EHNSW Engine 4":
-    #    continue
+    if benchdata['engine_name'] != "EHNSW Engine 4":
+        continue
     if enable_sprinkles:
         sprinkle = ""
         if sprinkle_param in benchdata['param_list']:

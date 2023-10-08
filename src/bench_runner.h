@@ -281,9 +281,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	}
 	if (true) {
 		// for (size_t k = 80; k <= 120; k += 5) {
-		// for (size_t k = 100; k <= 120; k += 20) {
-		// for (size_t k = 120; k <= 120; k += 20) {
-		for (size_t k = 20; k <= 50; k += 10) {
+		// for (size_t k = 80; k <= 200; k += 40) {
+		for (size_t k = 100; k <= 100; k += 40) {
+			// for (size_t k = 120; k <= 120; k += 20) {
+			// for (size_t k = 20; k <= 50; k += 10) {
+			// for (size_t k = 40; k <= 50; k += 10) {
 			// for (size_t k = 100; k <= 100; k += 20) {
 			//  for (size_t k = 80; k <= 100; k += 20) {
 			//  for (size_t k = 80; k <= 80; k += 20) {
@@ -293,7 +295,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			//  for (size_t num_for_1nn = 2; num_for_1nn <= 16; num_for_1nn *= 2) {
 			//  for (size_t num_for_1nn = 1; num_for_1nn <= 6; num_for_1nn += 1) {
 			//  for (size_t num_for_1nn = 3; num_for_1nn <= 4; num_for_1nn += 1) {
-			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn += 1) {
+			// for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn += 1) {
+			// for (size_t num_for_1nn = 16; num_for_1nn <= 64; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 4; num_for_1nn <= 16; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
 				// for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 4) {
 				if (false) {
 					ensg_engine_jobs.emplace_back(
@@ -306,7 +311,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				if (true) {
 					// for (size_t edge_count_search_factor = 1;
 					//		 edge_count_search_factor <= 4; ++edge_count_search_factor)
-					for (size_t edge_count_search_factor : {4})
+					// for (size_t edge_count_search_factor : {1, 4, 8})
+					for (size_t edge_count_search_factor : {1})
 						ehnsw_engine_4_jobs.emplace_back(ehnsw_engine_4_config(
 								k, num_for_1nn, 100, 1.0f, false, false, false, 1, false, false,
 								1.0f, edge_count_search_factor));
