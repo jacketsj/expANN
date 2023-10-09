@@ -106,8 +106,8 @@ sprinkle_param = 'pruning_factor'
 engines = set()
 for benchdata in datavec:
     #engines.add(benchdata['engine_name'] + "=" + benchdata['param_list']['max_depth'])
-    if benchdata['engine_name'] != "EHNSW Engine 4":
-        continue
+    #if benchdata['engine_name'] != "EHNSW Engine 4":
+    #    continue
     if enable_sprinkles:
         sprinkle = ""
         if sprinkle_param in benchdata['param_list']:
