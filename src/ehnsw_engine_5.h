@@ -11,18 +11,18 @@
 #include "ann_engine.h"
 #include "robin_hood.h"
 
-struct ehnsw_engine_4_config {
+struct ehnsw_engine_5_config {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
-	ehnsw_engine_4_config(size_t _edge_count_mult, size_t _num_for_1nn,
+	ehnsw_engine_5_config(size_t _edge_count_mult, size_t _num_for_1nn,
 												size_t _edge_count_search_factor = 1)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				edge_count_search_factor(_edge_count_search_factor) {}
 };
 
 template <typename T>
-struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
+struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	std::random_device rd;
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
@@ -32,7 +32,7 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
 	const size_t num_cuts;
-	ehnsw_engine_4(ehnsw_engine_4_config conf)
+	ehnsw_engine_5(ehnsw_engine_5_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				edge_count_search_factor(conf.edge_count_search_factor),
@@ -84,7 +84,7 @@ struct ehnsw_engine_4 : public ann_engine<T, ehnsw_engine_4<T>> {
 	bool generate_elabel() { return int_distribution(gen); }
 };
 
-template <typename T> void ehnsw_engine_4<T>::_store_vector(const vec<T>& v) {
+template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 	size_t data_index = all_entries.size();
 	all_entries.push_back(v);
 
@@ -107,7 +107,7 @@ template <typename T> void ehnsw_engine_4<T>::_store_vector(const vec<T>& v) {
 
 // TODO try e_labels specific to each layer and see if it helps
 template <typename T>
-bool ehnsw_engine_4<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
+bool ehnsw_engine_5<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 	// the last bin permits any edge (no cut)
 	if (bin == num_cuts)
 		return true;
@@ -116,9 +116,10 @@ bool ehnsw_engine_4<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 }
 
 template <typename T>
-void ehnsw_engine_4<T>::add_edge_directional(size_t i, size_t j, T d,
+void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 																						 size_t layer) {
 	auto& edge_ranks = layers[layer].edge_ranks;
+	auto& to_data_index = layers[layer].to_data_index;
 	auto& adj = layers[layer].adj;
 	// keep track of all bins that have been used already
 	std::set<size_t> used_bins;
@@ -157,12 +158,12 @@ void ehnsw_engine_4<T>::add_edge_directional(size_t i, size_t j, T d,
 }
 
 template <typename T>
-void ehnsw_engine_4<T>::add_edge(size_t i, size_t j, T d, size_t layer) {
+void ehnsw_engine_5<T>::add_edge(size_t i, size_t j, T d, size_t layer) {
 	add_edge_directional(i, j, d, layer);
 	add_edge_directional(j, i, d, layer);
 }
 
-template <typename T> void ehnsw_engine_4<T>::_build() {
+template <typename T> void ehnsw_engine_5<T>::_build() {
 	assert(all_entries.size() > 0);
 	size_t op_count = 0;
 
@@ -193,7 +194,7 @@ template <typename T> void ehnsw_engine_4<T>::_build() {
 }
 template <typename T>
 const std::vector<std::pair<T, size_t>>
-ehnsw_engine_4<T>::_query_k_internal(const vec<T>& v, size_t k,
+ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 																		 const std::vector<size_t>& starting_points,
 																		 size_t layer) {
 	auto& adj = layers[layer].adj;
@@ -239,7 +240,7 @@ ehnsw_engine_4<T>::_query_k_internal(const vec<T>& v, size_t k,
 
 template <typename T>
 const std::vector<std::vector<std::pair<T, size_t>>>
-ehnsw_engine_4<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
+ehnsw_engine_5<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
 																						 size_t full_search_top_layer) {
 	auto current = starting_vertex;
 	std::vector<std::vector<std::pair<T, size_t>>> ret;
@@ -250,14 +251,14 @@ ehnsw_engine_4<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
 			layer_k = 1;
 		ret.emplace_back(_query_k_internal(
 				v, layer_k, {layers[layer].to_vertex[current]}, layer));
-		current = layers[layer].to_data_index(ret.back().front().second);
+		current = layers[layer].to_data_index[ret.back().front().second];
 	}
 	reverse(ret.begin(), ret.end());
 	return ret;
 }
 
 template <typename T>
-std::vector<size_t> ehnsw_engine_4<T>::_query_k(const vec<T>& v, size_t k) {
+std::vector<size_t> ehnsw_engine_5<T>::_query_k(const vec<T>& v, size_t k) {
 	auto ret_combined = _query_k_internal_wrapper(v, k * num_for_1nn, 0)[0];
 	ret_combined.resize(std::min(k, ret_combined.size()));
 	auto ret = std::vector<size_t>(ret_combined.size());

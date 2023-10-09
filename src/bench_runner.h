@@ -18,6 +18,7 @@
 #include "ehnsw_engine_2.h"
 #include "ehnsw_engine_3.h"
 #include "ehnsw_engine_4.h"
+#include "ehnsw_engine_5.h"
 #include "ensg_engine.h"
 #include "filter_ehnsw_engine.h"
 #include "hier_arrangement_engine.h"
@@ -142,6 +143,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			ehnsw_engine_3_jobs;
 	std::vector<job<ehnsw_engine_4<float>, ehnsw_engine_4_config>>
 			ehnsw_engine_4_jobs;
+	std::vector<job<ehnsw_engine_5<float>, ehnsw_engine_5_config>>
+			ehnsw_engine_5_jobs;
 	std::vector<job<ensg_engine<float>, ensg_engine_config>> ensg_engine_jobs;
 	std::vector<job<jamana_ehnsw_engine<float>, jamana_ehnsw_engine_config>>
 			jamana_ehnsw_engine_jobs;
@@ -309,6 +312,12 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							100, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
 				}
 				if (true) {
+					for (size_t edge_count_search_factor : {1}) {
+						ehnsw_engine_5_jobs.emplace_back(ehnsw_engine_5_config(
+								k, num_for_1nn, edge_count_search_factor));
+					}
+				}
+				if (false) {
 					// for (size_t edge_count_search_factor = 1;
 					//		 edge_count_search_factor <= 4; ++edge_count_search_factor)
 					// for (size_t edge_count_search_factor : {1, 4, 8})
@@ -666,10 +675,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			ds.name, num_threads, basic_benchmarker, hnsw_engine_jobs,
 			hnsw_engine_2_jobs, arrangement_engine_jobs, ehnsw_engine_jobs,
 			ehnsw_engine_2_jobs, ehnsw_engine_3_jobs, ehnsw_engine_4_jobs,
-			ensg_engine_jobs, jamana_ehnsw_engine_jobs, filter_ehnsw_engine_jobs,
-			clustered_ehnsw_engine_jobs, hier_arrangement_engine_jobs,
-			hnsw_engine_hybrid_jobs, tree_arrangement_engine_jobs,
-			tree_arrangement_engine_if_jobs, isect_clustering_engine_jobs,
-			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
-			disk_ehnsw_engine_jobs, hyper_hnsw_engine_jobs);
+			ehnsw_engine_5_jobs, ensg_engine_jobs, jamana_ehnsw_engine_jobs,
+			filter_ehnsw_engine_jobs, clustered_ehnsw_engine_jobs,
+			hier_arrangement_engine_jobs, hnsw_engine_hybrid_jobs,
+			tree_arrangement_engine_jobs, tree_arrangement_engine_if_jobs,
+			isect_clustering_engine_jobs, projection_hnsw_engine_2_jobs,
+			projection_ehnsw_engine_2_jobs, disk_ehnsw_engine_jobs,
+			hyper_hnsw_engine_jobs);
 }
