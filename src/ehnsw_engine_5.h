@@ -38,13 +38,12 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 				edge_count_search_factor(conf.edge_count_search_factor),
 				num_cuts(conf.edge_count_mult - 1) {}
 	std::vector<vec<T>> all_entries;
-	// TODO make these vectors, not hash maps
 	struct layer_data {
 		std::vector<std::vector<size_t>>
 				adj; // vertex -> cut -> outgoing_edge data_index
 		std::vector<std::vector<std::tuple<T, size_t, size_t>>>
 				edge_ranks; // vertex -> closest connected [distance, bin, edge_index]
-		// std::vector<vec<T>> vals;					 // vertex -> data
+		std::vector<vec<T>> vals;					 // vertex -> data
 		std::vector<size_t> to_data_index; // vertex -> data_index
 		robin_hood::unordered_flat_map<size_t, size_t>
 				to_vertex; // data_index -> vertex
@@ -53,11 +52,10 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 			to_data_index.emplace_back(data_index);
 			adj.emplace_back();
 			edge_ranks.emplace_back();
-			// vals.emplace_back(data);
+			vals.emplace_back(data);
 		}
 	};
 	std::vector<layer_data> layers;
-	// TODO initialize vertex_heights and e_labels when adding a piece of data
 	std::vector<size_t> vertex_heights; // data_index -> max_height
 	std::vector<std::vector<bool>>
 			e_labels; // data_index -> cut labels (*num_cuts=edge_count_mult-1)
@@ -75,7 +73,9 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	_query_k_internal_wrapper(const vec<T>& v, size_t k,
 														size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine 5(double bottom)"; }
+	const std::string _name() {
+		return "EHNSW Engine 5(double bottom, double train)";
+	}
 
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -194,7 +194,18 @@ template <typename T> void ehnsw_engine_5<T>::_build() {
 
 	for (size_t i = 0; i < all_entries.size(); ++i) {
 		if (i % 5000 == 0)
-			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
+			std::cerr << "Built " << double(i) / double(all_entries.size() * 2) * 100
+								<< "%" << std::endl;
+
+		++op_count;
+		improve_vertex_edges(i);
+	}
+
+	for (size_t i = 0; i < all_entries.size(); ++i) {
+		if (i % 5000 == 0)
+			std::cerr << "Built "
+								<< double(i + all_entries.size()) /
+											 double(all_entries.size() * 2) * 100
 								<< "%" << std::endl;
 
 		++op_count;
@@ -207,8 +218,8 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 																		 const std::vector<size_t>& starting_points,
 																		 size_t layer) {
 	auto& adj = layers[layer].adj;
-	// auto& vals = layers[layer].vals;
-	auto& to_data_index = layers[layer].to_data_index;
+	auto& vals = layers[layer].vals;
+	// auto& to_data_index = layers[layer].to_data_index;
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::priority_queue<std::pair<T, size_t>> to_visit;
 	robin_hood::unordered_flat_map<size_t, T> visited;
@@ -225,9 +236,8 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 		return is_good;
 	};
 	for (const auto& sp : starting_points)
-		// visit(dist(v, vals[sp]), sp);
-		// visit(dist(v, all_entries[to_data_index[sp]]), sp);
-		visit(dist2fast(v, all_entries[to_data_index[sp]]), sp);
+		visit(dist2fast(v, vals[sp]), sp);
+	// visit(dist2fast(v, all_entries[to_data_index[sp]]), sp);
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -236,9 +246,13 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
+		_mm_prefetch(&adj[cur], _MM_HINT_T0);
 		for (const auto& u : adj[cur]) {
-			// T d_next = dist(v, vals[u]);
-			T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+			_mm_prefetch(&vals[u], _MM_HINT_T0);
+		}
+		for (const auto& u : adj[cur]) {
+			T d_next = dist2fast(v, vals[u]);
+			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			visit(d_next, u);
 		}
 	}
@@ -275,16 +289,16 @@ size_t ehnsw_engine_5<T>::_query_1_internal(const vec<T>& v,
 																						size_t starting_point,
 																						size_t layer) {
 	auto& adj = layers[layer].adj;
-	// auto& vals = layers[layer].vals;
-	auto& to_data_index = layers[layer].to_data_index;
+	auto& vals = layers[layer].vals;
+	// auto& to_data_index = layers[layer].to_data_index;
 	size_t best = starting_point;
 	T d = dist2fast(v, all_entries[starting_point]);
 	bool changed = true;
 	while (changed) {
 		changed = false;
 		for (const auto& u : adj[best]) {
-			// T d_next = dist(v, vals[u]);
-			T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+			T d_next = dist2fast(v, vals[u]);
+			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			if (d_next < d) {
 				changed = true;
 				d = d_next;
