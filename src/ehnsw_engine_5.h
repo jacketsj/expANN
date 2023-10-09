@@ -44,7 +44,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 				adj; // vertex -> cut -> outgoing_edge data_index
 		std::vector<std::vector<std::tuple<T, size_t, size_t>>>
 				edge_ranks; // vertex -> closest connected [distance, bin, edge_index]
-		std::vector<vec<T>> vals;					 // vertex -> data
+		// std::vector<vec<T>> vals;					 // vertex -> data
 		std::vector<size_t> to_data_index; // vertex -> data_index
 		robin_hood::unordered_flat_map<size_t, size_t>
 				to_vertex; // data_index -> vertex
@@ -53,7 +53,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 			to_data_index.emplace_back(data_index);
 			adj.emplace_back();
 			edge_ranks.emplace_back();
-			vals.emplace_back(data);
+			// vals.emplace_back(data);
 		}
 	};
 	std::vector<layer_data> layers;
@@ -74,6 +74,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 														size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "EHNSW Engine 5"; }
+
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, edge_count_mult);
@@ -110,7 +111,7 @@ template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 // TODO try e_labels specific to each layer and see if it helps
 template <typename T>
 bool ehnsw_engine_5<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
-	// the last bin permits any edge (no cut)
+	//  the last bin permits any edge (no cut)
 	if (bin == num_cuts)
 		return true;
 	//  an edge is permitted in a bin if it crosses the cut for that bin
@@ -201,7 +202,8 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 																		 const std::vector<size_t>& starting_points,
 																		 size_t layer) {
 	auto& adj = layers[layer].adj;
-	auto& vals = layers[layer].vals;
+	// auto& vals = layers[layer].vals;
+	auto& to_data_index = layers[layer].to_data_index;
 	std::priority_queue<std::pair<T, size_t>> top_k;
 	std::priority_queue<std::pair<T, size_t>> to_visit;
 	robin_hood::unordered_flat_map<size_t, T> visited;
@@ -218,7 +220,8 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 		return is_good;
 	};
 	for (const auto& sp : starting_points)
-		visit(dist2(v, vals[sp]), sp);
+		// visit(dist(v, vals[sp]), sp);
+		visit(dist(v, all_entries[to_data_index[sp]]), sp);
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -228,7 +231,8 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 			break;
 		to_visit.pop();
 		for (const auto& u : adj[cur]) {
-			T d_next = dist2(v, vals[u]);
+			// T d_next = dist(v, vals[u]);
+			T d_next = dist(v, all_entries[to_data_index[u]]);
 			visit(d_next, u);
 		}
 	}
