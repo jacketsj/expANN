@@ -14,6 +14,8 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
+#include <valgrind/callgrind.h>
+
 template <typename T, typename test_dataset_t> struct basic_bench {
 	const test_dataset_t& ds;
 	basic_bench(const test_dataset_t& _ds) : ds(_ds) {}
@@ -71,6 +73,9 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 		// if (stoken.stop_requested())
 		//	return ret;
 
+		CALLGRIND_START_INSTRUMENTATION;
+		CALLGRIND_TOGGLE_COLLECT;
+
 		// run the queries
 		double avg_dist = 0, avg_dist2 = 0;
 		size_t num_best_found = 0;
@@ -119,6 +124,9 @@ template <typename T, typename test_dataset_t> struct basic_bench {
 			//	return ret;
 		}
 		auto time_end = std::chrono::high_resolution_clock::now();
+
+		CALLGRIND_TOGGLE_COLLECT;
+		CALLGRIND_STOP_INSTRUMENTATION;
 
 		ret.time_per_query_ns =
 				double(std::chrono::duration_cast<std::chrono::nanoseconds>(time_end -

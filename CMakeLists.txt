@@ -25,13 +25,14 @@ include_directories("${SRC}")
 option(ENABLE_STACK_INFO "Enable stack info" OFF)
 option(ENABLE_GCOV "Enable gcov" OFF)
 
-set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ggdb3 ${OpenMP_CXX_FLAGS}") # Normal
+set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 ${OpenMP_CXX_FLAGS}") # Normal
 
 if(ENABLE_STACK_INFO)
     message("Enabling stack info.")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -g")
 else()
     message("Disabling stack info.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native --ggdb3")
 endif()
 
 if(ENABLE_GCOV)
