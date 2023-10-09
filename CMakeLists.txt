@@ -16,9 +16,31 @@ include_directories("${SRC}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Og -mavx -ggdb3 ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -mavx -g ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -ggdb3 ${OpenMP_CXX_FLAGS}") # For profiling
-set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ggdb3 ${OpenMP_CXX_FLAGS}") # The real one
+#set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ggdb3 ${OpenMP_CXX_FLAGS}") # The real one
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -fno-omit-frame-pointer -g ${OpenMP_CXX_FLAGS}") # For running perf
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Og -mavx -fprofile-arcs -ftest-coverage -ggdb3 ${OpenMP_CXX_FLAGS}") # For running line coverage
+
+
+# Different build options for profiling of various kinds
+option(ENABLE_STACK_INFO "Enable stack info" OFF)
+option(ENABLE_GCOV "Enable gcov" OFF)
+
+set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ggdb3 ${OpenMP_CXX_FLAGS}") # Normal
+
+if(ENABLE_STACK_INFO)
+    message("Enabling stack info.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -g")
+else()
+    message("Disabling stack info.")
+endif()
+
+if(ENABLE_GCOV)
+    message("Enabling gcov.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
+else()
+    message("Disabling gcov.")
+endif()
+
 
 include(./cmake/CPM.cmake)  # Package manager for simple requirements.
 
