@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "distance.h"
+
 #include <Eigen/Dense>
 
 #include "small_vector.hpp"
@@ -124,6 +126,13 @@ public:
 	friend T dist2(const vec<T>& a, const vec<T>& b) {
 		// return (a.internal - b.internal).squaredNorm();
 		return (a - b).norm2();
+	}
+	friend T dist2fast(const vec<T>& a, const vec<T>& b) {
+		return distance_compare_avx512f_f16(a.internal.data(), b.internal.data(),
+																				a.size());
+		// return distance_compare_avx512f_f16((unsigned char*)a.internal.data(),
+		//																		(unsigned char*)b.internal.data(),
+		//																		a.size());
 	}
 	friend T dist(const vec<T>& a, const vec<T>& b) {
 		// assert(a.dim() == b.dim());

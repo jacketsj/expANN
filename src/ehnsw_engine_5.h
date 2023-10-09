@@ -221,7 +221,8 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 	};
 	for (const auto& sp : starting_points)
 		// visit(dist(v, vals[sp]), sp);
-		visit(dist(v, all_entries[to_data_index[sp]]), sp);
+		// visit(dist(v, all_entries[to_data_index[sp]]), sp);
+		visit(dist2fast(v, all_entries[to_data_index[sp]]), sp);
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -232,7 +233,7 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 		to_visit.pop();
 		for (const auto& u : adj[cur]) {
 			// T d_next = dist(v, vals[u]);
-			T d_next = dist(v, all_entries[to_data_index[u]]);
+			T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			visit(d_next, u);
 		}
 	}
