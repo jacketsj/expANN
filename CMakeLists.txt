@@ -28,7 +28,7 @@ option(ENABLE_GCOV "Enable gcov" OFF)
 set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 ${OpenMP_CXX_FLAGS}") # Normal
 
 if(ENABLE_STACK_INFO)
-    message("Enabling stack info.")
+    message("Enabling stack info (-march=native omitted).")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -g")
 else()
     message("Disabling stack info.")
