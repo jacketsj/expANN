@@ -66,6 +66,8 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	const std::vector<std::pair<T, size_t>>
 	_query_k_internal(const vec<T>& v, size_t k,
 										const std::vector<size_t>& starting_points, size_t layer);
+	size_t _query_1_internal(const vec<T>& v, size_t starting_point,
+													 size_t layer);
 	bool is_valid_edge(size_t i, size_t j, size_t bin);
 	void add_edge(size_t i, size_t j, T d, size_t layer);
 	void add_edge_directional(size_t i, size_t j, T d, size_t layer);
@@ -73,7 +75,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	_query_k_internal_wrapper(const vec<T>& v, size_t k,
 														size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine 5"; }
+	const std::string _name() { return "EHNSW Engine 5(double bottom)"; }
 
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -121,6 +123,9 @@ bool ehnsw_engine_5<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 template <typename T>
 void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 																						 size_t layer) {
+	size_t max_node_size = edge_count_mult;
+	if (layer == 0)
+		max_node_size *= 2;
 	auto& edge_ranks = layers[layer].edge_ranks;
 	auto& to_data_index = layers[layer].to_data_index;
 	auto& adj = layers[layer].adj;
@@ -129,7 +134,7 @@ void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 	// iterate through all the edges, smallest to biggest, while maintaining a
 	// current edge. Greedily improve the currently visited bin each time.
 	// don't bother if nothing will get modified
-	if (edge_ranks[i].size() < edge_count_mult ||
+	if (edge_ranks[i].size() < max_node_size ||
 			d < std::get<0>(edge_ranks[i].back())) {
 		for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
 			used_bins.insert(bin);
@@ -147,7 +152,7 @@ void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 			}
 		}
 		// iterate through all unused bins, use one of them if it is compatible
-		if (used_bins.size() < edge_count_mult)
+		if (used_bins.size() < max_node_size)
 			for (size_t bin = 0; bin < num_cuts + 1; ++bin)
 				if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
 					size_t edge_index = adj[i].size();
@@ -266,8 +271,43 @@ ehnsw_engine_5<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
 }
 
 template <typename T>
+size_t ehnsw_engine_5<T>::_query_1_internal(const vec<T>& v,
+																						size_t starting_point,
+																						size_t layer) {
+	auto& adj = layers[layer].adj;
+	// auto& vals = layers[layer].vals;
+	auto& to_data_index = layers[layer].to_data_index;
+	size_t best = starting_point;
+	T d = dist2fast(v, all_entries[starting_point]);
+	bool changed = true;
+	while (changed) {
+		changed = false;
+		for (const auto& u : adj[best]) {
+			// T d_next = dist(v, vals[u]);
+			T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+			if (d_next < d) {
+				changed = true;
+				d = d_next;
+				best = u;
+			}
+		}
+	}
+	return best;
+}
+
+template <typename T>
 std::vector<size_t> ehnsw_engine_5<T>::_query_k(const vec<T>& v, size_t k) {
+	auto current = starting_vertex;
+	for (int layer = layers.size() - 1; layer > 0; --layer) {
+		current = layers[layer].to_data_index[_query_1_internal(
+				v, layers[layer].to_vertex[current], layer)];
+	}
+	auto ret_combined =
+			_query_k_internal(v, k * num_for_1nn, {layers[0].to_vertex[current]}, 0);
+
+	/*
 	auto ret_combined = _query_k_internal_wrapper(v, k * num_for_1nn, 0)[0];
+	*/
 	ret_combined.resize(std::min(k, ret_combined.size()));
 	auto ret = std::vector<size_t>(ret_combined.size());
 	for (size_t i = 0; i < ret.size(); ++i)

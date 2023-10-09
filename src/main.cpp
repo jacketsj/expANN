@@ -12,7 +12,7 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
-#define NUM_THREADS 1
+#define NUM_THREADS 2
 
 int main() {
 	dataset_loader<float> dsl;
