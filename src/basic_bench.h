@@ -14,8 +14,6 @@
 #include "randomgeometry.h"
 #include "vec.h"
 
-const double TOLERANCE = 1e-7;
-
 template <typename T, typename test_dataset_t> struct basic_bench {
 	const test_dataset_t& ds;
 	basic_bench(const test_dataset_t& _ds) : ds(_ds) {}
