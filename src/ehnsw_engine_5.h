@@ -88,9 +88,11 @@ template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 	size_t data_index = all_entries.size();
 	all_entries.push_back(v);
 
-	vertex_heights.emplace_back(std::min(
-			size_t(floor(-log(distribution(gen)) / log(double(edge_count_mult)))),
-			num_cuts - 1));
+	vertex_heights.emplace_back(
+			data_index == 0 ? num_cuts - 1
+											: std::min(size_t(floor(-log(distribution(gen)) /
+																							log(double(edge_count_mult)))),
+																 num_cuts - 1));
 
 	for (size_t layer = 0; layer <= vertex_heights[data_index]; ++layer) {
 		if (layers.size() <= layer) {
@@ -177,8 +179,9 @@ template <typename T> void ehnsw_engine_5<T>::_build() {
 		for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
 				 ++layer) {
 			sort(kNNs[layer].begin(), kNNs[layer].end());
-			for (auto [d, u] : kNNs[layer]) {
-				add_edge(v, u, d, layer);
+			size_t v_in_layer = layers[layer].to_vertex[v];
+			for (auto [d, u_in_layer] : kNNs[layer]) {
+				add_edge(v_in_layer, u_in_layer, d, layer);
 			}
 		}
 	};
