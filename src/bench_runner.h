@@ -317,7 +317,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								k, num_for_1nn, edge_count_search_factor));
 					}
 				}
-				if (false) {
+				if (true) {
 					// for (size_t edge_count_search_factor = 1;
 					//		 edge_count_search_factor <= 4; ++edge_count_search_factor)
 					// for (size_t edge_count_search_factor : {1, 4, 8})
