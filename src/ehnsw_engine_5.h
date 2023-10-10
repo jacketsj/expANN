@@ -73,9 +73,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	_query_k_internal_wrapper(const vec<T>& v, size_t k,
 														size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() {
-		return "EHNSW Engine 5(double bottom, double train)";
-	}
+	const std::string _name() { return "EHNSW Engine 5('fast')"; }
 
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -123,9 +121,10 @@ bool ehnsw_engine_5<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 template <typename T>
 void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 																						 size_t layer) {
+	// TODO do double-bottom with cuts across entire bottom
 	size_t max_node_size = edge_count_mult;
-	if (layer == 0)
-		max_node_size *= 2;
+	// if (layer == 0)
+	//	max_node_size *= 2;
 	auto& edge_ranks = layers[layer].edge_ranks;
 	auto& to_data_index = layers[layer].to_data_index;
 	auto& adj = layers[layer].adj;
@@ -194,13 +193,14 @@ template <typename T> void ehnsw_engine_5<T>::_build() {
 
 	for (size_t i = 0; i < all_entries.size(); ++i) {
 		if (i % 5000 == 0)
-			std::cerr << "Built " << double(i) / double(all_entries.size() * 2) * 100
+			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
 								<< "%" << std::endl;
 
 		++op_count;
 		improve_vertex_edges(i);
 	}
 
+	/*
 	for (size_t i = 0; i < all_entries.size(); ++i) {
 		if (i % 5000 == 0)
 			std::cerr << "Built "
@@ -211,6 +211,7 @@ template <typename T> void ehnsw_engine_5<T>::_build() {
 		++op_count;
 		improve_vertex_edges(i);
 	}
+	*/
 }
 template <typename T>
 const std::vector<std::pair<T, size_t>>

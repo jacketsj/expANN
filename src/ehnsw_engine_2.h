@@ -74,7 +74,7 @@ struct ehnsw_engine_2 : public ann_engine<T, ehnsw_engine_2<T>> {
 	const std::vector<std::vector<size_t>>
 	_query_k_internal(const vec<T>& v, size_t k, size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine 2"; }
+	const std::string _name() { return "EHNSW Engine 2('fast')"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, max_depth);
@@ -226,6 +226,10 @@ ehnsw_engine_2<T>::_query_k_at_layer(const vec<T>& v, size_t k,
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
+		_mm_prefetch(&hadj[layer][cur], _MM_HINT_T0);
+		for (const auto& u : hadj[layer][cur]) {
+			_mm_prefetch(&all_entries[u], _MM_HINT_T0);
+		}
 		for (const auto& u : hadj[layer][cur]) {
 			T d_next = dist(v, all_entries[u]);
 			visit(d_next, u);
