@@ -289,7 +289,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 40; k <= 40; k += 40) {
 		// for (size_t k = 120; k <= 120; k += 20) {
 		// for (size_t k = 200; k <= 200; k += 20) {
-		for (size_t k = 20; k <= 20; k += 20) {
+		// for (size_t k = 20; k <= 20; k += 20) { // used for small opt stuff, want
+		//																				// this to be very good on its own
+		// for (size_t k = 120; k <= 120; k += 20) { // gets decent recall already
+		for (size_t k = 100; k <= 140; k += 20) { // gets decent recall already
 			// for (size_t k = 20; k <= 50; k += 10) {
 			// for (size_t k = 40; k <= 50; k += 10) {
 			// for (size_t k = 100; k <= 100; k += 20) {
@@ -312,12 +315,13 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					ensg_engine_jobs.emplace_back(
 							ensg_engine_config(k, num_for_1nn, 1.0f));
 				}
-				if (false) {
+				if (true) {
 					ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 							100, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
 				}
-				if (true) {
-					for (size_t edge_count_search_factor : {2, 4}) {
+				if (false) {
+					// for (size_t edge_count_search_factor : {2, 4}) {
+					for (size_t edge_count_search_factor : {4}) {
 						ehnsw_engine_5_jobs.emplace_back(ehnsw_engine_5_config(
 								k, num_for_1nn, edge_count_search_factor));
 					}
