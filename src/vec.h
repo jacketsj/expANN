@@ -31,7 +31,7 @@ template <typename T> class vec {
 	// gch::small_vector<T> internal;
 
 	// Eigen::VectorXf internal;
-	using Underlying = ChooseUnderlying<T>::Underlying;
+	using Underlying = typename ChooseUnderlying<T>::Underlying;
 	Underlying internal;
 
 public:
