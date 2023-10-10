@@ -237,6 +237,7 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 		return is_good;
 	};
 	for (const auto& sp : starting_points)
+		// visit(dist2(v, vals[sp]), sp);
 		visit(dist2fast(v, vals[sp]), sp);
 	// visit(dist2fast(v, all_entries[to_data_index[sp]]), sp);
 	while (!to_visit.empty()) {
@@ -253,10 +254,66 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 		}
 		for (const auto& u : adj[cur]) {
 			T d_next = dist2fast(v, vals[u]);
+			// T d_next = dist2(v, vals[u]);
 			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			visit(d_next, u);
 		}
 	}
+	/*
+	std::vector<std::pair<T, size_t>> neighbour_buffer;
+	neighbour_buffer.reserve(edge_count_mult);
+	auto visit_neighbours = [&]() {
+		sort(neighbour_buffer.begin(), neighbour_buffer.end(),
+			[](const auto& [d1, _], const auto& [d2, _]) {
+		return d1 < d2;});
+		// TODO binary search for which vectors will be added
+		size_t num_to_add = std::lower_bound(neighbour_buffer.begin()
+		for (auto& [d, u] : neighbour_buffer) {
+			if (!visited.contains(u) && top_k.top().first > d)
+				top_k.emplace(d, u);		 // top_k is a max heap
+				to_visit.emplace(-d, u); // to_visit is a min heap
+			visited[u] = d;
+		}
+
+		bool is_good =
+				!visited.contains(u) && top_k.top().first > d;
+		visited[u] = d;
+		if (is_good) {
+			top_k.emplace(d, u);		 // top_k is a max heap
+			to_visit.emplace(-d, u); // to_visit is a min heap
+		}
+		if (top_k.size() > k)
+			top_k.pop();
+		return is_good;
+	};
+	for (const auto& sp : starting_points)
+		neighbour_buffer.emplace_back(dist2fast(v, vals[sp]), sp);
+	visit_neighbours();
+	while (!to_visit.empty()) {
+		T nd;
+		size_t cur;
+		std::tie(nd, cur) = to_visit.top();
+		if (top_k.size() == k && -nd > top_k.top().first)
+			// everything neighbouring current best set is already evaluated
+			break;
+		to_visit.pop();
+		_mm_prefetch(&adj[cur], _MM_HINT_T0);
+		for (const auto& u : adj[cur]) {
+			_mm_prefetch(&vals[u], _MM_HINT_T0);
+		}
+		neighbour_buffer.clear();
+		for (size_t neighbour_index = 0; neighbour_index < adj[cur].size();
+				 ++neighbour_index)
+			neighbour_buffer.emplace_back(
+					dist2fast(v, vals[adj[cur][neighbour_index]]));
+		visit_neighbours();
+		// for (const auto& u : adj[cur]) {
+		//	T d_next = dist2fast(v, vals[u]);
+		//	// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+		//	visit(d_next, u);
+		// }
+	}
+	*/
 	std::vector<std::pair<T, size_t>> ret;
 	while (!top_k.empty()) {
 		ret.push_back(top_k.top());
@@ -293,12 +350,14 @@ size_t ehnsw_engine_5<T>::_query_1_internal(const vec<T>& v,
 	auto& vals = layers[layer].vals;
 	// auto& to_data_index = layers[layer].to_data_index;
 	size_t best = starting_point;
-	T d = dist2fast(v, all_entries[starting_point]);
+	// T d = dist2fast(v, all_entries[starting_point]);
+	T d = dist2(v, all_entries[starting_point]);
 	bool changed = true;
 	while (changed) {
 		changed = false;
 		for (const auto& u : adj[best]) {
-			T d_next = dist2fast(v, vals[u]);
+			// T d_next = dist2fast(v, vals[u]);
+			T d_next = dist2(v, vals[u]);
 			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			if (d_next < d) {
 				changed = true;

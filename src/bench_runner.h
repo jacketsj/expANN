@@ -294,7 +294,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 120; k <= 120; k += 20) { // gets decent recall already
 		// for (size_t k = 100; k <= 140; k += 20) { // gets very good recall and
 		// range
-		for (size_t k = 50; k <= 70; k += 10) { // will hopfully get good recall?
+		// for (size_t k = 50; k <= 70; k += 10) { // will hopfully get good recall?
+		for (size_t k = 60; k <= 60; k += 10) { // will hopfully get good recall?
 			// for (size_t k = 20; k <= 50; k += 10) {
 			// for (size_t k = 40; k <= 50; k += 10) {
 			// for (size_t k = 100; k <= 100; k += 20) {
