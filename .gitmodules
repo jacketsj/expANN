@@ -4,9 +4,3 @@
 [submodule "eigen"]
 	path = eigen
 	url = https://gitlab.com/libeigen/eigen.git
-[submodule "llvm-project-cxxjit"]
-	path = llvm-project-cxxjit
-	url = https://github.com/hfinkel/llvm-project-cxxjit.git
-[submodule "easy-just-in-time"]
-	path = easy-just-in-time
-	url = https://github.com/jmmartinez/easy-just-in-time.git
