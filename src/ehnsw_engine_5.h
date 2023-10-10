@@ -221,9 +221,18 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 	auto& adj = layers[layer].adj;
 	auto& vals = layers[layer].vals;
 	// auto& to_data_index = layers[layer].to_data_index;
-	std::priority_queue<std::pair<T, size_t>> top_k;
-	std::priority_queue<std::pair<T, size_t>> to_visit;
+	static auto compare = [](const std::pair<T, size_t>& a,
+													 const std::pair<T, size_t>& b) {
+		return a.first < b.first;
+	};
+	std::priority_queue<std::pair<T, size_t>, std::vector<std::pair<T, size_t>>,
+											decltype(compare)>
+			top_k(compare);
+	std::priority_queue<std::pair<T, size_t>, std::vector<std::pair<T, size_t>>,
+											decltype(compare)>
+			to_visit(compare);
 	robin_hood::unordered_flat_map<size_t, T> visited;
+
 	auto visit = [&](T d, size_t u) {
 		bool is_good =
 				!visited.contains(u) && (top_k.size() < k || top_k.top().first > d);
