@@ -234,26 +234,23 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 			to_visit(compare);
 	robin_hood::unordered_flat_map<size_t, T> visited;
 
-	size_t counter = 0;
-	auto make_name = [&](size_t vertex) {
+	auto make_name = [&](size_t vertex, T d) {
 		return std::string("v") + std::to_string(vertex);
 	};
 	auto make_declaration = [&](std::string name) {
 		if (starting_yet)
-			std::cout << name << " [label=\"" << std::to_string(counter++)
-								<< "\"];\n";
+			std::cout << name << " [label=\"" << std::to_string(d) << "\"];\n";
 	};
-	auto make_edge_declaration = [&](std::string name1, std::string name2, T d) {
+	auto make_edge_declaration = [&](std::string name1, std::string name2) {
 		if (starting_yet) {
-			std::cout << name1 << " -> " << name2;
-			std::cout << " [label=\"" << std::to_string(d) << "\"];\n";
+			std::cout << name1 << " -> " << name2 << ";\n";
 		}
 	};
 	auto visit = [&](T d, size_t u) {
 		bool is_good =
 				!visited.contains(u) && (top_k.size() < k || top_k.top().first > d);
 		if (!visited.contains(u))
-			make_declaration(make_name(u));
+			make_declaration(make_name(u), d);
 		visited[u] = d;
 		if (is_good) {
 			top_k.emplace(d, u);		 // top_k is a max heap
@@ -281,7 +278,7 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 		}
 		for (const auto& u : adj[cur]) {
 			T d_next = dist2fast(v, vals[u]);
-			make_edge_declaration(make_name(cur), make_name(u), d_next);
+			make_edge_declaration(make_name(cur), make_name(u));
 			// T d_next = dist2(v, vals[u]);
 			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			visit(d_next, u);
