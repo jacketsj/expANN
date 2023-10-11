@@ -295,7 +295,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 100; k <= 140; k += 20) { // gets very good recall and
 		// range
 		// for (size_t k = 50; k <= 70; k += 10) { // will hopfully get good recall?
-		for (size_t k = 60; k <= 60; k += 10) { // will hopfully get good
+		// for (size_t k = 60; k <= 60; k += 10) { // will hopfully get good
+		// for (size_t k = 16; k <= 16; k += 10) { // will hopfully get good
+		// for (size_t k = 32; k <= 32; k += 10) { // will hopfully get good
+		// for (size_t k = 16; k <= 16; k += 10) { // will hopfully get good
+		for (size_t k = 10; k <= 10; k += 10) { // will hopfully get good
 			// recall?
 			//  for (size_t k = 20; k <= 50; k += 10) {
 			//  for (size_t k = 40; k <= 50; k += 10) {
@@ -312,7 +316,13 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			//  for (size_t num_for_1nn = 16; num_for_1nn <= 64; num_for_1nn *= 2) {
 			//  for (size_t num_for_1nn = 4; num_for_1nn <= 16; num_for_1nn *= 2) {
 			//  for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 4; num_for_1nn <= 16; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
+			// for (size_t num_for_1nn = 1; num_for_1nn <= 16; num_for_1nn *= 4) {
+			// for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 4) {
+			for (size_t num_for_1nn = 16; num_for_1nn <= 16; num_for_1nn *= 4) {
 				// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
 				//  for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 4) {
 				if (false) {
@@ -325,6 +335,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				}
 				if (true) {
 					// for (size_t edge_count_search_factor : {2, 4}) {
+					// for (size_t edge_count_search_factor : {4}) {
 					// for (size_t edge_count_search_factor : {4}) {
 					for (size_t edge_count_search_factor : {1}) {
 						ehnsw_engine_5_jobs.emplace_back(ehnsw_engine_5_config(

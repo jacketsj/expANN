@@ -22,6 +22,7 @@ struct ehnsw_engine_5_config {
 };
 
 size_t counterr = 0;
+size_t counterr2 = 0;
 size_t total = 0;
 
 template <typename T>
@@ -96,7 +97,7 @@ template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 
 	vertex_heights.emplace_back(
 			data_index == 0 ? num_cuts - 1
-											: std::min(size_t(floor(-log(distribution(gen)) /
+											: std::min(size_t(floor(-log(distribution(gen)) *
 																							log(double(edge_count_mult)))),
 																 num_cuts - 1));
 
@@ -202,6 +203,11 @@ template <typename T> void ehnsw_engine_5<T>::_build() {
 	assert(all_entries.size() > 0);
 	size_t op_count = 0;
 
+	while (layers.back().adj.size() <= 1) {
+		std::cout << "Popping useless layer" << std::endl;
+		layers.pop_back();
+	}
+
 	auto improve_vertex_edges = [&](size_t v) {
 		// get current approx kNN
 		std::vector<std::vector<std::pair<T, size_t>>> kNNs =
@@ -227,7 +233,6 @@ template <typename T> void ehnsw_engine_5<T>::_build() {
 		++op_count;
 		improve_vertex_edges(i);
 	}
-
 	/*
 	for (size_t i = 0; i < all_entries.size(); ++i) {
 		if (i % 5000 == 0)
@@ -245,10 +250,9 @@ template <typename T> void ehnsw_engine_5<T>::_build() {
 	total = 0;
 }
 template <typename T>
-const std::vector<std::pair<T, size_t>>
-ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
-																		 const std::vector<size_t>& starting_points,
-																		 size_t layer) {
+const std::vector<std::pair<T, size_t>> ehnsw_engine_5<T>::_query_k_internal(
+		const vec<T>& v, size_t k, const std::vector<size_t>& starting_points_,
+		size_t layer) {
 	auto& adj = layers[layer].adj;
 	auto& vals = layers[layer].vals;
 	// auto& to_data_index = layers[layer].to_data_index;
@@ -263,6 +267,30 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 											decltype(compare)>
 			to_visit(compare);
 	robin_hood::unordered_flat_map<size_t, T> visited;
+
+	// init list of starting points by doing a greedy traversal to the approx 1-NN
+	std::vector<size_t> starting_points = starting_points_;
+	if (false) {
+		size_t cur = starting_points_[0]; // assumes size of starting points is 1
+		T d_cur = dist2fast(v, all_entries[cur]);
+		bool changed = true;
+		while (changed) {
+			changed = false;
+			starting_points.emplace_back(cur);
+			for (const auto& [_, u] : adj[cur]) {
+				// T d_next = dist2fast(v, vals[u]);
+				T d_next = dist2fast(v, vals[u]);
+				// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+				if (d_next < d_cur) {
+					changed = true;
+					d_cur = d_next;
+					cur = u;
+				}
+			}
+		}
+		reverse(starting_points.begin(), starting_points.end());
+	}
+	// TODO make a priority queue of lower bounds instead, pop from that maybe?
 
 	auto visit = [&](T d, size_t u) {
 		bool is_good =
@@ -287,12 +315,12 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 		T nd;
 		size_t cur;
 		std::tie(nd, cur) = to_visit.top();
-		if (top_k.size() == k && -nd > top_k.top().first)
+		T d_worst = top_k.top().first;
+		if (top_k.size() == k && -nd > d_worst)
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
 		if (top_k.size() == k) {
-			T d_worst = top_k.top().first;
 			_mm_prefetch(&adj[cur], _MM_HINT_T0);
 			// auto it_low = std::lower_bound(
 			//		adj[cur].begin(), adj[cur].end(), nd - d_worst,
@@ -346,6 +374,7 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 			std::for_each(it_low, it_high, [&](auto& neighbour) {
 				auto& u = neighbour.second;
 				++counterr;
+				++total;
 				T d_next = dist2fast(v, vals[u]);
 				visit(d_next, u);
 			});
@@ -431,16 +460,23 @@ template <typename T>
 const std::vector<std::vector<std::pair<T, size_t>>>
 ehnsw_engine_5<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
 																						 size_t full_search_top_layer) {
-	auto current = starting_vertex;
+	std::vector<size_t> current = {starting_vertex};
 	std::vector<std::vector<std::pair<T, size_t>>> ret;
 	// for each layer, in decreasing depth
 	for (int layer = layers.size() - 1; layer >= 0; --layer) {
 		size_t layer_k = k;
 		if (layer > int(full_search_top_layer))
 			layer_k = 1;
-		ret.emplace_back(_query_k_internal(
-				v, layer_k, {layers[layer].to_vertex[current]}, layer));
-		current = layers[layer].to_data_index[ret.back().front().second];
+		for (auto& current_val : current)
+			current_val = layers[layer].to_vertex[current_val];
+		ret.emplace_back(_query_k_internal(v, layer_k, {current}, layer));
+		// ret.emplace_back(_query_k_internal(
+		//		v, layer_k, {layers[layer].to_vertex[current]}, layer));
+		// current = layers[layer].to_data_index[ret.back().front().second];
+		current.clear();
+		for (auto& new_current_val : ret.back())
+			current.emplace_back(layers[layer].to_data_index[new_current_val.second]);
+		// current = layers[layer].to_data_index[ret.back().front().second];
 	}
 	reverse(ret.begin(), ret.end());
 	return ret;
@@ -461,7 +497,8 @@ size_t ehnsw_engine_5<T>::_query_1_internal(const vec<T>& v,
 		changed = false;
 		for (const auto& [_, u] : adj[best]) {
 			// T d_next = dist2fast(v, vals[u]);
-			T d_next = dist2(v, vals[u]);
+			T d_next = dist2fast(v, vals[u]);
+			counterr2++;
 			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			if (d_next < d) {
 				changed = true;
@@ -496,4 +533,13 @@ std::vector<size_t> ehnsw_engine_5<T>::_query_k(const vec<T>& v, size_t k) {
 template <typename T> ehnsw_engine_5<T>::~ehnsw_engine_5() {
 	std::cout << "Post-queries counterr: " << counterr << "/" << total
 						<< std::endl;
+	// print off height of 0, and max 2 heights
+	std::cout << "height of 0: " << vertex_heights[0] << std::endl;
+	sort(vertex_heights.rbegin(), vertex_heights.rend());
+	std::cout << "largest heights: " << std::endl;
+	for (size_t i = 0; i < 10; ++i) {
+		std::cout << vertex_heights[i] << ' ';
+	}
+	std::cout << std::endl;
+	std::cout << "counterr2=" << counterr2 << std::endl;
 }
