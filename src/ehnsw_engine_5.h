@@ -272,6 +272,8 @@ ehnsw_engine_5<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
 		size_t layer_k = k;
 		if (layer > int(full_search_top_layer))
 			layer_k = 1;
+		if (layer == 0)
+			layer_k *= 2;
 		ret.emplace_back(_query_k_internal(
 				v, layer_k, {layers[layer].to_vertex[current]}, layer));
 		current = layers[layer].to_data_index[ret.back().front().second];
