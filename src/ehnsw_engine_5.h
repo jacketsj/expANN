@@ -21,6 +21,9 @@ struct ehnsw_engine_5_config {
 				edge_count_search_factor(_edge_count_search_factor) {}
 };
 
+size_t counterr = 0;
+size_t total = 0;
+
 template <typename T>
 struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	std::random_device rd;
@@ -37,12 +40,14 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				edge_count_search_factor(conf.edge_count_search_factor),
 				num_cuts(conf.edge_count_mult - 1) {}
+	~ehnsw_engine_5();
 	std::vector<vec<T>> all_entries;
 	struct layer_data {
-		std::vector<std::vector<size_t>>
+		std::vector<std::vector<std::pair<T, size_t>>>
 				adj; // vertex -> cut -> outgoing_edge data_index
 		std::vector<std::vector<std::tuple<T, size_t, size_t>>>
 				edge_ranks; // vertex -> closest connected [distance, bin, edge_index]
+
 		std::vector<vec<T>> vals;					 // vertex -> data
 		std::vector<size_t> to_data_index; // vertex -> data_index
 		robin_hood::unordered_flat_map<size_t, size_t>
@@ -137,7 +142,7 @@ void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 			d < std::get<0>(edge_ranks[i].back())) {
 		for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
 			used_bins.insert(bin);
-			if (j == adj[i][edge_index]) {
+			if (j == adj[i][edge_index].second) {
 				// duplicate edge found, discard and return
 				// will only happen if no swaps have occurred so far
 				return;
@@ -146,8 +151,12 @@ void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 					is_valid_edge(to_data_index[i], to_data_index[j], bin)) {
 				// (i,j) is a better edge than (i, adj[i][edge_index]) for the current
 				// bin, so swap
-				std::swap(j, adj[i][edge_index]);
+				size_t j2 = adj[i][edge_index].second;
+				adj[i][edge_index].second = j;
+				j = j2;
+				// std::swap(j, adj[i][edge_index].second);
 				std::swap(d, other_d);
+				adj[i][edge_index].first = other_d;
 			}
 		}
 		// iterate through all unused bins, use one of them if it is compatible
@@ -155,12 +164,31 @@ void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 			for (size_t bin = 0; bin < num_cuts + 1; ++bin)
 				if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
 					size_t edge_index = adj[i].size();
-					adj[i].emplace_back(j);
+					adj[i].emplace_back(d, j);
 					edge_ranks[i].emplace_back(d, bin, edge_index);
 					break;
 				}
 		// sort edge ranks by increasing distance again
 		std::sort(edge_ranks[i].begin(), edge_ranks[i].end());
+		std::vector<std::pair<T, size_t>> new_adj;
+		for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
+			new_adj.emplace_back(adj[i][edge_index]);
+			edge_index = new_adj.size() - 1;
+		}
+		adj[i] = new_adj;
+		/*
+		// sort them in adj too
+		std::vector<std::pair<decltype(adj[i][0]), decltype(edge_ranks[i][0])>>
+				zipped;
+		for (size_t edge_index = 0; edge_index < adj[i].size(); ++edge_index) {
+			zipped.emplace_back(adj[i][edge_index], edge_ranks[i][edge_index]);
+		}
+		std::sort(zipped.begin(), zipped.end());
+		for (size_t edge_index = 0; edge_index < adj[i].size(); ++edge_index) {
+			adj[i][edge_index] = zipped[edge_index].first;
+			edge_ranks[i][edge_index] = zipped[edge_index].second;
+		}
+		*/
 	}
 }
 
@@ -212,6 +240,9 @@ template <typename T> void ehnsw_engine_5<T>::_build() {
 		improve_vertex_edges(i);
 	}
 	*/
+	std::cout << "Post-build counterr: " << counterr << "/" << total << std::endl;
+	counterr = 0;
+	total = 0;
 }
 template <typename T>
 const std::vector<std::pair<T, size_t>>
@@ -245,9 +276,12 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 			top_k.pop();
 		return is_good;
 	};
-	for (const auto& sp : starting_points)
+	for (const auto& sp : starting_points) {
 		// visit(dist2(v, vals[sp]), sp);
+		++counterr;
+		++total;
 		visit(dist2fast(v, vals[sp]), sp);
+	}
 	// visit(dist2fast(v, all_entries[to_data_index[sp]]), sp);
 	while (!to_visit.empty()) {
 		T nd;
@@ -257,16 +291,77 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
+		if (top_k.size() == k) {
+			T d_worst = top_k.top().first;
+			_mm_prefetch(&adj[cur], _MM_HINT_T0);
+			// auto it_low = std::lower_bound(
+			//		adj[cur].begin(), adj[cur].end(), nd - d_worst,
+			//		[](const auto& p, float val) { return p.first < val; });
+			// auto it_high =
+			//		std::upper_bound(adj[cur].begin(), adj[cur].end(), nd + d_worst,
+			//										 [](float val, auto& p) { return val < p.first; });
+			auto it_low = std::lower_bound(
+					adj[cur].begin(), adj[cur].end(), -nd - d_worst,
+					[&](const std::pair<float, size_t>& neighbour, float) {
+						return -nd - neighbour.first > d_worst;
+					});
+			// it_high can be replaced with an if statement inside the loop
+			auto it_high = std::lower_bound(
+					adj[cur].begin(), adj[cur].end(), -nd - d_worst,
+					[&](const std::pair<float, size_t>& neighbour, float) {
+						return neighbour.first - -nd <= d_worst;
+					});
+
+			// auto it_high = std::upper_bound(
+			//		adj[cur].begin(), adj[cur].end(), d_worst - -nd,
+			//		[](float value, const std::pair<float, size_t>& elem) {
+			//			return value < elem.first;
+			//		});
+			//  auto it_low = adj[cur].begin();
+			//  auto it_high = adj[cur].end();
+			std::for_each(it_low, it_high, [&](auto& neighbour) {
+				auto& u = neighbour.second;
+				_mm_prefetch(&vals[u], _MM_HINT_T0);
+			});
+			total += adj[cur].size();
+			std::for_each(it_low, it_high, [&](auto& neighbour) {
+				++counterr;
+				if (std::max(-nd - neighbour.first, neighbour.first - -nd) > d_worst) {
+					// TODO this shouldn't happen, increment a 'useless' counter
+					std::cout << "Impossible" << std::endl;
+				}
+				auto& u = neighbour.second;
+				T d_next = dist2fast(v, vals[u]);
+				visit(d_next, u);
+				//}
+			});
+		} else {
+			_mm_prefetch(&adj[cur], _MM_HINT_T0);
+			auto it_low = adj[cur].begin();
+			auto it_high = adj[cur].end();
+			std::for_each(it_low, it_high, [&](auto& neighbour) {
+				auto& u = neighbour.second;
+				_mm_prefetch(&vals[u], _MM_HINT_T0);
+			});
+			std::for_each(it_low, it_high, [&](auto& neighbour) {
+				auto& u = neighbour.second;
+				++counterr;
+				T d_next = dist2fast(v, vals[u]);
+				visit(d_next, u);
+			});
+		}
+		/*
 		_mm_prefetch(&adj[cur], _MM_HINT_T0);
-		for (const auto& u : adj[cur]) {
+		for (const auto& [_, u] : adj[cur]) {
 			_mm_prefetch(&vals[u], _MM_HINT_T0);
 		}
-		for (const auto& u : adj[cur]) {
+		for (const auto& [_, u] : adj[cur]) {
 			T d_next = dist2fast(v, vals[u]);
 			// T d_next = dist2(v, vals[u]);
 			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			visit(d_next, u);
 		}
+		*/
 	}
 	/*
 	std::vector<std::pair<T, size_t>> neighbour_buffer;
@@ -364,7 +459,7 @@ size_t ehnsw_engine_5<T>::_query_1_internal(const vec<T>& v,
 	bool changed = true;
 	while (changed) {
 		changed = false;
-		for (const auto& u : adj[best]) {
+		for (const auto& [_, u] : adj[best]) {
 			// T d_next = dist2fast(v, vals[u]);
 			T d_next = dist2(v, vals[u]);
 			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
@@ -396,4 +491,9 @@ std::vector<size_t> ehnsw_engine_5<T>::_query_k(const vec<T>& v, size_t k) {
 	for (size_t i = 0; i < ret.size(); ++i)
 		ret[i] = ret_combined[i].second;
 	return ret;
+}
+
+template <typename T> ehnsw_engine_5<T>::~ehnsw_engine_5() {
+	std::cout << "Post-queries counterr: " << counterr << "/" << total
+						<< std::endl;
 }

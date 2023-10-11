@@ -4,7 +4,6 @@
 #include <limits>
 #include <queue>
 #include <random>
-#include <ranges>
 #include <set>
 #include <string>
 #include <vector>
@@ -21,9 +20,6 @@ struct zehnsw_engine_config {
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				edge_count_search_factor(_edge_count_search_factor) {}
 };
-
-size_t useless = 0;
-size_t total_comps = 0;
 
 template <typename T>
 struct zehnsw_engine : public ann_engine<T, zehnsw_engine<T>> {
@@ -46,8 +42,9 @@ struct zehnsw_engine : public ann_engine<T, zehnsw_engine<T>> {
 		std::vector<std::vector<std::pair<T, size_t>>>
 				adj; // vertex -> list of outgoing edges, sorted by increasing distance
 		std::vector<std::vector<size_t>> edge_bins; // vertex -> edge_index -> bin
-		std::vector<vec<T>> vals;										// vertex -> data
-		std::vector<size_t> to_data_index;					// vertex -> data_index
+
+		std::vector<vec<T>> vals;					 // vertex -> data
+		std::vector<size_t> to_data_index; // vertex -> data_index
 		robin_hood::unordered_flat_map<size_t, size_t>
 				to_vertex; // data_index -> vertex
 		void add_vertex(size_t data_index, const vec<T>& data) {
@@ -364,8 +361,6 @@ size_t zehnsw_engine<T>::_query_1_internal(const vec<T>& v,
 
 template <typename T>
 std::vector<size_t> zehnsw_engine<T>::_query_k(const vec<T>& v, size_t k) {
-	// useless = 0;
-	// total_comps = 0;
 	auto current = starting_vertex;
 	for (int layer = layers.size() - 1; layer > 0; --layer) {
 		current = layers[layer].to_data_index[_query_1_internal(
