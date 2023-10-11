@@ -90,10 +90,7 @@ template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 	all_entries.push_back(v);
 
 	vertex_heights.emplace_back(
-			data_index == 0 ? num_cuts - 1
-											: std::min(size_t(floor(-log(distribution(gen)) /
-																							log(double(edge_count_mult)))),
-																 num_cuts - 1));
+			size_t(floor(-log(distribution(gen)) * log(double(edge_count_mult)))));
 
 	for (size_t layer = 0; layer <= vertex_heights[data_index]; ++layer) {
 		if (layers.size() <= layer) {
