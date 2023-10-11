@@ -11,12 +11,12 @@
 #include "ann_engine.h"
 #include "robin_hood.h"
 
-struct ehnsw_engine_5_config {
+struct zehnsw_engine_config {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
-	ehnsw_engine_5_config(size_t _edge_count_mult, size_t _num_for_1nn,
-												size_t _edge_count_search_factor = 1)
+	zehnsw_engine_config(size_t _edge_count_mult, size_t _num_for_1nn,
+											 size_t _edge_count_search_factor = 1)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				edge_count_search_factor(_edge_count_search_factor) {}
 };
@@ -26,7 +26,7 @@ size_t counterr2 = 0;
 size_t total = 0;
 
 template <typename T>
-struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
+struct zehnsw_engine : public ann_engine<T, zehnsw_engine<T>> {
 	std::random_device rd;
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
@@ -36,12 +36,12 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
 	const size_t num_cuts;
-	ehnsw_engine_5(ehnsw_engine_5_config conf)
+	zehnsw_engine(zehnsw_engine_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				edge_count_search_factor(conf.edge_count_search_factor),
 				num_cuts(conf.edge_count_mult - 1) {}
-	~ehnsw_engine_5();
+	~zehnsw_engine();
 	std::vector<vec<T>> all_entries;
 	struct layer_data {
 		std::vector<std::vector<std::pair<T, size_t>>>
@@ -79,7 +79,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	_query_k_internal_wrapper(const vec<T>& v, size_t k,
 														size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine 5('fast')"; }
+	const std::string _name() { return "ZEHNSW Engine('testing')"; }
 
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -91,7 +91,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	bool generate_elabel() { return int_distribution(gen); }
 };
 
-template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
+template <typename T> void zehnsw_engine<T>::_store_vector(const vec<T>& v) {
 	size_t data_index = all_entries.size();
 	all_entries.push_back(v);
 
@@ -116,7 +116,7 @@ template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 
 // TODO try e_labels specific to each layer and see if it helps
 template <typename T>
-bool ehnsw_engine_5<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
+bool zehnsw_engine<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 	//  the last bin permits any edge (no cut)
 	if (bin == num_cuts)
 		return true;
@@ -125,8 +125,8 @@ bool ehnsw_engine_5<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 }
 
 template <typename T>
-void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
-																						 size_t layer) {
+void zehnsw_engine<T>::add_edge_directional(size_t i, size_t j, T d,
+																						size_t layer) {
 	// TODO do double-bottom with cuts across entire bottom
 	size_t max_node_size = edge_count_mult;
 	// if (layer == 0)
@@ -194,12 +194,12 @@ void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 }
 
 template <typename T>
-void ehnsw_engine_5<T>::add_edge(size_t i, size_t j, T d, size_t layer) {
+void zehnsw_engine<T>::add_edge(size_t i, size_t j, T d, size_t layer) {
 	add_edge_directional(i, j, d, layer);
 	add_edge_directional(j, i, d, layer);
 }
 
-template <typename T> void ehnsw_engine_5<T>::_build() {
+template <typename T> void zehnsw_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 	size_t op_count = 0;
 
@@ -250,9 +250,10 @@ template <typename T> void ehnsw_engine_5<T>::_build() {
 	total = 0;
 }
 template <typename T>
-const std::vector<std::pair<T, size_t>> ehnsw_engine_5<T>::_query_k_internal(
-		const vec<T>& v, size_t k, const std::vector<size_t>& starting_points_,
-		size_t layer) {
+const std::vector<std::pair<T, size_t>>
+zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
+																		const std::vector<size_t>& starting_points_,
+																		size_t layer) {
 	auto& adj = layers[layer].adj;
 	auto& vals = layers[layer].vals;
 	// auto& to_data_index = layers[layer].to_data_index;
@@ -458,8 +459,8 @@ const std::vector<std::pair<T, size_t>> ehnsw_engine_5<T>::_query_k_internal(
 
 template <typename T>
 const std::vector<std::vector<std::pair<T, size_t>>>
-ehnsw_engine_5<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
-																						 size_t full_search_top_layer) {
+zehnsw_engine<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
+																						size_t full_search_top_layer) {
 	std::vector<size_t> current = {starting_vertex};
 	std::vector<std::vector<std::pair<T, size_t>>> ret;
 	// for each layer, in decreasing depth
@@ -483,9 +484,9 @@ ehnsw_engine_5<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
 }
 
 template <typename T>
-size_t ehnsw_engine_5<T>::_query_1_internal(const vec<T>& v,
-																						size_t starting_point,
-																						size_t layer) {
+size_t zehnsw_engine<T>::_query_1_internal(const vec<T>& v,
+																					 size_t starting_point,
+																					 size_t layer) {
 	auto& adj = layers[layer].adj;
 	auto& vals = layers[layer].vals;
 	// auto& to_data_index = layers[layer].to_data_index;
@@ -511,7 +512,7 @@ size_t ehnsw_engine_5<T>::_query_1_internal(const vec<T>& v,
 }
 
 template <typename T>
-std::vector<size_t> ehnsw_engine_5<T>::_query_k(const vec<T>& v, size_t k) {
+std::vector<size_t> zehnsw_engine<T>::_query_k(const vec<T>& v, size_t k) {
 	auto current = starting_vertex;
 	for (int layer = layers.size() - 1; layer > 0; --layer) {
 		current = layers[layer].to_data_index[_query_1_internal(
@@ -530,7 +531,7 @@ std::vector<size_t> ehnsw_engine_5<T>::_query_k(const vec<T>& v, size_t k) {
 	return ret;
 }
 
-template <typename T> ehnsw_engine_5<T>::~ehnsw_engine_5() {
+template <typename T> zehnsw_engine<T>::~zehnsw_engine() {
 	std::cout << "Post-queries counterr: " << counterr << "/" << total
 						<< std::endl;
 	// print off height of 0, and max 2 heights
