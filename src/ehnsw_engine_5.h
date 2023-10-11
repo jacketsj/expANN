@@ -47,18 +47,30 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 		std::vector<size_t> to_data_index; // vertex -> data_index
 		robin_hood::unordered_flat_map<size_t, size_t>
 				to_vertex; // data_index -> vertex
-		void add_vertex(size_t data_index, const vec<T>& data) {
+		std::vector<std::vector<bool>>
+				e_labels; // vertex -> cut labels (*num_cuts=edge_count_mult-1)
+		void add_vertex(size_t data_index, const vec<T>& data, size_t max_degree,
+										std::function<bool()> generate_elabel) {
 			to_vertex[data_index] = to_data_index.size();
 			to_data_index.emplace_back(data_index);
 			adj.emplace_back();
 			edge_ranks.emplace_back();
 			vals.emplace_back(data);
+
+			e_labels.emplace_back();
+			for (size_t cut = 0; cut + 1 < max_degree; ++cut)
+				e_labels.back().emplace_back(generate_elabel());
+		}
+		is_valid_edge(size_t vertex_i, size_t vertex_j, size_t bin) {
+			//  the last bin permits any edge (no cut)
+			if (bin == e_labels[vertex_i].size())
+				return true;
+			//  an edge is permitted in a bin if it crosses the cut for that bin
+			return e_labels[i][bin] != e_labels[j][bin];
 		}
 	};
 	std::vector<layer_data> layers;
 	std::vector<size_t> vertex_heights; // data_index -> max_height
-	std::vector<std::vector<bool>>
-			e_labels; // data_index -> cut labels (*num_cuts=edge_count_mult-1)
 	void _store_vector(const vec<T>& v);
 	void _build();
 	const std::vector<std::pair<T, size_t>>
@@ -66,7 +78,6 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 										const std::vector<size_t>& starting_points, size_t layer);
 	size_t _query_1_internal(const vec<T>& v, size_t starting_point,
 													 size_t layer);
-	bool is_valid_edge(size_t i, size_t j, size_t bin);
 	void add_edge(size_t i, size_t j, T d, size_t layer);
 	void add_edge_directional(size_t i, size_t j, T d, size_t layer);
 	const std::vector<std::vector<std::pair<T, size_t>>>
@@ -97,28 +108,17 @@ template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 			starting_vertex = data_index;
 			layers.emplace_back();
 		}
-		layers[layer].add_vertex(data_index, v);
+		size_t max_degree_layer = edge_count_mult;
+		if (layer == 0)
+			max_degree_layer *= 2;
+		layers[layer].add_vertex(data_index, v, max_degree_layer,
+														 [&]() { return generate_elabel(); });
 	}
-
-	e_labels.emplace_back();
-	for (size_t cut = 0; cut < num_cuts; ++cut)
-		e_labels[data_index].emplace_back(generate_elabel());
-}
-
-// TODO try e_labels specific to each layer and see if it helps
-template <typename T>
-bool ehnsw_engine_5<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
-	//  the last bin permits any edge (no cut)
-	if (bin == num_cuts)
-		return true;
-	//  an edge is permitted in a bin if it crosses the cut for that bin
-	return e_labels[i][bin] != e_labels[j][bin];
 }
 
 template <typename T>
 void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 																						 size_t layer) {
-	// TODO do double-bottom with cuts across entire bottom
 	size_t max_node_size = edge_count_mult;
 	// if (layer == 0)
 	//	max_node_size *= 2;
@@ -139,8 +139,7 @@ void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 				// will only happen if no swaps have occurred so far
 				return;
 			}
-			if (d < other_d &&
-					is_valid_edge(to_data_index[i], to_data_index[j], bin)) {
+			if (d < other_d && layers[layer].is_valid_edge(i, j, bin)) {
 				// (i,j) is a better edge than (i, adj[i][edge_index]) for the current
 				// bin, so swap
 				std::swap(j, adj[i][edge_index]);
@@ -150,7 +149,8 @@ void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 		// iterate through all unused bins, use one of them if it is compatible
 		if (used_bins.size() < max_node_size)
 			for (size_t bin = 0; bin < num_cuts + 1; ++bin)
-				if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
+				if (!used_bins.contains(bin) &&
+						layers[layer].is_valid_edge(i, j, bin)) {
 					size_t edge_index = adj[i].size();
 					adj[i].emplace_back(j);
 					edge_ranks[i].emplace_back(d, bin, edge_index);
@@ -252,61 +252,6 @@ ehnsw_engine_5<T>::_query_k_internal(const vec<T>& v, size_t k,
 			visit(d_next, u);
 		}
 	}
-	/*
-	std::vector<std::pair<T, size_t>> neighbour_buffer;
-	neighbour_buffer.reserve(edge_count_mult);
-	auto visit_neighbours = [&]() {
-		sort(neighbour_buffer.begin(), neighbour_buffer.end(),
-			[](const auto& [d1, _], const auto& [d2, _]) {
-		return d1 < d2;});
-		// TODO binary search for which vectors will be added
-		size_t num_to_add = std::lower_bound(neighbour_buffer.begin()
-		for (auto& [d, u] : neighbour_buffer) {
-			if (!visited.contains(u) && top_k.top().first > d)
-				top_k.emplace(d, u);		 // top_k is a max heap
-				to_visit.emplace(-d, u); // to_visit is a min heap
-			visited[u] = d;
-		}
-
-		bool is_good =
-				!visited.contains(u) && top_k.top().first > d;
-		visited[u] = d;
-		if (is_good) {
-			top_k.emplace(d, u);		 // top_k is a max heap
-			to_visit.emplace(-d, u); // to_visit is a min heap
-		}
-		if (top_k.size() > k)
-			top_k.pop();
-		return is_good;
-	};
-	for (const auto& sp : starting_points)
-		neighbour_buffer.emplace_back(dist2fast(v, vals[sp]), sp);
-	visit_neighbours();
-	while (!to_visit.empty()) {
-		T nd;
-		size_t cur;
-		std::tie(nd, cur) = to_visit.top();
-		if (top_k.size() == k && -nd > top_k.top().first)
-			// everything neighbouring current best set is already evaluated
-			break;
-		to_visit.pop();
-		_mm_prefetch(&adj[cur], _MM_HINT_T0);
-		for (const auto& u : adj[cur]) {
-			_mm_prefetch(&vals[u], _MM_HINT_T0);
-		}
-		neighbour_buffer.clear();
-		for (size_t neighbour_index = 0; neighbour_index < adj[cur].size();
-				 ++neighbour_index)
-			neighbour_buffer.emplace_back(
-					dist2fast(v, vals[adj[cur][neighbour_index]]));
-		visit_neighbours();
-		// for (const auto& u : adj[cur]) {
-		//	T d_next = dist2fast(v, vals[u]);
-		//	// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
-		//	visit(d_next, u);
-		// }
-	}
-	*/
 	std::vector<std::pair<T, size_t>> ret;
 	while (!top_k.empty()) {
 		ret.push_back(top_k.top());
