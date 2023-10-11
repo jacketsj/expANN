@@ -11,18 +11,22 @@
 #include "ann_engine.h"
 #include "robin_hood.h"
 
-struct zehnsw_engine_config {
+struct ehnsw_engine_5_config {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
-	zehnsw_engine_config(size_t _edge_count_mult, size_t _num_for_1nn,
-											 size_t _edge_count_search_factor = 1)
+	ehnsw_engine_5_config(size_t _edge_count_mult, size_t _num_for_1nn,
+												size_t _edge_count_search_factor = 1)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
 				edge_count_search_factor(_edge_count_search_factor) {}
 };
 
+size_t counterr = 0;
+size_t counterr2 = 0;
+size_t total = 0;
+
 template <typename T>
-struct zehnsw_engine : public ann_engine<T, zehnsw_engine<T>> {
+struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	std::random_device rd;
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
@@ -32,16 +36,18 @@ struct zehnsw_engine : public ann_engine<T, zehnsw_engine<T>> {
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
 	const size_t num_cuts;
-	zehnsw_engine(zehnsw_engine_config conf)
+	ehnsw_engine_5(ehnsw_engine_5_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				edge_count_search_factor(conf.edge_count_search_factor),
 				num_cuts(conf.edge_count_mult - 1) {}
+	~ehnsw_engine_5();
 	std::vector<vec<T>> all_entries;
 	struct layer_data {
 		std::vector<std::vector<std::pair<T, size_t>>>
-				adj; // vertex -> list of outgoing edges, sorted by increasing distance
-		std::vector<std::vector<size_t>> edge_bins; // vertex -> edge_index -> bin
+				adj; // vertex -> cut -> outgoing_edge data_index
+		std::vector<std::vector<std::tuple<T, size_t, size_t>>>
+				edge_ranks; // vertex -> closest connected [distance, bin, edge_index]
 
 		std::vector<vec<T>> vals;					 // vertex -> data
 		std::vector<size_t> to_data_index; // vertex -> data_index
@@ -51,7 +57,7 @@ struct zehnsw_engine : public ann_engine<T, zehnsw_engine<T>> {
 			to_vertex[data_index] = to_data_index.size();
 			to_data_index.emplace_back(data_index);
 			adj.emplace_back();
-			edge_bins.emplace_back();
+			edge_ranks.emplace_back();
 			vals.emplace_back(data);
 		}
 	};
@@ -73,7 +79,7 @@ struct zehnsw_engine : public ann_engine<T, zehnsw_engine<T>> {
 	_query_k_internal_wrapper(const vec<T>& v, size_t k,
 														size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "ZEHNSW Engine"; }
+	const std::string _name() { return "EHNSW Engine 5('fast')"; }
 
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -83,18 +89,15 @@ struct zehnsw_engine : public ann_engine<T, zehnsw_engine<T>> {
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
-	~zehnsw_engine() {
-		std::cout << "count: " << useless << "/" << total_comps << std::endl;
-	}
 };
 
-template <typename T> void zehnsw_engine<T>::_store_vector(const vec<T>& v) {
+template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 	size_t data_index = all_entries.size();
 	all_entries.push_back(v);
 
 	vertex_heights.emplace_back(
 			data_index == 0 ? num_cuts - 1
-											: std::min(size_t(floor(-log(distribution(gen)) /
+											: std::min(size_t(floor(-log(distribution(gen)) *
 																							log(double(edge_count_mult)))),
 																 num_cuts - 1));
 
@@ -113,7 +116,7 @@ template <typename T> void zehnsw_engine<T>::_store_vector(const vec<T>& v) {
 
 // TODO try e_labels specific to each layer and see if it helps
 template <typename T>
-bool zehnsw_engine<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
+bool ehnsw_engine_5<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 	//  the last bin permits any edge (no cut)
 	if (bin == num_cuts)
 		return true;
@@ -122,13 +125,13 @@ bool zehnsw_engine<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 }
 
 template <typename T>
-void zehnsw_engine<T>::add_edge_directional(size_t i, size_t j, T d,
-																						size_t layer) {
+void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
+																						 size_t layer) {
 	// TODO do double-bottom with cuts across entire bottom
 	size_t max_node_size = edge_count_mult;
 	// if (layer == 0)
 	//	max_node_size *= 2;
-	auto& edge_bins = layers[layer].edge_bins;
+	auto& edge_ranks = layers[layer].edge_ranks;
 	auto& to_data_index = layers[layer].to_data_index;
 	auto& adj = layers[layer].adj;
 	// keep track of all bins that have been used already
@@ -136,59 +139,74 @@ void zehnsw_engine<T>::add_edge_directional(size_t i, size_t j, T d,
 	// iterate through all the edges, smallest to biggest, while maintaining a
 	// current edge. Greedily improve the currently visited bin each time.
 	// don't bother if nothing will get modified
-	if (adj[i].size() < max_node_size || d < std::get<0>(adj[i].back())) {
-		for (size_t edge_index = 0; edge_index < adj[i].size(); ++edge_index) {
-			auto& bin = edge_bins[i][edge_index];
+	if (edge_ranks[i].size() < max_node_size ||
+			d < std::get<0>(edge_ranks[i].back())) {
+		for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
+			used_bins.insert(bin);
 			if (j == adj[i][edge_index].second) {
 				// duplicate edge found, discard and return
 				// will only happen if no swaps have occurred so far
 				return;
 			}
-			if (d < adj[i][edge_index].first &&
+			if (d < other_d &&
 					is_valid_edge(to_data_index[i], to_data_index[j], bin)) {
-				std::swap(j, adj[i][edge_index].second);
-				std::swap(d, adj[i][edge_index].first);
+				// (i,j) is a better edge than (i, adj[i][edge_index]) for the current
+				// bin, so swap
+				size_t j2 = adj[i][edge_index].second;
+				adj[i][edge_index].second = j;
+				j = j2;
+				// std::swap(j, adj[i][edge_index].second);
+				std::swap(d, other_d);
+				adj[i][edge_index].first = other_d;
 			}
 		}
 		// iterate through all unused bins, use one of them if it is compatible
 		if (used_bins.size() < max_node_size)
 			for (size_t bin = 0; bin < num_cuts + 1; ++bin)
-				// TODO there was a bug in the following line in the old version (wrong
-				// indexing), need to go back and test that
-				if (!used_bins.contains(bin) &&
-						is_valid_edge(to_data_index[i], to_data_index[j], bin)) {
-					// is_valid_edge(i, j, bin)) {
+				if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
+					size_t edge_index = adj[i].size();
 					adj[i].emplace_back(d, j);
-					edge_bins[i].emplace_back(bin);
+					edge_ranks[i].emplace_back(d, bin, edge_index);
 					break;
 				}
-		// sort edge ranks by increasing distance again (while keeping bins)
-		// C++23 version (unsupported by gcc 11.2)
-		// std::ranges::sort(
-		//		std::views::zip(adj[i], edge_bins[i]),
-		//		[](auto&& a, auto&& b) { return std::get<0>(a) < std::get<0>(b); });
-		std::vector<std::pair<decltype(adj[i][0]), decltype(edge_bins[i][0])>>
+		// sort edge ranks by increasing distance again
+		std::sort(edge_ranks[i].begin(), edge_ranks[i].end());
+		std::vector<std::pair<T, size_t>> new_adj;
+		for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
+			new_adj.emplace_back(adj[i][edge_index]);
+			edge_index = new_adj.size() - 1;
+		}
+		adj[i] = new_adj;
+		/*
+		// sort them in adj too
+		std::vector<std::pair<decltype(adj[i][0]), decltype(edge_ranks[i][0])>>
 				zipped;
 		for (size_t edge_index = 0; edge_index < adj[i].size(); ++edge_index) {
-			zipped.emplace_back(adj[i][edge_index], edge_bins[i][edge_index]);
+			zipped.emplace_back(adj[i][edge_index], edge_ranks[i][edge_index]);
 		}
 		std::sort(zipped.begin(), zipped.end());
 		for (size_t edge_index = 0; edge_index < adj[i].size(); ++edge_index) {
 			adj[i][edge_index] = zipped[edge_index].first;
-			edge_bins[i][edge_index] = zipped[edge_index].second;
+			edge_ranks[i][edge_index] = zipped[edge_index].second;
 		}
+		*/
 	}
 }
 
 template <typename T>
-void zehnsw_engine<T>::add_edge(size_t i, size_t j, T d, size_t layer) {
+void ehnsw_engine_5<T>::add_edge(size_t i, size_t j, T d, size_t layer) {
 	add_edge_directional(i, j, d, layer);
 	add_edge_directional(j, i, d, layer);
 }
 
-template <typename T> void zehnsw_engine<T>::_build() {
+template <typename T> void ehnsw_engine_5<T>::_build() {
 	assert(all_entries.size() > 0);
 	size_t op_count = 0;
+
+	while (layers.back().adj.size() <= 1) {
+		std::cout << "Popping useless layer" << std::endl;
+		layers.pop_back();
+	}
 
 	auto improve_vertex_edges = [&](size_t v) {
 		// get current approx kNN
@@ -215,13 +233,26 @@ template <typename T> void zehnsw_engine<T>::_build() {
 		++op_count;
 		improve_vertex_edges(i);
 	}
-}
+	/*
+	for (size_t i = 0; i < all_entries.size(); ++i) {
+		if (i % 5000 == 0)
+			std::cerr << "Built "
+								<< double(i + all_entries.size()) /
+											 double(all_entries.size() * 2) * 100
+								<< "%" << std::endl;
 
+		++op_count;
+		improve_vertex_edges(i);
+	}
+	*/
+	std::cout << "Post-build counterr: " << counterr << "/" << total << std::endl;
+	counterr = 0;
+	total = 0;
+}
 template <typename T>
-const std::vector<std::pair<T, size_t>>
-zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
-																		const std::vector<size_t>& starting_points,
-																		size_t layer) {
+const std::vector<std::pair<T, size_t>> ehnsw_engine_5<T>::_query_k_internal(
+		const vec<T>& v, size_t k, const std::vector<size_t>& starting_points_,
+		size_t layer) {
 	auto& adj = layers[layer].adj;
 	auto& vals = layers[layer].vals;
 	// auto& to_data_index = layers[layer].to_data_index;
@@ -237,6 +268,30 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 			to_visit(compare);
 	robin_hood::unordered_flat_map<size_t, T> visited;
 
+	// init list of starting points by doing a greedy traversal to the approx 1-NN
+	std::vector<size_t> starting_points = starting_points_;
+	if (false) {
+		size_t cur = starting_points_[0]; // assumes size of starting points is 1
+		T d_cur = dist2fast(v, all_entries[cur]);
+		bool changed = true;
+		while (changed) {
+			changed = false;
+			starting_points.emplace_back(cur);
+			for (const auto& [_, u] : adj[cur]) {
+				// T d_next = dist2fast(v, vals[u]);
+				T d_next = dist2fast(v, vals[u]);
+				// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+				if (d_next < d_cur) {
+					changed = true;
+					d_cur = d_next;
+					cur = u;
+				}
+			}
+		}
+		reverse(starting_points.begin(), starting_points.end());
+	}
+	// TODO make a priority queue of lower bounds instead, pop from that maybe?
+
 	auto visit = [&](T d, size_t u) {
 		bool is_good =
 				!visited.contains(u) && (top_k.size() < k || top_k.top().first > d);
@@ -249,10 +304,124 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 			top_k.pop();
 		return is_good;
 	};
-	for (const auto& sp : starting_points)
+	for (const auto& sp : starting_points) {
 		// visit(dist2(v, vals[sp]), sp);
+		++counterr;
+		++total;
 		visit(dist2fast(v, vals[sp]), sp);
+	}
 	// visit(dist2fast(v, all_entries[to_data_index[sp]]), sp);
+	while (!to_visit.empty()) {
+		T nd;
+		size_t cur;
+		std::tie(nd, cur) = to_visit.top();
+		T d_worst = top_k.top().first;
+		if (top_k.size() == k && -nd > d_worst)
+			// everything neighbouring current best set is already evaluated
+			break;
+		to_visit.pop();
+		if (top_k.size() == k) {
+			_mm_prefetch(&adj[cur], _MM_HINT_T0);
+			// auto it_low = std::lower_bound(
+			//		adj[cur].begin(), adj[cur].end(), nd - d_worst,
+			//		[](const auto& p, float val) { return p.first < val; });
+			// auto it_high =
+			//		std::upper_bound(adj[cur].begin(), adj[cur].end(), nd + d_worst,
+			//										 [](float val, auto& p) { return val < p.first; });
+			auto it_low = std::lower_bound(
+					adj[cur].begin(), adj[cur].end(), -nd - d_worst,
+					[&](const std::pair<float, size_t>& neighbour, float) {
+						return -nd - neighbour.first > d_worst;
+					});
+			// it_high can be replaced with an if statement inside the loop
+			auto it_high = std::lower_bound(
+					adj[cur].begin(), adj[cur].end(), -nd - d_worst,
+					[&](const std::pair<float, size_t>& neighbour, float) {
+						return neighbour.first - -nd <= d_worst;
+					});
+
+			// auto it_high = std::upper_bound(
+			//		adj[cur].begin(), adj[cur].end(), d_worst - -nd,
+			//		[](float value, const std::pair<float, size_t>& elem) {
+			//			return value < elem.first;
+			//		});
+			//  auto it_low = adj[cur].begin();
+			//  auto it_high = adj[cur].end();
+			std::for_each(it_low, it_high, [&](auto& neighbour) {
+				auto& u = neighbour.second;
+				_mm_prefetch(&vals[u], _MM_HINT_T0);
+			});
+			total += adj[cur].size();
+			std::for_each(it_low, it_high, [&](auto& neighbour) {
+				++counterr;
+				if (std::max(-nd - neighbour.first, neighbour.first - -nd) > d_worst) {
+					// TODO this shouldn't happen, increment a 'useless' counter
+					std::cout << "Impossible" << std::endl;
+				}
+				auto& u = neighbour.second;
+				T d_next = dist2fast(v, vals[u]);
+				visit(d_next, u);
+				//}
+			});
+		} else {
+			_mm_prefetch(&adj[cur], _MM_HINT_T0);
+			auto it_low = adj[cur].begin();
+			auto it_high = adj[cur].end();
+			std::for_each(it_low, it_high, [&](auto& neighbour) {
+				auto& u = neighbour.second;
+				_mm_prefetch(&vals[u], _MM_HINT_T0);
+			});
+			std::for_each(it_low, it_high, [&](auto& neighbour) {
+				auto& u = neighbour.second;
+				++counterr;
+				++total;
+				T d_next = dist2fast(v, vals[u]);
+				visit(d_next, u);
+			});
+		}
+		/*
+		_mm_prefetch(&adj[cur], _MM_HINT_T0);
+		for (const auto& [_, u] : adj[cur]) {
+			_mm_prefetch(&vals[u], _MM_HINT_T0);
+		}
+		for (const auto& [_, u] : adj[cur]) {
+			T d_next = dist2fast(v, vals[u]);
+			// T d_next = dist2(v, vals[u]);
+			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+			visit(d_next, u);
+		}
+		*/
+	}
+	/*
+	std::vector<std::pair<T, size_t>> neighbour_buffer;
+	neighbour_buffer.reserve(edge_count_mult);
+	auto visit_neighbours = [&]() {
+		sort(neighbour_buffer.begin(), neighbour_buffer.end(),
+			[](const auto& [d1, _], const auto& [d2, _]) {
+		return d1 < d2;});
+		// TODO binary search for which vectors will be added
+		size_t num_to_add = std::lower_bound(neighbour_buffer.begin()
+		for (auto& [d, u] : neighbour_buffer) {
+			if (!visited.contains(u) && top_k.top().first > d)
+				top_k.emplace(d, u);		 // top_k is a max heap
+				to_visit.emplace(-d, u); // to_visit is a min heap
+			visited[u] = d;
+		}
+
+		bool is_good =
+				!visited.contains(u) && top_k.top().first > d;
+		visited[u] = d;
+		if (is_good) {
+			top_k.emplace(d, u);		 // top_k is a max heap
+			to_visit.emplace(-d, u); // to_visit is a min heap
+		}
+		if (top_k.size() > k)
+			top_k.pop();
+		return is_good;
+	};
+	for (const auto& sp : starting_points)
+		neighbour_buffer.emplace_back(dist2fast(v, vals[sp]), sp);
+	visit_neighbours();
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -261,49 +430,23 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 			// everything neighbouring current best set is already evaluated
 			break;
 		to_visit.pop();
-		// TODO modify this code so that it makes use of the sorted distances and
-		// prunes
-		const T& d_worst = top_k.top().first;
 		_mm_prefetch(&adj[cur], _MM_HINT_T0);
-		/*
-		// auto it_low = std::lower_bound(
-		//		adj[cur].begin(), adj[cur].end(), nd - d_worst,
-		//		[](const auto& p, float val) { return p.first < val; });
-		// auto it_high =
-		//		std::upper_bound(adj[cur].begin(), adj[cur].end(), nd + d_worst,
-		//										 [](float val, auto& p) { return val < p.first; });
-		auto it_low = adj[cur].begin();
-		auto it_high = adj[cur].end();
-		std::for_each(it_low, it_high, [&](auto& neighbour) {
-			auto& u = neighbour.second;
-			_mm_prefetch(&vals[u], _MM_HINT_T0);
-		});
-		std::for_each(it_low, it_high, [&](auto& neighbour) {
-			auto& u = neighbour.second;
-			T d_next = dist2fast(v, vals[u]);
-			visit(d_next, u);
-			++total_comps;
-		});
-		*/
-		for (const auto& [_, u] : adj[cur]) {
+		for (const auto& u : adj[cur]) {
 			_mm_prefetch(&vals[u], _MM_HINT_T0);
 		}
-		for (const auto& [_, u] : adj[cur]) {
-			T d_next = dist2fast(v, vals[u]);
-
-			// T d_star = dist2fast(vals[u], vals[cur]);
-			// T d_worst = top_k.top().first;
-			// if (std::max(nd, d_star) - std::min(nd, d_star) > d_worst) {
-			//	// d_next is a useless distance computation
-			//	++useless;
-			// }
-			++total_comps;
-
-			// T d_next = dist2(v, vals[u]);
-			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
-			visit(d_next, u);
-		}
+		neighbour_buffer.clear();
+		for (size_t neighbour_index = 0; neighbour_index < adj[cur].size();
+				 ++neighbour_index)
+			neighbour_buffer.emplace_back(
+					dist2fast(v, vals[adj[cur][neighbour_index]]));
+		visit_neighbours();
+		// for (const auto& u : adj[cur]) {
+		//	T d_next = dist2fast(v, vals[u]);
+		//	// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+		//	visit(d_next, u);
+		// }
 	}
+	*/
 	std::vector<std::pair<T, size_t>> ret;
 	while (!top_k.empty()) {
 		ret.push_back(top_k.top());
@@ -315,27 +458,34 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 
 template <typename T>
 const std::vector<std::vector<std::pair<T, size_t>>>
-zehnsw_engine<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
-																						size_t full_search_top_layer) {
-	auto current = starting_vertex;
+ehnsw_engine_5<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
+																						 size_t full_search_top_layer) {
+	std::vector<size_t> current = {starting_vertex};
 	std::vector<std::vector<std::pair<T, size_t>>> ret;
 	// for each layer, in decreasing depth
 	for (int layer = layers.size() - 1; layer >= 0; --layer) {
 		size_t layer_k = k;
 		if (layer > int(full_search_top_layer))
 			layer_k = 1;
-		ret.emplace_back(_query_k_internal(
-				v, layer_k, {layers[layer].to_vertex[current]}, layer));
-		current = layers[layer].to_data_index[ret.back().front().second];
+		for (auto& current_val : current)
+			current_val = layers[layer].to_vertex[current_val];
+		ret.emplace_back(_query_k_internal(v, layer_k, {current}, layer));
+		// ret.emplace_back(_query_k_internal(
+		//		v, layer_k, {layers[layer].to_vertex[current]}, layer));
+		// current = layers[layer].to_data_index[ret.back().front().second];
+		current.clear();
+		for (auto& new_current_val : ret.back())
+			current.emplace_back(layers[layer].to_data_index[new_current_val.second]);
+		// current = layers[layer].to_data_index[ret.back().front().second];
 	}
 	reverse(ret.begin(), ret.end());
 	return ret;
 }
 
 template <typename T>
-size_t zehnsw_engine<T>::_query_1_internal(const vec<T>& v,
-																					 size_t starting_point,
-																					 size_t layer) {
+size_t ehnsw_engine_5<T>::_query_1_internal(const vec<T>& v,
+																						size_t starting_point,
+																						size_t layer) {
 	auto& adj = layers[layer].adj;
 	auto& vals = layers[layer].vals;
 	// auto& to_data_index = layers[layer].to_data_index;
@@ -347,7 +497,8 @@ size_t zehnsw_engine<T>::_query_1_internal(const vec<T>& v,
 		changed = false;
 		for (const auto& [_, u] : adj[best]) {
 			// T d_next = dist2fast(v, vals[u]);
-			T d_next = dist2(v, vals[u]);
+			T d_next = dist2fast(v, vals[u]);
+			counterr2++;
 			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			if (d_next < d) {
 				changed = true;
@@ -360,7 +511,7 @@ size_t zehnsw_engine<T>::_query_1_internal(const vec<T>& v,
 }
 
 template <typename T>
-std::vector<size_t> zehnsw_engine<T>::_query_k(const vec<T>& v, size_t k) {
+std::vector<size_t> ehnsw_engine_5<T>::_query_k(const vec<T>& v, size_t k) {
 	auto current = starting_vertex;
 	for (int layer = layers.size() - 1; layer > 0; --layer) {
 		current = layers[layer].to_data_index[_query_1_internal(
@@ -377,4 +528,18 @@ std::vector<size_t> zehnsw_engine<T>::_query_k(const vec<T>& v, size_t k) {
 	for (size_t i = 0; i < ret.size(); ++i)
 		ret[i] = ret_combined[i].second;
 	return ret;
+}
+
+template <typename T> ehnsw_engine_5<T>::~ehnsw_engine_5() {
+	std::cout << "Post-queries counterr: " << counterr << "/" << total
+						<< std::endl;
+	// print off height of 0, and max 2 heights
+	std::cout << "height of 0: " << vertex_heights[0] << std::endl;
+	sort(vertex_heights.rbegin(), vertex_heights.rend());
+	std::cout << "largest heights: " << std::endl;
+	for (size_t i = 0; i < 10; ++i) {
+		std::cout << vertex_heights[i] << ' ';
+	}
+	std::cout << std::endl;
+	std::cout << "counterr2=" << counterr2 << std::endl;
 }
