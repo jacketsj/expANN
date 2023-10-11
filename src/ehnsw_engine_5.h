@@ -61,7 +61,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 			for (size_t cut = 0; cut + 1 < max_degree; ++cut)
 				e_labels.back().emplace_back(generate_elabel());
 		}
-		is_valid_edge(size_t vertex_i, size_t vertex_j, size_t bin) {
+		bool is_valid_edge(size_t vertex_i, size_t vertex_j, size_t bin) {
 			//  the last bin permits any edge (no cut)
 			if (bin == e_labels[vertex_i].size())
 				return true;
