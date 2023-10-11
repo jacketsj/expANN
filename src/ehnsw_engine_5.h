@@ -66,7 +66,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 			if (bin == e_labels[vertex_i].size())
 				return true;
 			//  an edge is permitted in a bin if it crosses the cut for that bin
-			return e_labels[i][bin] != e_labels[j][bin];
+			return e_labels[vertex_i][bin] != e_labels[vertex_j][bin];
 		}
 	};
 	std::vector<layer_data> layers;
