@@ -15,10 +15,13 @@ struct ehnsw_engine_5_config {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
+	float layer_multiplier;
 	ehnsw_engine_5_config(size_t _edge_count_mult, size_t _num_for_1nn,
-												size_t _edge_count_search_factor = 1)
+												size_t _edge_count_search_factor = 1,
+												float _layer_multiplier = 0.5f)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
-				edge_count_search_factor(_edge_count_search_factor) {}
+				edge_count_search_factor(_edge_count_search_factor),
+				layer_multiplier(_layer_multiplier) {}
 };
 
 template <typename T>
@@ -31,12 +34,13 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
-	const size_t num_cuts;
+	float layer_multiplier;
 	ehnsw_engine_5(ehnsw_engine_5_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				edge_count_search_factor(conf.edge_count_search_factor),
-				num_cuts(conf.edge_count_mult - 1) {}
+				layer_multiplier(conf.layer_multiplier) {}
+	~ehnsw_engine_5();
 	std::vector<vec<T>> all_entries;
 	struct layer_data {
 		std::vector<std::vector<size_t>>
@@ -46,9 +50,9 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 		std::vector<vec<T>> vals;					 // vertex -> data
 		std::vector<size_t> to_data_index; // vertex -> data_index
 		robin_hood::unordered_flat_map<size_t, size_t>
-				to_vertex; // data_index -> vertex
-		std::vector<std::vector<bool>>
-				e_labels; // vertex -> cut labels (*num_cuts=edge_count_mult-1)
+				to_vertex;													 // data_index -> vertex
+		std::vector<std::vector<bool>> e_labels; // vertex -> cut labels (*num_cuts)
+		size_t num_cuts() { return e_labels[0].size(); }
 		void add_vertex(size_t data_index, const vec<T>& data, size_t max_degree,
 										std::function<bool()> generate_elabel) {
 			to_vertex[data_index] = to_data_index.size();
@@ -91,6 +95,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 		add_param(pl, edge_count_mult);
 		add_param(pl, num_for_1nn);
 		add_param(pl, edge_count_search_factor);
+		add_param(pl, layer_multiplier);
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
@@ -101,7 +106,8 @@ template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 	all_entries.push_back(v);
 
 	vertex_heights.emplace_back(
-			size_t(floor(-log(distribution(gen)) * log(double(edge_count_mult)))));
+			// size_t(floor(-log(distribution(gen)) / log(double(edge_count_mult)))));
+			size_t(floor(-log(distribution(gen)) * layer_multiplier)));
 
 	for (size_t layer = 0; layer <= vertex_heights[data_index]; ++layer) {
 		if (layers.size() <= layer) {
@@ -148,7 +154,7 @@ void ehnsw_engine_5<T>::add_edge_directional(size_t i, size_t j, T d,
 		}
 		// iterate through all unused bins, use one of them if it is compatible
 		if (used_bins.size() < max_node_size)
-			for (size_t bin = 0; bin < num_cuts + 1; ++bin)
+			for (size_t bin = 0; bin < layers[layer].num_cuts() + 1; ++bin)
 				if (!used_bins.contains(bin) &&
 						layers[layer].is_valid_edge(i, j, bin)) {
 					size_t edge_index = adj[i].size();
@@ -327,4 +333,13 @@ std::vector<size_t> ehnsw_engine_5<T>::_query_k(const vec<T>& v, size_t k) {
 	for (size_t i = 0; i < ret.size(); ++i)
 		ret[i] = ret_combined[i].second;
 	return ret;
+}
+
+template <typename T> ehnsw_engine_5<T>::~ehnsw_engine_5() {
+	sort(vertex_heights.rbegin(), vertex_heights.rend());
+	std::cout << "largest heights: " << std::endl;
+	for (size_t i = 0; i < 100; ++i) {
+		std::cout << vertex_heights[i] << ' ';
+	}
+	std::cout << std::endl;
 }

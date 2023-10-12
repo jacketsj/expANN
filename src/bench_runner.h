@@ -299,7 +299,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 16; k <= 16; k += 10) { // will hopfully get good
 		// for (size_t k = 32; k <= 32; k += 10) { // will hopfully get good
 		// for (size_t k = 16; k <= 16; k += 10) { // will hopfully get good
-		for (size_t k = 10; k <= 10; k += 10) { // will hopfully get good
+		for (size_t k = 20; k <= 20; k += 20) { // will hopfully get good
 			// recall?
 			//  for (size_t k = 20; k <= 50; k += 10) {
 			//  for (size_t k = 40; k <= 50; k += 10) {
@@ -337,9 +337,13 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					// for (size_t edge_count_search_factor : {2, 4}) {
 					// for (size_t edge_count_search_factor : {4}) {
 					// for (size_t edge_count_search_factor : {4}) {
-					for (size_t edge_count_search_factor : {1}) {
-						ehnsw_engine_5_jobs.emplace_back(ehnsw_engine_5_config(
-								k, num_for_1nn, edge_count_search_factor));
+					for (size_t edge_count_search_factor : {2}) {
+						// for (double layer_multiplier :
+						//		 {1 / log(k), 2 / log(k), 4 / log(k), 0.3})
+						for (double layer_multiplier = 0.2; layer_multiplier <= 2.0f;
+								 layer_multiplier += 0.2f)
+							ehnsw_engine_5_jobs.emplace_back(ehnsw_engine_5_config(
+									k, num_for_1nn, edge_count_search_factor, layer_multiplier));
 					}
 				}
 				if (false) {
