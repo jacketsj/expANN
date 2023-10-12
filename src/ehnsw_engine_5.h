@@ -15,13 +15,13 @@ struct ehnsw_engine_5_config {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
-	float layer_multiplier;
+	// float layer_multiplier;
 	ehnsw_engine_5_config(size_t _edge_count_mult, size_t _num_for_1nn,
-												size_t _edge_count_search_factor = 1,
-												float _layer_multiplier = 0.5f)
+												size_t _edge_count_search_factor = 1)
+			// float _layer_multiplier = 0.5f)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
-				edge_count_search_factor(_edge_count_search_factor),
-				layer_multiplier(_layer_multiplier) {}
+				edge_count_search_factor(_edge_count_search_factor) {}
+	// layer_multiplier(_layer_multiplier) {}
 };
 
 template <typename T>
@@ -34,12 +34,12 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
 	size_t edge_count_search_factor;
-	float layer_multiplier;
+	// float layer_multiplier;
 	ehnsw_engine_5(ehnsw_engine_5_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
-				edge_count_search_factor(conf.edge_count_search_factor),
-				layer_multiplier(conf.layer_multiplier) {}
+				edge_count_search_factor(conf.edge_count_search_factor) {}
+	// layer_multiplier(conf.layer_multiplier) {}
 	~ehnsw_engine_5();
 	std::vector<vec<T>> all_entries;
 	struct layer_data {
@@ -95,7 +95,7 @@ struct ehnsw_engine_5 : public ann_engine<T, ehnsw_engine_5<T>> {
 		add_param(pl, edge_count_mult);
 		add_param(pl, num_for_1nn);
 		add_param(pl, edge_count_search_factor);
-		add_param(pl, layer_multiplier);
+		// add_param(pl, layer_multiplier);
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
@@ -106,8 +106,8 @@ template <typename T> void ehnsw_engine_5<T>::_store_vector(const vec<T>& v) {
 	all_entries.push_back(v);
 
 	vertex_heights.emplace_back(
-			// size_t(floor(-log(distribution(gen)) / log(double(edge_count_mult)))));
-			size_t(floor(-log(distribution(gen)) * layer_multiplier)));
+			size_t(floor(-log(distribution(gen)) / log(double(edge_count_mult)))));
+	// size_t(floor(-log(distribution(gen)) * layer_multiplier)));
 
 	for (size_t layer = 0; layer <= vertex_heights[data_index]; ++layer) {
 		if (layers.size() <= layer) {

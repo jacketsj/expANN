@@ -349,10 +349,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					for (size_t edge_count_search_factor : {2}) {
 						// for (double layer_multiplier :
 						//		 {1 / log(k), 2 / log(k), 4 / log(k), 0.3})
-						for (double layer_multiplier = 0.2; layer_multiplier <= 2.0f;
-								 layer_multiplier += 0.2f)
-							ehnsw_engine_5_jobs.emplace_back(ehnsw_engine_5_config(
-									k, num_for_1nn, edge_count_search_factor, layer_multiplier));
+						//	for (double layer_multiplier = 0.2; layer_multiplier <= 2.0f;
+						//			 layer_multiplier += 0.2f)
+						ehnsw_engine_5_jobs.emplace_back(ehnsw_engine_5_config(
+								k, num_for_1nn, edge_count_search_factor));
+						//, layer_multiplier));
 					}
 				}
 				if (false) {
