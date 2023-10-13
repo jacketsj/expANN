@@ -127,6 +127,9 @@ template <typename T>
 void ehnsw_engine_6<T>::add_edges(size_t from,
 																	std::vector<std::pair<T, size_t>> to,
 																	size_t layer) {
+	if (neighbours.size() >= layers[layer].max_degree)
+		break;
+
 	auto& vals = layers[layer].vals;
 
 	sort(to.begin(), to.end());
@@ -170,8 +173,6 @@ void ehnsw_engine_6<T>::add_edges(size_t from,
 		} else {
 			discard_queue.emplace(to_vert);
 		}
-		if (neighbours.size() >= layers[layer].max_degree)
-			break;
 	}
 	while (neighbours.size() < layers[layer].max_degree) {
 		neighbours.emplace_back(discard_queue.front());
@@ -188,6 +189,8 @@ template <typename T> void ehnsw_engine_6<T>::improve_vertex_edges(size_t v) {
 	std::vector<std::vector<std::pair<T, size_t>>> kNNs =
 			_query_k_internal_wrapper(all_entries[v], edge_count_search,
 																layers.size() - 1);
+	// TODO batch-add "candidate" edges to a fixed candidate edge list, then
+	// update things periodically
 	// add all the found neighbours as edges (if they are good)
 	for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
 			 ++layer) {
