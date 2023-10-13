@@ -14,11 +14,16 @@
 struct ehnsw_engine_6_config {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
-	size_t edge_count_search_factor;
+	size_t edge_count_search;
+	bool extend_to_neighbours;
 	ehnsw_engine_6_config(size_t _edge_count_mult, size_t _num_for_1nn,
-												size_t _edge_count_search_factor = 1)
+												size_t _edge_count_search,
+												bool _extend_to_neighbours = true)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
-				edge_count_search_factor(_edge_count_search_factor) {}
+				edge_count_search(_edge_count_search),
+				extend_to_neighbours(_extend_to_neighbours) {
+		assert(edge_count_search >= edge_count_mult);
+	}
 };
 
 template <typename T>
@@ -30,11 +35,13 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 	size_t starting_vertex;
 	size_t edge_count_mult;
 	size_t num_for_1nn;
-	size_t edge_count_search_factor;
+	size_t edge_count_search;
+	bool extend_to_neighbours;
 	ehnsw_engine_6(ehnsw_engine_6_config conf)
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
-				edge_count_search_factor(conf.edge_count_search_factor) {}
+				edge_count_search(conf.edge_count_search),
+				extend_to_neighbours(conf.extend_to_neighbours) {}
 	std::vector<vec<T>> all_entries;
 	struct layer_data {
 		std::vector<std::vector<size_t>>
@@ -89,7 +96,8 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 		param_list_t pl;
 		add_param(pl, edge_count_mult);
 		add_param(pl, num_for_1nn);
-		add_param(pl, edge_count_search_factor);
+		add_param(pl, edge_count_search);
+		add_param(pl, extend_to_neighbours);
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
@@ -126,6 +134,9 @@ void ehnsw_engine_6<T>::add_edges(size_t from,
 	// do not add reverse edges, do not assume existing edges shall stay
 	//
 	// TODO consider extending by neighbours
+	if (extend_to_neighbours) {
+		// TODO ...
+	}
 	//
 	// TODO consider keeping candidate lists stored for other vertices, and adding
 	// reverse edges that way (later) --- probably not a good idea, since they can
@@ -135,8 +146,7 @@ void ehnsw_engine_6<T>::add_edges(size_t from,
 template <typename T> void ehnsw_engine_6<T>::improve_vertex_edges(size_t v) {
 	// get current approx kNN
 	std::vector<std::vector<std::pair<T, size_t>>> kNNs =
-			_query_k_internal_wrapper(all_entries[v],
-																edge_count_mult * edge_count_search_factor,
+			_query_k_internal_wrapper(all_entries[v], edge_count_search,
 																layers.size() - 1);
 	// add all the found neighbours as edges (if they are good)
 	for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
