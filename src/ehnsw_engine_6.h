@@ -66,6 +66,7 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 				e_labels.back().emplace_back(char(bool(generate_elabel())));
 		}
 		bool is_valid_edge(size_t vertex_i, size_t vertex_j, size_t bin) {
+			// return true; // TODO temporary for debugging
 			//  the last bin permits any edge (no cut)
 			if (bin == e_labels[vertex_i].size())
 				return true;
@@ -119,8 +120,6 @@ template <typename T> void ehnsw_engine_6<T>::_store_vector(const vec<T>& v) {
 		}
 		layers[layer].add_vertex(data_index, v,
 														 [&]() { return generate_elabel(); });
-
-		// TODO consider starting with a random graph
 	}
 }
 
