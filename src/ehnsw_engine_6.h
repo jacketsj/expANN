@@ -66,7 +66,7 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 				e_labels.back().emplace_back(char(bool(generate_elabel())));
 		}
 		bool is_valid_edge(size_t vertex_i, size_t vertex_j, size_t bin) {
-			// return true; // TODO temporary for debugging
+			// return true; // TODO temporary for debugging, no e mode
 			//  the last bin permits any edge (no cut)
 			if (bin == e_labels[vertex_i].size())
 				return true;
@@ -129,6 +129,8 @@ void ehnsw_engine_6<T>::add_edges(size_t from,
 																	size_t layer) {
 	auto& vals = layers[layer].vals;
 
+	sort(to.begin(), to.end());
+
 	// TODO consider extending by neighbours
 	auto& neighbours = layers[layer].adj[from];
 	if (extend_to_neighbours) {
@@ -189,8 +191,29 @@ template <typename T> void ehnsw_engine_6<T>::improve_vertex_edges(size_t v) {
 	// add all the found neighbours as edges (if they are good)
 	for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
 			 ++layer) {
-		sort(kNNs[layer].begin(), kNNs[layer].end());
-		add_edges(layers[layer].to_vertex[v], kNNs[layer], layer);
+		size_t v_vertex = layers[layer].to_vertex[v];
+		add_edges(v_vertex, kNNs[layer], layer);
+		// add bidirectional edges, pruning if necessary
+		for (size_t u_vertex : layers[layer].adj[v_vertex]) {
+			std::vector<std::pair<T, size_t>> new_candidates;
+			bool seen_v = false;
+			for (size_t old_candidate : layers[layer].adj[u_vertex]) {
+				new_candidates.emplace_back(dist2(layers[layer].vals[u_vertex],
+																					layers[layer].vals[old_candidate]),
+																		old_candidate);
+				if (old_candidate == v_vertex) {
+					seen_v = true;
+					break;
+				}
+			}
+			if (!seen_v) {
+				new_candidates.emplace_back(
+						dist2(layers[layer].vals[u_vertex], layers[layer].vals[v_vertex]),
+						v_vertex);
+				layers[layer].adj[u_vertex].clear();
+				add_edges(u_vertex, new_candidates, layer);
+			}
+		}
 	}
 }
 
