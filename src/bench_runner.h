@@ -303,7 +303,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 32; k <= 32; k += 10) { // will hopfully get good
 		// for (size_t k = 16; k <= 16; k += 10) { // will hopfully get good
 		// for (size_t k = 20; k <= 20; k += 20) { // will hopfully get good
-		for (size_t k = 70; k <= 70; k += 20) { // will hopfully get good
+		// for (size_t k = 70; k <= 70; k += 20) { // will hopfully get good
+		for (size_t k = 30; k <= 30; k += 20) { // will hopfully get good
 			// recall?
 			//  for (size_t k = 20; k <= 50; k += 10) {
 			//  for (size_t k = 40; k <= 50; k += 10) {
@@ -326,7 +327,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 16; num_for_1nn *= 4) {
 			// for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 4) {
-			for (size_t num_for_1nn = 16; num_for_1nn <= 16; num_for_1nn *= 4) {
+			// for (size_t num_for_1nn = 16; num_for_1nn <= 16; num_for_1nn *= 4) {
+			for (size_t num_for_1nn = 1; num_for_1nn <= 1; num_for_1nn *= 4) {
 				// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
 				//  for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 4) {
 				if (false) {
@@ -338,7 +340,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							100, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
 				}
 				if (true) {
-					for (size_t edge_count_search_factor : {4}) {
+					for (size_t edge_count_search_factor : {1}) {
 						hnsw_engine_reference_jobs.emplace_back(
 								hnsw_engine_reference_config(k, edge_count_search_factor * k));
 					}
@@ -347,7 +349,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					// for (size_t edge_count_search_factor : {2, 4}) {
 					// for (size_t edge_count_search_factor : {4}) {
 					// for (size_t edge_count_search_factor : {4}) {
-					for (size_t edge_count_search_factor : {4}) {
+					for (size_t edge_count_search_factor : {1}) {
 						// for (double layer_multiplier :
 						//		 {1 / log(k), 2 / log(k), 4 / log(k), 0.3})
 						//	for (double layer_multiplier = 0.2; layer_multiplier <= 2.0f;
