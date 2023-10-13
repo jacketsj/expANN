@@ -45,10 +45,8 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 	std::vector<vec<T>> all_entries;
 	struct layer_data {
 		std::vector<std::vector<size_t>>
-				adj; // vertex -> cut -> outgoing_edge data_index
-		std::vector<std::vector<std::tuple<T, size_t, size_t>>>
-				edge_ranks; // vertex -> closest connected [distance, bin, edge_index]
-		std::vector<vec<T>> vals;					 // vertex -> data
+				adj;									// vertex -> cut -> outgoing_edge data_index
+		std::vector<vec<T>> vals; // vertex -> data
 		std::vector<size_t> to_data_index; // vertex -> data_index
 		robin_hood::unordered_flat_map<size_t, size_t>
 				to_vertex;													 // data_index -> vertex
@@ -59,7 +57,6 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 			to_vertex[data_index] = to_data_index.size();
 			to_data_index.emplace_back(data_index);
 			adj.emplace_back();
-			edge_ranks.emplace_back();
 			vals.emplace_back(data);
 
 			e_labels.emplace_back();
@@ -129,15 +126,56 @@ template <typename T>
 void ehnsw_engine_6<T>::add_edges(size_t from,
 																	std::vector<std::pair<T, size_t>> to,
 																	size_t layer) {
-	// TODO prune based on distance
-	// TODO add all edges in increasing order, prune based on e_labels (maybe?)
-	// do not add reverse edges, do not assume existing edges shall stay
-	//
+	size_t max_degree = edge_count_mult;
+	if (layer == 0)
+		max_degree *= 2;
+
 	// TODO consider extending by neighbours
+	auto& neighbours = layers[layer].adj[from];
 	if (extend_to_neighbours) {
 		// TODO ...
+		assert(false); // not implemented
 	}
-	//
+	sort(to.begin(), to.end());
+	std::set<size_t> available_bins;
+	for (size_t bin = 0; bin < layers[layer].num_cuts() + 1; ++bin)
+		available_bins.insert(bin);
+	std::queue<size_t> discard_queue;
+	for (const auto& [to_d, to_vert] : to) {
+		int chosen_bin = 0;
+		bool include = false;
+		// prune based on cuts
+		for (size_t bin : available_bins) {
+			if (layers[layer].is_valid_edge(from, to_vert, bin)) {
+				chosen_bin = bin;
+				include = true;
+				break;
+			}
+		}
+		if (include) {
+			// prune based on distance
+			// TODO consider better (graph-based? higher-dimensional?)
+			// anti-clique methods
+			for (const size_t& chosen_vert : neighbours) {
+				if (dist2(vals[chosen_vert], vals[to_vert]) < to_d) {
+					include = false;
+					break;
+				}
+			}
+		}
+		if (include) {
+			neighbours.emplace_back(to_vert);
+		} else {
+			discard_queue.emplace_back(to_vert);
+		}
+		if (neighbours.size() >= max_degree)
+			break;
+	}
+	while (neighbours.size() < max_degree) {
+		neighbours.emplace_back(discard_queue.top());
+		discard_queue.pop();
+	}
+
 	// TODO consider keeping candidate lists stored for other vertices, and adding
 	// reverse edges that way (later) --- probably not a good idea, since they can
 	// be found later when doing an improve call
