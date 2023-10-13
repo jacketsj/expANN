@@ -35,7 +35,6 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 			: rd(), gen(rd()), distribution(0, 1), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				edge_count_search_factor(conf.edge_count_search_factor) {}
-	~ehnsw_engine_6();
 	std::vector<vec<T>> all_entries;
 	struct layer_data {
 		std::vector<std::vector<size_t>>
@@ -71,6 +70,7 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 	std::vector<layer_data> layers;
 	std::vector<size_t> vertex_heights; // data_index -> max_height
 	void _store_vector(const vec<T>& v);
+	void improve_vertex_edges(size_t v);
 	void _build();
 	const std::vector<std::pair<T, size_t>>
 	_query_k_internal(const vec<T>& v, size_t k,
@@ -112,6 +112,8 @@ template <typename T> void ehnsw_engine_6<T>::_store_vector(const vec<T>& v) {
 			max_degree_layer *= 2;
 		layers[layer].add_vertex(data_index, v, max_degree_layer,
 														 [&]() { return generate_elabel(); });
+
+		// TODO consider starting with a random graph
 	}
 }
 
@@ -126,30 +128,29 @@ void ehnsw_engine_6<T>::add_edges(size_t from,
 	// TODO consider extending by neighbours
 	//
 	// TODO consider keeping candidate lists stored for other vertices, and adding
-	// reverse edges that way
+	// reverse edges that way (later) --- probably not a good idea, since they can
+	// be found later when doing an improve call
+}
+
+template <typename T> void ehnsw_engine_6<T>::improve_vertex_edges(size_t v) {
+	// get current approx kNN
+	std::vector<std::vector<std::pair<T, size_t>>> kNNs =
+			_query_k_internal_wrapper(all_entries[v],
+																edge_count_mult * edge_count_search_factor,
+																layers.size() - 1);
+	// add all the found neighbours as edges (if they are good)
+	for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
+			 ++layer) {
+		sort(kNNs[layer].begin(), kNNs[layer].end());
+		add_edges(v, kNNs[layer], layer);
+	}
 }
 
 template <typename T> void ehnsw_engine_6<T>::_build() {
 	assert(all_entries.size() > 0);
 	size_t op_count = 0;
 
-	auto improve_vertex_edges = [&](size_t v) {
-		// get current approx kNN
-		std::vector<std::vector<std::pair<T, size_t>>> kNNs =
-				_query_k_internal_wrapper(all_entries[v],
-																	edge_count_mult * edge_count_search_factor,
-																	layers.size() - 1);
-		// add all the found neighbours as edges (if they are good)
-		for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
-				 ++layer) {
-			sort(kNNs[layer].begin(), kNNs[layer].end());
-			size_t v_in_layer = layers[layer].to_vertex[v];
-			for (auto [d, u_in_layer] : kNNs[layer]) {
-				add_edge(v_in_layer, u_in_layer, d, layer);
-			}
-		}
-	};
-
+	// TODO use a random permutation
 	for (size_t i = 0; i < all_entries.size(); ++i) {
 		if (i % 5000 == 0)
 			std::cerr << "Built " << double(i) / double(all_entries.size()) * 100
@@ -158,7 +159,9 @@ template <typename T> void ehnsw_engine_6<T>::_build() {
 		++op_count;
 		improve_vertex_edges(i);
 	}
+	// TODO consider using a second pass
 }
+
 template <typename T>
 const std::vector<std::pair<T, size_t>>
 ehnsw_engine_6<T>::_query_k_internal(const vec<T>& v, size_t k,
@@ -192,8 +195,8 @@ ehnsw_engine_6<T>::_query_k_internal(const vec<T>& v, size_t k,
 		return is_good;
 	};
 	for (const auto& sp : starting_points)
-		// visit(dist2(v, vals[sp]), sp);
-		visit(dist2fast(v, vals[sp]), sp);
+		visit(dist2(v, vals[sp]), sp);
+	// visit(dist2fast(v, vals[sp]), sp);
 	// visit(dist2fast(v, all_entries[to_data_index[sp]]), sp);
 	while (!to_visit.empty()) {
 		T nd;
@@ -208,8 +211,8 @@ ehnsw_engine_6<T>::_query_k_internal(const vec<T>& v, size_t k,
 			_mm_prefetch(&vals[u], _MM_HINT_T0);
 		}
 		for (const auto& u : adj[cur]) {
-			T d_next = dist2fast(v, vals[u]);
-			// T d_next = dist2(v, vals[u]);
+			// T d_next = dist2fast(v, vals[u]);
+			T d_next = dist2(v, vals[u]);
 			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
 			visit(d_next, u);
 		}
@@ -281,21 +284,9 @@ std::vector<size_t> ehnsw_engine_6<T>::_query_k(const vec<T>& v, size_t k) {
 	auto ret_combined =
 			_query_k_internal(v, k * num_for_1nn, {layers[0].to_vertex[current]}, 0);
 
-	/*
-	auto ret_combined = _query_k_internal_wrapper(v, k * num_for_1nn, 0)[0];
-	*/
 	ret_combined.resize(std::min(k, ret_combined.size()));
 	auto ret = std::vector<size_t>(ret_combined.size());
 	for (size_t i = 0; i < ret.size(); ++i)
 		ret[i] = ret_combined[i].second;
 	return ret;
-}
-
-template <typename T> ehnsw_engine_6<T>::~ehnsw_engine_6() {
-	sort(vertex_heights.rbegin(), vertex_heights.rend());
-	std::cout << "largest heights: " << std::endl;
-	for (size_t i = 0; i < 100; ++i) {
-		std::cout << vertex_heights[i] << ' ';
-	}
-	std::cout << std::endl;
 }
