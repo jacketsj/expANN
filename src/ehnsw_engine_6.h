@@ -44,15 +44,17 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 				extend_to_neighbours(conf.extend_to_neighbours) {}
 	std::vector<vec<T>> all_entries;
 	struct layer_data {
+		size_t max_degree;
+		layer_data(size_t _max_degree) : max_degree(_max_degree) {}
 		std::vector<std::vector<size_t>>
 				adj;									// vertex -> cut -> outgoing_edge data_index
 		std::vector<vec<T>> vals; // vertex -> data
 		std::vector<size_t> to_data_index; // vertex -> data_index
 		robin_hood::unordered_flat_map<size_t, size_t>
 				to_vertex;													 // data_index -> vertex
-		std::vector<std::vector<bool>> e_labels; // vertex -> cut labels (*num_cuts)
+		std::vector<std::vector<char>> e_labels; // vertex -> cut labels (*num_cuts)
 		size_t num_cuts() { return e_labels[0].size(); }
-		void add_vertex(size_t data_index, const vec<T>& data, size_t max_degree,
+		void add_vertex(size_t data_index, const vec<T>& data,
 										std::function<bool()> generate_elabel) {
 			to_vertex[data_index] = to_data_index.size();
 			to_data_index.emplace_back(data_index);
@@ -61,7 +63,7 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 
 			e_labels.emplace_back();
 			for (size_t cut = 0; cut + 1 < max_degree; ++cut)
-				e_labels.back().emplace_back(generate_elabel());
+				e_labels.back().emplace_back(char(bool(generate_elabel())));
 		}
 		bool is_valid_edge(size_t vertex_i, size_t vertex_j, size_t bin) {
 			//  the last bin permits any edge (no cut)
@@ -110,12 +112,12 @@ template <typename T> void ehnsw_engine_6<T>::_store_vector(const vec<T>& v) {
 	for (size_t layer = 0; layer <= vertex_heights[data_index]; ++layer) {
 		if (layers.size() <= layer) {
 			starting_vertex = data_index;
-			layers.emplace_back();
+			size_t max_degree_layer = edge_count_mult;
+			if (layer == 0)
+				max_degree_layer *= 2;
+			layers.emplace_back(max_degree_layer);
 		}
-		size_t max_degree_layer = edge_count_mult;
-		if (layer == 0)
-			max_degree_layer *= 2;
-		layers[layer].add_vertex(data_index, v, max_degree_layer,
+		layers[layer].add_vertex(data_index, v,
 														 [&]() { return generate_elabel(); });
 
 		// TODO consider starting with a random graph
@@ -126,9 +128,7 @@ template <typename T>
 void ehnsw_engine_6<T>::add_edges(size_t from,
 																	std::vector<std::pair<T, size_t>> to,
 																	size_t layer) {
-	size_t max_degree = edge_count_mult;
-	if (layer == 0)
-		max_degree *= 2;
+	auto& vals = layers[layer].vals;
 
 	// TODO consider extending by neighbours
 	auto& neighbours = layers[layer].adj[from];
@@ -165,14 +165,15 @@ void ehnsw_engine_6<T>::add_edges(size_t from,
 		}
 		if (include) {
 			neighbours.emplace_back(to_vert);
+			available_bins.erase(chosen_bin);
 		} else {
-			discard_queue.emplace_back(to_vert);
+			discard_queue.emplace(to_vert);
 		}
-		if (neighbours.size() >= max_degree)
+		if (neighbours.size() >= layers[layer].max_degree)
 			break;
 	}
-	while (neighbours.size() < max_degree) {
-		neighbours.emplace_back(discard_queue.top());
+	while (neighbours.size() < layers[layer].max_degree) {
+		neighbours.emplace_back(discard_queue.front());
 		discard_queue.pop();
 	}
 
@@ -190,7 +191,7 @@ template <typename T> void ehnsw_engine_6<T>::improve_vertex_edges(size_t v) {
 	for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
 			 ++layer) {
 		sort(kNNs[layer].begin(), kNNs[layer].end());
-		add_edges(v, kNNs[layer], layer);
+		add_edges(layers[layer].to_vertex[v], kNNs[layer], layer);
 	}
 }
 
