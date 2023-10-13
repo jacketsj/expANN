@@ -199,6 +199,24 @@ template <typename T> void ehnsw_engine_6<T>::_build() {
 	assert(all_entries.size() > 0);
 	size_t op_count = 0;
 
+	// start with a random graph
+	for (size_t v = 0; v < all_entries.size(); ++v) {
+		if (v % 5000 == 0)
+			std::cerr << "Randomized " << double(v) / double(all_entries.size()) * 100
+								<< "%" << std::endl;
+		for (size_t layer = 0; layer <= vertex_heights[v]; ++layer) {
+			std::vector<std::pair<T, size_t>> random_candidates;
+			std::uniform_int_distribution<> vert_distribution(
+					0, layers[layer].adj.size() - 1);
+			while (random_candidates.size() <= layers[layer].max_degree * 2) {
+				size_t u = vert_distribution(gen);
+				random_candidates.emplace_back(
+						dist2(layers[layer].vals[u], all_entries[v]), u);
+			}
+			add_edges(layers[layer].to_vertex[v], random_candidates, layer);
+		}
+	}
+
 	// TODO use a random permutation
 	for (size_t i = 0; i < all_entries.size(); ++i) {
 		if (i % 5000 == 0)
