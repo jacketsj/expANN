@@ -127,9 +127,6 @@ template <typename T>
 void ehnsw_engine_6<T>::add_edges(size_t from,
 																	std::vector<std::pair<T, size_t>> to,
 																	size_t layer) {
-	if (neighbours.size() >= layers[layer].max_degree)
-		break;
-
 	auto& vals = layers[layer].vals;
 
 	sort(to.begin(), to.end());
@@ -146,6 +143,9 @@ void ehnsw_engine_6<T>::add_edges(size_t from,
 		available_bins.insert(bin);
 	std::queue<size_t> discard_queue;
 	for (const auto& [to_d, to_vert] : to) {
+		if (neighbours.size() >= layers[layer].max_degree)
+			break;
+
 		int chosen_bin = 0;
 		bool include = false;
 		// prune based on cuts
