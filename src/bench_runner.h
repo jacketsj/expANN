@@ -310,7 +310,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 16; k <= 16; k += 10) { // will hopfully get good
 		// for (size_t k = 20; k <= 20; k += 20) { // will hopfully get good
 		// for (size_t k = 70; k <= 70; k += 20) { // will hopfully get good
-		for (size_t k = 30; k <= 30; k += 20) { // will hopfully get good
+		for (size_t k = 50; k <= 70; k += 20) { // will hopfully get good
 			// recall?
 			//  for (size_t k = 20; k <= 50; k += 10) {
 			//  for (size_t k = 40; k <= 50; k += 10) {
@@ -341,21 +341,24 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					ensg_engine_jobs.emplace_back(
 							ensg_engine_config(k, num_for_1nn, 1.0f));
 				}
-				if (true) {
+				if (false) {
 					ehnsw_engine_2_jobs.emplace_back(ehnsw_engine_2_config(
 							100, k, num_for_1nn, k - 1, 1, true, true, false, 0.5f));
 				}
-				if (true) {
+				if (false) {
 					for (size_t edge_count_search_factor : {4}) {
 						ehnsw_engine_7_jobs.emplace_back(ehnsw_engine_7_config(
 								100, k, k * edge_count_search_factor, num_for_1nn, k - 1, 1,
 								true, true, false, 0.5f));
 					}
 				}
-				if (false) {
-					for (size_t edge_count_search_factor : {1}) {
-						hnsw_engine_reference_jobs.emplace_back(
-								hnsw_engine_reference_config(k, edge_count_search_factor * k));
+				if (true) {
+					for (size_t edge_count_search_factor : {4, 8}) {
+						for (bool use_ecuts : {false, true}) {
+							hnsw_engine_reference_jobs.emplace_back(
+									hnsw_engine_reference_config(k, edge_count_search_factor * k,
+																							 use_ecuts));
+						}
 					}
 				}
 				if (false) {

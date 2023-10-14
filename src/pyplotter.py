@@ -101,8 +101,8 @@ f = open('./data/sift1m_full_k10/data/all.json')
 datavec = json.load(f)
 
 # TODO come up with a better name for this
-enable_sprinkles = False
-sprinkle_param = 'pruning_factor'
+enable_sprinkles = True
+sprinkle_param = 'use_ecuts'
 
 engines = set()
 for benchdata in datavec:

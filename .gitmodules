@@ -7,3 +7,5 @@
 [submodule "hnswlib"]
 	path = hnswlib
 	url = https://github.com/nmslib/hnswlib.git
+[submodule "hnswlib/"]
+	url = https://github.com/jacketsj/hnswlib-exp.git
