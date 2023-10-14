@@ -203,8 +203,8 @@ template <typename T> void ehnsw_engine_6<T>::improve_vertex_edges(size_t v) {
 		// add bidirectional edges, pruning if necessary
 		for (size_t u_vertex : layers[layer].adj[v_vertex]) {
 			// TODO change this back
-			layers[layer].adj[u_vertex].emplace_back(v_vertex);
-			continue;
+			// layers[layer].adj[u_vertex].emplace_back(v_vertex);
+			// continue;
 
 			std::vector<std::pair<T, size_t>> new_candidates;
 			bool seen_v = false;
