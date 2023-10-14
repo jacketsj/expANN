@@ -103,23 +103,59 @@ struct ehnsw_engine_6 : public ann_engine<T, ehnsw_engine_6<T>> {
 	bool generate_elabel() { return int_distribution(gen); }
 };
 
-template <typename T> void ehnsw_engine_6<T>::_store_vector(const vec<T>& v) {
-	size_t data_index = all_entries.size();
-	all_entries.push_back(v);
+template <typename T>
+void ehnsw_engine_6<T>::_store_vector(const vec<T>& v_data) {
+	size_t v = all_entries.size();
+	all_entries.push_back(v_data);
 
 	vertex_heights.emplace_back(
 			size_t(floor(-log(distribution(gen)) / log(double(edge_count_mult)))));
 
-	for (size_t layer = 0; layer <= vertex_heights[data_index]; ++layer) {
+	// TODO refactor this
+	std::vector<std::vector<std::pair<T, size_t>>> kNNs =
+			_query_k_internal_wrapper(all_entries[v], edge_count_search,
+																layers.size() - 1);
+
+	for (size_t layer = 0; layer <= vertex_heights[v]; ++layer) {
 		if (layers.size() <= layer) {
-			starting_vertex = data_index;
+			starting_vertex = v;
 			size_t max_degree_layer = edge_count_mult;
 			if (layer == 0)
 				max_degree_layer *= 2;
 			layers.emplace_back(max_degree_layer);
 		}
-		layers[layer].add_vertex(data_index, v,
-														 [&]() { return generate_elabel(); });
+		layers[layer].add_vertex(v, v_data, [&]() { return generate_elabel(); });
+	}
+
+	for (size_t layer = 0; layer < std::min(kNNs.size(), vertex_heights[v] + 1);
+			 ++layer) {
+		size_t v_vertex = layers[layer].to_vertex[v];
+		add_edges(v_vertex, kNNs[layer], layer);
+		// add bidirectional edges, pruning if necessary
+		for (size_t u_vertex : layers[layer].adj[v_vertex]) {
+			// TODO change this back
+			layers[layer].adj[u_vertex].emplace_back(v_vertex);
+			continue;
+
+			std::vector<std::pair<T, size_t>> new_candidates;
+			bool seen_v = false;
+			for (size_t old_candidate : layers[layer].adj[u_vertex]) {
+				new_candidates.emplace_back(dist2(layers[layer].vals[u_vertex],
+																					layers[layer].vals[old_candidate]),
+																		old_candidate);
+				if (old_candidate == v_vertex) {
+					seen_v = true;
+					break;
+				}
+			}
+			if (!seen_v) {
+				new_candidates.emplace_back(
+						dist2(layers[layer].vals[u_vertex], layers[layer].vals[v_vertex]),
+						v_vertex);
+				layers[layer].adj[u_vertex].clear();
+				add_edges(u_vertex, new_candidates, layer);
+			}
+		}
 	}
 }
 
@@ -203,8 +239,8 @@ template <typename T> void ehnsw_engine_6<T>::improve_vertex_edges(size_t v) {
 		// add bidirectional edges, pruning if necessary
 		for (size_t u_vertex : layers[layer].adj[v_vertex]) {
 			// TODO change this back
-			// layers[layer].adj[u_vertex].emplace_back(v_vertex);
-			// continue;
+			layers[layer].adj[u_vertex].emplace_back(v_vertex);
+			continue;
 
 			std::vector<std::pair<T, size_t>> new_candidates;
 			bool seen_v = false;
@@ -232,6 +268,7 @@ template <typename T> void ehnsw_engine_6<T>::_build() {
 	assert(all_entries.size() > 0);
 	size_t op_count = 0;
 
+	/*
 	// start with a random graph
 	for (size_t v = 0; v < all_entries.size(); ++v) {
 		if (v % 5000 == 0)
@@ -249,6 +286,7 @@ template <typename T> void ehnsw_engine_6<T>::_build() {
 			add_edges(layers[layer].to_vertex[v], random_candidates, layer);
 		}
 	}
+	*/
 
 	// TODO use a random permutation
 	for (size_t i = 0; i < all_entries.size(); ++i) {
