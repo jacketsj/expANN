@@ -14,6 +14,10 @@ while [[ $# -gt 0 ]]; do
             ENABLE_STACK_INFO="ON"
             shift
             ;;
+        --asan)
+            ENABLE_ASAN="ON"
+            shift
+            ;;
         --gcov)
             ENABLE_GCOV="ON"
             shift

@@ -32,6 +32,13 @@ set(CMAKE_CXX_FLAGS "-Wall -pthread -Ofast -ftree-vectorize ${OpenMP_CXX_FLAGS}"
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O0 ${OpenMP_CXX_FLAGS}") # Segfault debugging
 #set(CMAKE_CXX_FLAGS "-Wall -Ofast ${OpenMP_CXX_FLAGS}")
 
+if(ENABLE_ASAN)
+    message("Enabling asan.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -g -fno-omit-frame-pointer")
+else()
+    message("Disabling asan.")
+endif()
+
 if(ENABLE_STACK_INFO)
     message("Enabling stack info (-march=native omitted).")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -g")
