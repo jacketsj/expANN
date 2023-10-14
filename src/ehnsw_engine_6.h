@@ -137,12 +137,16 @@ void ehnsw_engine_6<T>::add_edges(size_t from,
 		// TODO ...
 		assert(false); // not implemented
 	}
+	// TODO remove duplicates from to
 	sort(to.begin(), to.end());
 	std::set<size_t> available_bins;
 	for (size_t bin = 0; bin < layers[layer].num_cuts() + 1; ++bin)
 		available_bins.insert(bin);
 	std::queue<size_t> discard_queue;
 	for (const auto& [to_d, to_vert] : to) {
+		if (to_vert == from)
+			continue;
+
 		if (neighbours.size() >= layers[layer].max_degree)
 			break;
 
@@ -174,11 +178,11 @@ void ehnsw_engine_6<T>::add_edges(size_t from,
 			discard_queue.emplace(to_vert);
 		}
 	}
-	while (neighbours.size() < layers[layer].max_degree) {
+	while (neighbours.size() < layers[layer].max_degree &&
+				 !discard_queue.empty()) {
 		neighbours.emplace_back(discard_queue.front());
 		discard_queue.pop();
 	}
-
 	// TODO consider keeping candidate lists stored for other vertices, and adding
 	// reverse edges that way (later) --- probably not a good idea, since they can
 	// be found later when doing an improve call
@@ -198,6 +202,10 @@ template <typename T> void ehnsw_engine_6<T>::improve_vertex_edges(size_t v) {
 		add_edges(v_vertex, kNNs[layer], layer);
 		// add bidirectional edges, pruning if necessary
 		for (size_t u_vertex : layers[layer].adj[v_vertex]) {
+			// TODO change this back
+			layers[layer].adj[u_vertex].emplace_back(v_vertex);
+			continue;
+
 			std::vector<std::pair<T, size_t>> new_candidates;
 			bool seen_v = false;
 			for (size_t old_candidate : layers[layer].adj[u_vertex]) {
