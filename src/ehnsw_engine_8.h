@@ -96,7 +96,7 @@ struct ehnsw_engine_8 : public ann_engine<T, ehnsw_engine_8<T>> {
 														size_t full_search_top_layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() {
-		return "EHNSW Engine 8('comparative re-reference engine')";
+		return "EHNSW Engine 8('comparative re-reference engine, no e')";
 	}
 
 	const param_list_t _param_list() {
