@@ -120,7 +120,7 @@ void hnsw_engine_basic_2<T>::_store_vector(const vec<T>& v) {
 	}
 
 	// add the found edges to the graph
-	for (size_t layer = 0; layer <= hadj.size(); ++layer) {
+	for (size_t layer = 0; layer < hadj.size(); ++layer) {
 		hadj.back()[v_index] = prune_edges(layer, kNN_per_layer[layer]);
 		// add bidirectional connections, prune if necessary
 		for (auto& md : kNN_per_layer[layer]) {
