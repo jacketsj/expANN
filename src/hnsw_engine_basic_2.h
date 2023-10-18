@@ -13,11 +13,11 @@
 struct hnsw_engine_basic_2_config {
 	size_t M;
 	size_t M0;
-	size_t ef_search;
+	size_t ef_search_mult;
 	size_t ef_construction;
-	hnsw_engine_basic_2_config(size_t _M, size_t _M0, size_t _ef_search,
+	hnsw_engine_basic_2_config(size_t _M, size_t _M0, size_t _ef_search_mult,
 														 size_t _ef_construction)
-			: M(_M), M0(_M0), ef_search(_ef_search),
+			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction) {}
 };
 
@@ -29,11 +29,12 @@ struct hnsw_engine_basic_2 : public ann_engine<T, hnsw_engine_basic_2<T>> {
 	size_t starting_vertex;
 	size_t M;
 	size_t M0;
-	size_t ef_search;
+	size_t ef_search_mult;
 	size_t ef_construction;
 	hnsw_engine_basic_2(hnsw_engine_basic_2_config conf)
 			: rd(), gen(rd()), distribution(0, 1), M(conf.M), M0(conf.M0),
-				ef_search(conf.ef_search), ef_construction(conf.ef_construction) {}
+				ef_search_mult(conf.ef_search_mult),
+				ef_construction(conf.ef_construction) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<
 			robin_hood::unordered_flat_map<size_t, std::vector<std::pair<T, size_t>>>>
@@ -51,7 +52,7 @@ struct hnsw_engine_basic_2 : public ann_engine<T, hnsw_engine_basic_2<T>> {
 		param_list_t pl;
 		add_param(pl, M);
 		add_param(pl, M0);
-		add_param(pl, ef_search);
+		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
 		return pl;
 	}
@@ -158,12 +159,18 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_2<T>::query_k_at_layer(
 	auto best_elem = [](const measured_data& a, const measured_data& b) {
 		return a.first > b.first;
 	};
+	std::vector<measured_data> entry_points_with_dist;
+	for (const auto& ep : entry_points) {
+		entry_points_with_dist.emplace_back(dist2(q, all_entries[ep]), ep);
+	}
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(best_elem)>
-			candidates(entry_points.begin(), entry_points.end(), best_elem);
+			candidates(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+								 best_elem);
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(worst_elem)>
-			nearest(entry_points.begin(), entry_points.end(), worst_elem);
+			nearest(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+							worst_elem);
 	while (nearest.size() > k)
 		nearest.pop();
 
@@ -212,7 +219,7 @@ std::vector<size_t> hnsw_engine_basic_2<T>::_query_k(const vec<T>& q,
 	int layer;
 	for (layer = hadj.size() - 1; layer > 0; --layer)
 		cur_vert = query_k_at_layer(q, layer, {cur_vert}, 1)[0].second;
-	auto ret_combined = query_k_at_layer(q, 0, {cur_vert}, k * ef_search);
+	auto ret_combined = query_k_at_layer(q, 0, {cur_vert}, k * ef_search_mult);
 	std::vector<size_t> ret;
 	for (size_t i = 0; i < ret_combined.size() && i < k; ++i) {
 		ret.emplace_back(ret_combined[i].second);
