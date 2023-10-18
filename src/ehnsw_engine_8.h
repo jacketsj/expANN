@@ -64,8 +64,8 @@ struct ehnsw_engine_8 : public ann_engine<T, ehnsw_engine_8<T>> {
 			// no longer do checks against e_labels, only do checks against other
 			// edges
 			for (const size_t& vertex_k : adj[vertex_i]) {
-				if (dist2(vals[vertex_k], vals[vertex_j]) <
-						dist2(vals[vertex_j], vals[vertex_i])) {
+				if (vertex_k == vertex_j || dist2(vals[vertex_k], vals[vertex_j]) <
+																				dist2(vals[vertex_j], vals[vertex_i])) {
 					return false;
 				}
 			}
@@ -261,6 +261,7 @@ ehnsw_engine_8<T>::_query_k_internal(const vec<T>& v, size_t k,
 		T nd;
 		size_t cur;
 		std::tie(nd, cur) = to_visit.top();
+		// TODO this is a butchering of how this should work I think
 		if (top_k.size() == k && -nd > top_k.top().first)
 			// everything neighbouring current best set is already evaluated
 			break;
@@ -289,7 +290,8 @@ template <typename T>
 const std::vector<std::vector<std::pair<T, size_t>>>
 ehnsw_engine_8<T>::_query_k_internal_wrapper(const vec<T>& v, size_t k,
 																						 size_t full_search_top_layer) {
-	auto current = starting_vertex;
+	auto current = starting_vertex; // TODO current should be a set (top k each
+																	// time), not a single vertex
 	std::vector<std::vector<std::pair<T, size_t>>> ret;
 	// for each layer, in decreasing depth
 	for (int layer = layers.size() - 1; layer >= 0; --layer) {
