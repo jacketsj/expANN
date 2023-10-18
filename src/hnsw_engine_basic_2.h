@@ -2,8 +2,9 @@
 
 #include <algorithm>
 #include <queue>
-#include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "ann_engine.h"
@@ -66,6 +67,11 @@ hnsw_engine_basic_2<T>::prune_edges(size_t layer,
 	if (layer == 0)
 		edge_count_mult = M0;
 
+	// reference impl vs paper difference
+	if (to.size() <= edge_count_mult) {
+		return to;
+	}
+
 	sort(to.begin(), to.end());
 	std::vector<std::pair<T, size_t>> ret;
 	for (const auto& md : to) {
@@ -96,10 +102,12 @@ void hnsw_engine_basic_2<T>::_store_vector(const vec<T>& v) {
 
 	// get kNN for each layer
 	size_t new_max_layer = floor(-log(distribution(gen)) * 1 / log(double(M)));
+	// std::cerr << "v_index=" << v_index << " at layer=" << new_max_layer
+	//					<< std::endl;
 	std::vector<std::vector<std::pair<T, size_t>>> kNN_per_layer;
 	if (all_entries.size() > 1) {
 		std::vector<size_t> cur = {starting_vertex};
-		for (int layer = hadj.size() - 1; layer > new_max_layer; --layer) {
+		for (int layer = hadj.size() - 1; layer > int(new_max_layer); --layer) {
 			kNN_per_layer.emplace_back(query_k_at_layer(v, layer, cur, 1));
 			cur.clear();
 			for (auto& md : kNN_per_layer.back()) {
@@ -114,15 +122,23 @@ void hnsw_engine_basic_2<T>::_store_vector(const vec<T>& v) {
 			for (auto& md : kNN_per_layer.back()) {
 				cur.emplace_back(md.second);
 			}
+			cur.resize(1); // present in reference impl, but not in hnsw paper
 		}
 
 		std::reverse(kNN_per_layer.begin(), kNN_per_layer.end());
 	}
 
 	// add the found edges to the graph
-	for (size_t layer = 0; layer < hadj.size(); ++layer) {
-		hadj.back()[v_index] = prune_edges(layer, kNN_per_layer[layer]);
-		// add bidirectional connections, prune if necessary
+	for (size_t layer = 0; layer < std::min(hadj.size(), new_max_layer + 1);
+			 ++layer) {
+		hadj[layer][v_index] = prune_edges(layer, kNN_per_layer[layer]);
+		// std::cerr << "Just set outgoing edges for " << v_index
+		//					<< " at layer=" << layer << ": ";
+		// for (auto& [_, u] : hadj[layer][v_index]) {
+		//	std::cerr << u << ' ';
+		// }
+		// std::cerr << '\n';
+		//  add bidirectional connections, prune if necessary
 		for (auto& md : kNN_per_layer[layer]) {
 			bool edge_exists = false;
 			for (auto& md_other : hadj[layer][md.second]) {
@@ -131,12 +147,27 @@ void hnsw_engine_basic_2<T>::_store_vector(const vec<T>& v) {
 				}
 			}
 			if (!edge_exists) {
+				// std::cerr << "(Inside) About to re-set outgoing edges for " <<
+				// md.second
+				//					<< " at layer=" << layer << " and v_index=" << v_index
+				//					<< ": ";
+				// for (auto& [_, u] : hadj[layer][md.second]) {
+				//	std::cerr << u << ' ';
+				// }
+				// std::cerr << '\n';
 				hadj[layer][md.second].emplace_back(md.first, v_index);
 				hadj[layer][md.second] = prune_edges(layer, hadj[layer][md.second]);
+				// std::cerr << "(Inside) just re-set outgoing edges for " << md.second
+				//					<< " at layer=" << layer << ": ";
+				// for (auto& [_, u] : hadj[layer][md.second]) {
+				//	std::cerr << u << ' ';
+				// }
+				// std::cerr << '\n';
 			}
 		}
 	}
 
+	// add new layers if necessary
 	while (new_max_layer >= hadj.size()) {
 		hadj.emplace_back();
 		hadj.back()[v_index] = std::vector<std::pair<T, size_t>>();
@@ -146,7 +177,24 @@ void hnsw_engine_basic_2<T>::_store_vector(const vec<T>& v) {
 
 template <typename T> void hnsw_engine_basic_2<T>::_build() {
 	assert(all_entries.size() > 0);
+
+	/*
+	for (size_t layer = 0; layer < hadj.size(); ++layer) {
+		std::cerr << "layer: " << layer << " (num nodes=" << hadj[layer].size()
+							<< ")\n";
+		for (size_t v_index = 0; v_index < all_entries.size(); ++v_index) {
+			if (hadj[layer].contains(v_index)) {
+				std::cerr << v_index << "->[";
+				for (auto [_, u] : hadj[layer][v_index])
+					std::cerr << u << " ";
+				std::cerr << "]\n";
+			}
+		}
+	}
+	*/
 }
+
+// bool querying = false;
 
 template <typename T>
 std::vector<std::pair<T, size_t>> hnsw_engine_basic_2<T>::query_k_at_layer(
@@ -180,6 +228,10 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_2<T>::query_k_at_layer(
 
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
+		// if (querying)
+		//	std::cerr << "Looking at candidate (layer=" << layer << ") " <<
+		//cur.second
+		//						<< std::endl;
 		candidates.pop();
 		if (cur.first > nearest.top().first && nearest.size() == k) {
 			// TODO second condition should be unnecessary as written
@@ -189,12 +241,14 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_2<T>::query_k_at_layer(
 		// for (size_t next : hadj[layer][cur.first]) {
 		//	_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 		// }
-		for (const auto& [_, next] : hadj[layer][cur.first]) {
+		for (const auto& [_, next] : hadj[layer][cur.second]) {
 			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 			if (!visited.contains(next)) {
 				visited.insert(next);
 				T d_next = dist2(q, all_entries[next]);
-				if (d_next < nearest.top().first || nearest.size() < k) {
+				if (nearest.size() < k || d_next < nearest.top().first) {
+					// if (querying)
+					//	std::cerr << "Looking at edge to " << next << std::endl;
 					candidates.emplace(d_next, next);
 					nearest.emplace(d_next, next);
 					if (nearest.size() > k)
@@ -215,7 +269,8 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_2<T>::query_k_at_layer(
 template <typename T>
 std::vector<size_t> hnsw_engine_basic_2<T>::_query_k(const vec<T>& q,
 																										 size_t k) {
-	size_t cur_vert = 0;
+	// querying = true;
+	size_t cur_vert = starting_vertex;
 	int layer;
 	for (layer = hadj.size() - 1; layer > 0; --layer)
 		cur_vert = query_k_at_layer(q, layer, {cur_vert}, 1)[0].second;
@@ -223,6 +278,7 @@ std::vector<size_t> hnsw_engine_basic_2<T>::_query_k(const vec<T>& q,
 	std::vector<size_t> ret;
 	for (size_t i = 0; i < ret_combined.size() && i < k; ++i) {
 		ret.emplace_back(ret_combined[i].second);
+		// std::cerr << "Returning " << ret.back() << std::endl;
 	}
 	return ret;
 }
