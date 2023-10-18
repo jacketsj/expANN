@@ -341,8 +341,7 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 		nearest.pop();
 
 	robin_hood::unordered_flat_set<size_t> visited;
-	for (const auto& ep : entry_points)
-		visited.insert(ep);
+	visited.insert(entry_point);
 
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
@@ -380,9 +379,9 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 			}
 		}
 	}
-	std::vector<measured_data> ret;
+	std::vector<size_t> ret;
 	while (!nearest.empty()) {
-		ret.emplace_back(nearest.top());
+		ret.emplace_back(nearest.top().second);
 		nearest.pop();
 	}
 	reverse(ret.begin(), ret.end());
