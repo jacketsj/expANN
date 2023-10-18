@@ -340,6 +340,7 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 	while (nearest.size() > k)
 		nearest.pop();
 
+	// TODO make visited a (global-ish) array as well
 	robin_hood::unordered_flat_set<size_t> visited;
 	visited.insert(entry_point);
 
@@ -351,11 +352,10 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 		//						<< std::endl;
 		candidates.pop();
 		if (cur.first > nearest.top().first && nearest.size() == k) {
-			// TODO second condition should be unnecessary as written
 			break;
 		}
+		// TODO figure out the exact prefetch pattern in reference impl, use it
 		_mm_prefetch(&hadj_bottom[cur.second], _MM_HINT_T0);
-		// TODO this might affect things positively or negatively
 		for (const auto& next : hadj_bottom[cur.second]) {
 			_mm_prefetch(&next, _MM_HINT_T0);
 		}
