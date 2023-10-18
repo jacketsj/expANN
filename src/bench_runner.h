@@ -365,7 +365,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								true, true, false, 0.5f));
 					}
 				}
-				if (true) {
+				if (false) {
 					for (size_t edge_count_search_factor : {1}) {
 						hnsw_engine_basic_2_jobs.emplace_back(hnsw_engine_basic_2_config(
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
@@ -377,7 +377,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
-				if (true) {
+				if (false) {
 					// for (size_t edge_count_search_factor : {4, 8}) {
 					for (size_t edge_count_search_factor : {1}) {
 						// for (bool use_ecuts : {false, true}) {

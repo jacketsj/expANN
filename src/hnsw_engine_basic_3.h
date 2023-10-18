@@ -196,7 +196,7 @@ template <typename T> void hnsw_engine_basic_3<T>::_build() {
 		hadj_bottom.emplace_back();
 		hadj_bottom[v_index] = convert_el(hadj[0][v_index]);
 		for (size_t layer = 0; layer < hadj.size(); ++layer) {
-			hadj_flat[layer].emplace_back();
+			hadj_flat[v_index].emplace_back();
 			if (hadj[layer].contains(v_index)) {
 				hadj_flat[v_index][layer] = convert_el(hadj[layer][v_index]);
 			} else {
@@ -265,15 +265,15 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_3<T>::query_k_at_layer(
 			break;
 		}
 		// TODO this might affect things positively or negatively
-		// for (const auto& next : hadj[layer][cur.first]) {
-		//	_mm_prefetch(&next, _MM_HINT_T0);
-		//}
-		// for (const auto& [_, next] : hadj[layer][cur.first]) {
-		//	_mm_prefetch(&all_entries[next], _MM_HINT_T0);
-		//}
+		for (const auto& next : hadj[layer][cur.second]) {
+			_mm_prefetch(&next, _MM_HINT_T0);
+		}
+		for (const auto& [_, next] : hadj[layer][cur.second]) {
+			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
+		}
 		for (const auto& [_, next] : hadj[layer][cur.second]) {
 			//_mm_prefetch(&next, _MM_HINT_T0);
-			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
+			//_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 			if (!visited.contains(next)) {
 				//_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 				visited.insert(next);
@@ -354,13 +354,14 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 			// TODO second condition should be unnecessary as written
 			break;
 		}
+		_mm_prefetch(&hadj_bottom[cur.second], _MM_HINT_T0);
 		// TODO this might affect things positively or negatively
-		// for (const auto& next : hadj[layer][cur.first]) {
-		//	_mm_prefetch(&next, _MM_HINT_T0);
-		//}
-		// for (const auto& [_, next] : hadj[layer][cur.first]) {
-		//	_mm_prefetch(&all_entries[next], _MM_HINT_T0);
-		//}
+		for (const auto& next : hadj_bottom[cur.second]) {
+			_mm_prefetch(&next, _MM_HINT_T0);
+		}
+		for (const auto& next : hadj_bottom[cur.second]) {
+			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
+		}
 		for (const auto& next : hadj_bottom[cur.second]) {
 			//_mm_prefetch(&next, _MM_HINT_T0);
 			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
