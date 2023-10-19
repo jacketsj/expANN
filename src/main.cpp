@@ -1,6 +1,9 @@
 #include <iostream>
 #include <string>
 
+#define DIM 128
+#include "vec.h"
+
 #include "arrangement_engine.h"
 #include "basic_bench.h"
 #include "bench_runner.h"
@@ -10,7 +13,6 @@
 #include "matplotlibcpp.h"
 #include "plotter.h"
 #include "randomgeometry.h"
-#include "vec.h"
 
 #define NUM_THREADS 10
 

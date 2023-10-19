@@ -15,7 +15,11 @@
 template <typename> struct ChooseUnderlying;
 
 template <> struct ChooseUnderlying<float> {
+#ifdef DIM
+	using Underlying = Eigen::Matrix<float, DIM, 1>;
+#else
 	using Underlying = Eigen::VectorXf;
+#endif
 };
 
 template <> struct ChooseUnderlying<double> {

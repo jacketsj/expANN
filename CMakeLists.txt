@@ -44,7 +44,7 @@ if(ENABLE_STACK_INFO)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -g")
 else()
     message("Disabling stack info.")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -ggdb3")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -ggdb3 -funroll-loops")
 endif()
 
 if(ENABLE_GCOV)

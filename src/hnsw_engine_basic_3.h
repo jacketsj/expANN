@@ -349,6 +349,7 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 	// robin_hood::unordered_flat_set<size_t> visited;
 	// visited.insert(entry_point);
 	visited[entry_point] = true;
+	visited_recent.emplace_back(entry_point);
 
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
@@ -357,20 +358,51 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 		// cur.second
 		//						<< std::endl;
 		candidates.pop();
+		_mm_prefetch(&hadj_bottom[cur.second][0], _MM_HINT_T0);
 		if (cur.first > nearest.top().first && nearest.size() == k) {
 			break;
 		}
 		// TODO figure out the exact prefetch pattern in reference impl, use it
-		_mm_prefetch(&hadj_bottom[cur.second], _MM_HINT_T0);
-		for (const auto& next : hadj_bottom[cur.second]) {
-			_mm_prefetch(&next, _MM_HINT_T0);
+		// for (const auto& next : hadj_bottom[cur.second]) {
+		//	_mm_prefetch(&next, _MM_HINT_T0);
+		// }
+		// for (const auto& next : hadj_bottom[cur.second]) {
+		//	_mm_prefetch(&all_entries[next], _MM_HINT_T0);
+		// }
+		_mm_prefetch(&all_entries[hadj_bottom[cur.second][0]], _MM_HINT_T0);
+		_mm_prefetch(&visited[hadj_bottom[cur.second][0]], _MM_HINT_T0);
+		constexpr size_t in_advance = 4;
+		constexpr size_t in_advance_extra = 2;
+		auto do_loop_prefetch = [&](size_t i) {
+		// if (next_i + 1 < hadj_bottom[cur.second].size()) {
+		//  TODO remove if statement with a separate loop iter for the last one
+#ifdef DIM
+			for (size_t mult = 0; mult < DIM * 4 / 64; ++mult)
+				_mm_prefetch(((char*)&all_entries[hadj_bottom[cur.second][i]]) +
+												 mult * 64,
+										 _MM_HINT_T0);
+#endif
+			_mm_prefetch(&visited[hadj_bottom[cur.second][i]], _MM_HINT_T0);
+		};
+		for (size_t next_i_pre = 0;
+				 next_i_pre < std::min(in_advance, hadj_bottom[cur.second].size());
+				 ++next_i_pre) {
+			do_loop_prefetch(next_i_pre);
 		}
-		for (const auto& next : hadj_bottom[cur.second]) {
-			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
-		}
-		for (const auto& next : hadj_bottom[cur.second]) {
+		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
+												 size_t next_i) {
+			// for (const auto& next : hadj_bottom[cur.second]) {
+			if constexpr (inAdvanceIterExtra) {
+				_mm_prefetch(
+						&hadj_bottom[cur.second][next_i + in_advance + in_advance_extra],
+						_MM_HINT_T0);
+			}
+			if constexpr (inAdvanceIter) {
+				do_loop_prefetch(next_i + in_advance);
+			}
+			const auto& next = hadj_bottom[cur.second][next_i];
 			//_mm_prefetch(&next, _MM_HINT_T0);
-			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
+			//_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 			if (!visited[next]) {
 				// if (!visited.contains(next)) {
 				//_mm_prefetch(&all_entries[next], _MM_HINT_T0);
@@ -389,6 +421,18 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 						nearest.pop();
 				}
 			}
+		};
+		size_t next_i = 0;
+		for (; next_i + in_advance + in_advance_extra <
+					 hadj_bottom[cur.second].size();
+				 ++next_i) {
+			loop_iter.template operator()<true, true>(next_i);
+		}
+		for (; next_i + in_advance < hadj_bottom[cur.second].size(); ++next_i) {
+			loop_iter.template operator()<true, false>(next_i);
+		}
+		for (; next_i < hadj_bottom[cur.second].size(); ++next_i) {
+			loop_iter.template operator()<false, false>(next_i);
 		}
 	}
 	for (auto& v : visited_recent)
