@@ -320,7 +320,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 20; k <= 20; k += 20) { // will hopfully get good
 		// for (size_t k = 70; k <= 70; k += 20) { // will hopfully get good
 		// for (size_t k = 50; k <= 70; k += 20) { // will hopfully get good
-		for (size_t k = 30; k <= 30; k += 20) { // will hopfully get good
+		// for (size_t k = 30; k <= 30; k += 20) { // will hopfully get good
+		for (size_t k = 30; k <= 50; k += 20) { // will hopfully get good
 			// for (size_t k = 90; k <= 90; k += 7) { // will hopfully get good
 			// for (size_t k = 30; k <= 30; k += 7) { // will hopfully get good
 			// for (size_t k = 40; k <= 40; k += 7) { // will hopfully get good
@@ -350,7 +351,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			//  for (size_t num_for_1nn = 16; num_for_1nn <= 16; num_for_1nn *= 4) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 1; num_for_1nn *= 4) {
 			// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 4; num_for_1nn <= 4; num_for_1nn *= 4) {
+			for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
 				if (false) {
 					ensg_engine_jobs.emplace_back(
 							ensg_engine_config(k, num_for_1nn, 1.0f));
