@@ -46,6 +46,8 @@ struct hnsw_engine_basic_3 : public ann_engine<T, hnsw_engine_basic_3<T>> {
 			hadj;
 	void _store_vector(const vec<T>& v);
 	void _build();
+	std::vector<bool> visited;
+	std::vector<size_t> visited_recent;
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
 									 const std::vector<size_t>& entry_points, size_t k);
@@ -205,6 +207,9 @@ template <typename T> void hnsw_engine_basic_3<T>::_build() {
 		}
 	}
 
+	visited.resize(all_entries.size());
+	visited_recent.reserve(all_entries.size());
+
 	/*
 	for (size_t layer = 0; layer < hadj.size(); ++layer) {
 		std::cerr << "layer: " << layer << " (num nodes=" << hadj[layer].size()
@@ -341,8 +346,9 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 		nearest.pop();
 
 	// TODO make visited a (global-ish) array as well
-	robin_hood::unordered_flat_set<size_t> visited;
-	visited.insert(entry_point);
+	// robin_hood::unordered_flat_set<size_t> visited;
+	// visited.insert(entry_point);
+	visited[entry_point] = true;
 
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
@@ -365,9 +371,14 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 		for (const auto& next : hadj_bottom[cur.second]) {
 			//_mm_prefetch(&next, _MM_HINT_T0);
 			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
-			if (!visited.contains(next)) {
+			if (!visited[next]) {
+				// if (!visited.contains(next)) {
 				//_mm_prefetch(&all_entries[next], _MM_HINT_T0);
-				visited.insert(next);
+				visited[next] = true;
+				// TODO visited_recent can avoid bounds checks since it is always
+				// sufficiently reserved
+				visited_recent.emplace_back(next);
+				// visited.insert(next);
 				T d_next = dist2(q, all_entries[next]);
 				if (nearest.size() < k || d_next < nearest.top().first) {
 					// if (querying)
@@ -380,6 +391,9 @@ std::vector<size_t> hnsw_engine_basic_3<T>::query_k_alt(const vec<T>& q,
 			}
 		}
 	}
+	for (auto& v : visited_recent)
+		visited[v] = false;
+	visited_recent.clear();
 	std::vector<size_t> ret;
 	while (!nearest.empty()) {
 		ret.emplace_back(nearest.top().second);
