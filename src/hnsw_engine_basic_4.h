@@ -32,10 +32,11 @@ struct hnsw_engine_basic_4 : public ann_engine<T, hnsw_engine_basic_4<T>> {
 	size_t M0;
 	size_t ef_search_mult;
 	size_t ef_construction;
+	size_t max_layer;
 	hnsw_engine_basic_4(hnsw_engine_basic_4_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
-				ef_construction(conf.ef_construction) {}
+				ef_construction(conf.ef_construction), max_layer(0) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
@@ -120,14 +121,14 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	std::vector<std::vector<std::pair<T, size_t>>> kNN_per_layer;
 	if (all_entries.size() > 1) {
 		std::vector<size_t> cur = {starting_vertex};
-		for (int layer = hadj.size() - 1; layer > int(new_max_layer); --layer) {
+		for (int layer = max_layer - 1; layer > int(new_max_layer); --layer) {
 			kNN_per_layer.emplace_back(query_k_alt<false>(v, layer, cur, 1));
 			cur.clear();
 			for (auto& md : kNN_per_layer.back()) {
 				cur.emplace_back(md.second);
 			}
 		}
-		for (int layer = std::min(new_max_layer, hadj.size() - 1); layer >= 0;
+		for (int layer = std::min(new_max_layer, max_layer - 1); layer >= 0;
 				 --layer) {
 			kNN_per_layer.emplace_back(
 					query_k_alt<false>(v, layer, cur, ef_construction));
@@ -142,7 +143,7 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	}
 
 	// add the found edges to the graph
-	for (size_t layer = 0; layer < std::min(hadj.size(), new_max_layer + 1);
+	for (size_t layer = 0; layer < std::min(max_layer, new_max_layer + 1);
 			 ++layer) {
 		hadj[layer][v_index] = prune_edges(layer, kNN_per_layer[layer]);
 		//  add bidirectional connections, prune if necessary
@@ -164,8 +165,9 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	}
 
 	// add new layers if necessary
-	while (new_max_layer >= hadj.size()) {
+	while (new_max_layer >= max_layer) {
 		hadj.emplace_back();
+		++max_layer;
 		hadj.back()[v_index] = std::vector<std::pair<T, size_t>>();
 		starting_vertex = v_index;
 	}
@@ -174,7 +176,7 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	hadj_flat.emplace_back();
 	hadj_bottom.emplace_back();
 	hadj_bottom[v_index] = convert_el(hadj[0][v_index]);
-	for (size_t layer = 0; layer < hadj.size(); ++layer) {
+	for (size_t layer = 0; layer < max_layer; ++layer) {
 		if (hadj[layer].contains(v_index)) {
 			hadj_flat[v_index].emplace_back();
 			hadj_flat[v_index][layer] = convert_el(hadj[layer][v_index]);
@@ -307,7 +309,7 @@ std::vector<size_t> hnsw_engine_basic_4<T>::_query_k(const vec<T>& q,
 																										 size_t k) {
 	size_t entry_point = starting_vertex;
 	T ep_dist = dist2(all_entries[entry_point], q);
-	for (size_t layer = hadj.size() - 1; layer > 0; --layer) {
+	for (size_t layer = max_layer - 1; layer > 0; --layer) {
 		bool changed = true;
 		while (changed) {
 			changed = false;
