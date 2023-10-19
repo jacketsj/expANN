@@ -345,37 +345,21 @@ std::vector<size_t> hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q,
 	while (nearest.size() > k)
 		nearest.pop();
 
-	// TODO make visited a (global-ish) array as well
-	// robin_hood::unordered_flat_set<size_t> visited;
-	// visited.insert(entry_point);
 	visited[entry_point] = true;
 	visited_recent.emplace_back(entry_point);
 
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
-		// if (querying)
-		//	std::cerr << "Looking at candidate (layer=" << layer << ") " <<
-		// cur.second
-		//						<< std::endl;
 		candidates.pop();
 		_mm_prefetch(&hadj_bottom[cur.second][0], _MM_HINT_T0);
 		if (cur.first > nearest.top().first && nearest.size() == k) {
 			break;
 		}
-		// TODO figure out the exact prefetch pattern in reference impl, use it
-		// for (const auto& next : hadj_bottom[cur.second]) {
-		//	_mm_prefetch(&next, _MM_HINT_T0);
-		// }
-		// for (const auto& next : hadj_bottom[cur.second]) {
-		//	_mm_prefetch(&all_entries[next], _MM_HINT_T0);
-		// }
 		_mm_prefetch(&all_entries[hadj_bottom[cur.second][0]], _MM_HINT_T0);
 		_mm_prefetch(&visited[hadj_bottom[cur.second][0]], _MM_HINT_T0);
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
 		auto do_loop_prefetch = [&](size_t i) {
-		// if (next_i + 1 < hadj_bottom[cur.second].size()) {
-		//  TODO remove if statement with a separate loop iter for the last one
 #ifdef DIM
 			for (size_t mult = 0; mult < DIM * 4 / 64; ++mult)
 				_mm_prefetch(((char*)&all_entries[hadj_bottom[cur.second][i]]) +
@@ -391,7 +375,6 @@ std::vector<size_t> hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q,
 		}
 		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
 												 size_t next_i) {
-			// for (const auto& next : hadj_bottom[cur.second]) {
 			if constexpr (inAdvanceIterExtra) {
 				_mm_prefetch(
 						&hadj_bottom[cur.second][next_i + in_advance + in_advance_extra],
@@ -401,20 +384,11 @@ std::vector<size_t> hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q,
 				do_loop_prefetch(next_i + in_advance);
 			}
 			const auto& next = hadj_bottom[cur.second][next_i];
-			//_mm_prefetch(&next, _MM_HINT_T0);
-			//_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 			if (!visited[next]) {
-				// if (!visited.contains(next)) {
-				//_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 				visited[next] = true;
-				// TODO visited_recent can avoid bounds checks since it is always
-				// sufficiently reserved
 				visited_recent.emplace_back(next);
-				// visited.insert(next);
 				T d_next = dist2(q, all_entries[next]);
 				if (nearest.size() < k || d_next < nearest.top().first) {
-					// if (querying)
-					//	std::cerr << "Looking at edge to " << next << std::endl;
 					candidates.emplace(d_next, next);
 					nearest.emplace(d_next, next);
 					if (nearest.size() > k)
