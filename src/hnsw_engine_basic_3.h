@@ -46,7 +46,7 @@ struct hnsw_engine_basic_3 : public ann_engine<T, hnsw_engine_basic_3<T>> {
 			hadj;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	std::vector<bool> visited;
+	std::vector<char> visited; // booleans
 	std::vector<size_t> visited_recent;
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
