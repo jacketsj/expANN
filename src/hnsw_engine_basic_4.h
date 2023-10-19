@@ -53,7 +53,9 @@ struct hnsw_engine_basic_4 : public ann_engine<T, hnsw_engine_basic_4<T>> {
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<std::pair<T, size_t>>
 	prune_edges(size_t layer, std::vector<std::pair<T, size_t>> to);
-	std::vector<std::pair<T, size_t>> query_k_alt(const vec<T>& v, size_t k);
+	template <bool use_bottomlayer>
+	std::vector<std::pair<T, size_t>>
+	query_k_alt(const vec<T>& v, size_t k, size_t entry_point, size_t layer);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "HNSW Engine Basic 4"; }
 	const param_list_t _param_list() {
@@ -304,26 +306,11 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
 }
 
 template <typename T>
+template <bool use_bottomlayer>
 std::vector<std::pair<T, size_t>>
-hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t k) {
+hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t k,
+																		size_t entry_point, size_t layer) {
 	using measured_data = std::pair<T, size_t>;
-	size_t entry_point = starting_vertex;
-	T ep_dist = dist2(all_entries[entry_point], q);
-	for (size_t layer = hadj.size() - 1; layer > 0; --layer) {
-		bool changed = true;
-		while (changed) {
-			changed = false;
-			for (auto& neighbour : hadj_flat[entry_point][layer]) {
-				_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
-				T neighbour_dist = dist2(q, all_entries[neighbour]);
-				if (neighbour_dist < ep_dist) {
-					entry_point = neighbour;
-					ep_dist = neighbour_dist;
-					changed = true;
-				}
-			}
-		}
-	}
 
 	auto worst_elem = [](const measured_data& a, const measured_data& b) {
 		return a.first < b.first;
@@ -332,7 +319,8 @@ hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t k) {
 		return a.first > b.first;
 	};
 	std::vector<measured_data> entry_points_with_dist;
-	entry_points_with_dist.emplace_back(ep_dist, entry_point);
+	entry_points_with_dist.emplace_back(dist2(all_entries[entry_point], q),
+																			entry_point);
 
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(best_elem)>
@@ -424,7 +412,25 @@ hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t k) {
 template <typename T>
 std::vector<size_t> hnsw_engine_basic_4<T>::_query_k(const vec<T>& q,
 																										 size_t k) {
-	auto ret_combined = query_k_alt(q, k * ef_search_mult);
+	size_t entry_point = starting_vertex;
+	T ep_dist = dist2(all_entries[entry_point], q);
+	for (size_t layer = hadj.size() - 1; layer > 0; --layer) {
+		bool changed = true;
+		while (changed) {
+			changed = false;
+			for (auto& neighbour : hadj_flat[entry_point][layer]) {
+				_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
+				T neighbour_dist = dist2(q, all_entries[neighbour]);
+				if (neighbour_dist < ep_dist) {
+					entry_point = neighbour;
+					ep_dist = neighbour_dist;
+					changed = true;
+				}
+			}
+		}
+	}
+
+	auto ret_combined = query_k_alt<true>(q, k * ef_search_mult, entry_point, 0);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;
