@@ -261,13 +261,12 @@ hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t layer,
 			do_loop_prefetch(next_i_pre);
 		}
 		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
-												 size_t next_i) {
-			if constexpr (inAdvanceIterExtra)
-				constexpr {
-					_mm_prefetch(
-							&get_vertex(cur.second)[next_i + in_advance + in_advance_extra],
-							_MM_HINT_T0);
-				}
+				size_t next_i) constexpr {
+			if constexpr (inAdvanceIterExtra) {
+				_mm_prefetch(
+						&get_vertex(cur.second)[next_i + in_advance + in_advance_extra],
+						_MM_HINT_T0);
+			}
 			if constexpr (inAdvanceIter) {
 				do_loop_prefetch(next_i + in_advance);
 			}
