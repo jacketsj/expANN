@@ -189,51 +189,7 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 
 template <typename T> void hnsw_engine_basic_4<T>::_build() {
 	assert(all_entries.size() > 0);
-
-	/*
-	auto convert_el = [](std::vector<std::pair<T, size_t>> el) {
-		std::vector<size_t> ret;
-		for (auto& [_, val] : el) {
-			ret.emplace_back(val);
-		}
-		return ret;
-	};
-
-	for (size_t v_index = 0; v_index < all_entries.size(); ++v_index) {
-		hadj_flat.emplace_back();
-		hadj_bottom.emplace_back();
-		hadj_bottom[v_index] = convert_el(hadj[0][v_index]);
-		for (size_t layer = 0; layer < hadj.size(); ++layer) {
-			hadj_flat[v_index].emplace_back();
-			if (hadj[layer].contains(v_index)) {
-				hadj_flat[v_index][layer] = convert_el(hadj[layer][v_index]);
-			} else {
-				break;
-			}
-		}
-	}
-
-	visited.resize(all_entries.size());
-	visited_recent.reserve(all_entries.size());
-	*/
-
-	/*
-	for (size_t layer = 0; layer < hadj.size(); ++layer) {
-		std::cerr << "layer: " << layer << " (num nodes=" << hadj[layer].size()
-							<< ")\n";
-		for (size_t v_index = 0; v_index < all_entries.size(); ++v_index) {
-			if (hadj[layer].contains(v_index)) {
-				std::cerr << v_index << "->[";
-				for (auto [_, u] : hadj[layer][v_index])
-					std::cerr << u << " ";
-				std::cerr << "]\n";
-			}
-		}
-	}
-	*/
 }
-
-// bool querying = false;
 
 template <typename T>
 std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
@@ -267,16 +223,10 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
 
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
-		// if (querying)
-		//	std::cerr << "Looking at candidate (layer=" << layer << ") " <<
-		// cur.second
-		//						<< std::endl;
 		candidates.pop();
 		if (cur.first > nearest.top().first && nearest.size() == k) {
-			// TODO second condition should be unnecessary as written
 			break;
 		}
-		// TODO this might affect things positively or negatively
 		for (const auto& next : hadj[layer][cur.second]) {
 			_mm_prefetch(&next, _MM_HINT_T0);
 		}
@@ -284,15 +234,10 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
 			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 		}
 		for (const auto& [_, next] : hadj[layer][cur.second]) {
-			//_mm_prefetch(&next, _MM_HINT_T0);
-			//_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 			if (!visited.contains(next)) {
-				//_mm_prefetch(&all_entries[next], _MM_HINT_T0);
 				visited.insert(next);
 				T d_next = dist2(q, all_entries[next]);
 				if (nearest.size() < k || d_next < nearest.top().first) {
-					// if (querying)
-					//	std::cerr << "Looking at edge to " << next << std::endl;
 					candidates.emplace(d_next, next);
 					nearest.emplace(d_next, next);
 					if (nearest.size() > k)
