@@ -7,16 +7,19 @@
 struct hnsw_engine_reference_config {
 	int M;
 	int ef_construction;
+	int ef_factor;
 	bool use_ecuts;
-	hnsw_engine_reference_config(int _M, int _ef_construction,
+	hnsw_engine_reference_config(int _M, int _ef_construction, int _ef_factor,
 															 bool _use_ecuts = false)
-			: M(_M), ef_construction(_ef_construction), use_ecuts(_use_ecuts) {}
+			: M(_M), ef_construction(_ef_construction), ef_factor(_ef_factor),
+				use_ecuts(_use_ecuts) {}
 };
 
 template <typename T>
 struct hnsw_engine_reference : public ann_engine<T, hnsw_engine_reference<T>> {
 	int M;
 	int ef_construction;
+	int ef_factor;
 	bool use_ecuts;
 	std::random_device rd;
 	std::mt19937 gen;
@@ -28,19 +31,20 @@ struct hnsw_engine_reference : public ann_engine<T, hnsw_engine_reference<T>> {
 	std::vector<std::vector<char>> e_labels; // vertex -> cut labels (*num_cuts)
 	hnsw_engine_reference(hnsw_engine_reference_config conf)
 			: M(conf.M), ef_construction(conf.ef_construction),
-				use_ecuts(conf.use_ecuts), rd(), gen(rd()), int_distribution(0, 1),
-				alg_hnsw(nullptr), space(nullptr) {}
+				ef_factor(conf.ef_factor), use_ecuts(conf.use_ecuts), rd(), gen(rd()),
+				int_distribution(0, 1), alg_hnsw(nullptr), space(nullptr) {}
 	// std::vector<vec<T>> all_entries;
 	size_t dim;
 	std::vector<T> all_entries_f;
 	void _store_vector(vec<T> v);
 	void _build();
 	std::vector<size_t> _query_k(vec<T> v, size_t k);
-	const std::string _name() { return "HNSW Reference Engine(no ecuts)"; }
+	const std::string _name() { return "HNSW Reference Engine(ecuts optional)"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
 		add_param(pl, ef_construction);
+		add_param(pl, ef_factor);
 		add_param(pl, use_ecuts);
 		return pl;
 	}
@@ -67,7 +71,6 @@ template <typename T> void hnsw_engine_reference<T>::_store_vector(vec<T> v) {
 
 template <typename T>
 bool hnsw_engine_reference<T>::edge_filter(size_t v, size_t u) {
-	return true;
 	for (size_t bin : available_bins) {
 		// an edge is permitted in a bin if it crosses the cut for that bin
 		// TODO check if bin+1 >= current M value here, instead of elabels size
@@ -87,15 +90,15 @@ template <typename T> void hnsw_engine_reference<T>::_build() {
 	// init index
 	space = new hnswlib::L2Space(dim);
 	// TODO do this in a memory safe way
-	std::function<void(size_t)> efr = [&](size_t M) { edge_filter_refresh(M); };
-	std::function<bool(size_t, size_t)> ef = [&](size_t u, size_t v) {
+	std::function<void(size_t)> efilr = [&](size_t M) { edge_filter_refresh(M); };
+	std::function<bool(size_t, size_t)> efil = [&](size_t u, size_t v) {
 		if (!use_ecuts)
 			return true;
 		return edge_filter(u, v);
 	};
 	// if (use_ecuts) {
 	alg_hnsw = new hnswlib::HierarchicalNSW<float>(
-			space, all_entries_f.size() / dim, M, ef_construction, ef, efr);
+			space, all_entries_f.size() / dim, M, ef_construction, efil, efilr);
 	//} else {
 	// TODO fix this
 	// alg_hnsw = new hnswlib::HierarchicalNSW<float>(
@@ -119,6 +122,7 @@ std::vector<size_t> hnsw_engine_reference<T>::_query_k(vec<T> v, size_t k) {
 	size_t ref_size = all_entries_f.size();
 	for (size_t i = 0; i < v.size(); ++i)
 		all_entries_f.push_back(v[i]);
+	alg_hnsw->ef_ = k * ef_factor;
 	std::priority_queue<std::pair<float, hnswlib::labeltype>> result =
 			alg_hnsw->searchKnn(&all_entries_f[ref_size], k);
 	// alg_hnsw->searchKnn(v.data(), k);

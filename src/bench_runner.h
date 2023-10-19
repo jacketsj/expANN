@@ -385,7 +385,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						for (bool use_ecuts : {false}) {
 							hnsw_engine_reference_jobs.emplace_back(
 									hnsw_engine_reference_config(k, edge_count_search_factor * k,
-																							 use_ecuts));
+																							 num_for_1nn, use_ecuts));
 						}
 					}
 				}
