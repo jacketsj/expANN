@@ -53,7 +53,7 @@ struct hnsw_engine_basic_4 : public ann_engine<T, hnsw_engine_basic_4<T>> {
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<std::pair<T, size_t>>
 	prune_edges(size_t layer, std::vector<std::pair<T, size_t>> to);
-	std::vector<size_t> query_k_alt(const vec<T>& v, size_t k);
+	std::vector<std::pair<T, size_t>> query_k_alt(const vec<T>& v, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "HNSW Engine Basic 4"; }
 	const param_list_t _param_list() {
@@ -304,8 +304,8 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
 }
 
 template <typename T>
-std::vector<size_t> hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q,
-																												size_t k) {
+std::vector<std::pair<T, size_t>>
+hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t k) {
 	using measured_data = std::pair<T, size_t>;
 	size_t entry_point = starting_vertex;
 	T ep_dist = dist2(all_entries[entry_point], q);
@@ -412,9 +412,9 @@ std::vector<size_t> hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q,
 	for (auto& v : visited_recent)
 		visited[v] = false;
 	visited_recent.clear();
-	std::vector<size_t> ret;
+	std::vector<std::pair<T, size_t>> ret;
 	while (!nearest.empty()) {
-		ret.emplace_back(nearest.top().second);
+		ret.emplace_back(nearest.top());
 		nearest.pop();
 	}
 	reverse(ret.begin(), ret.end());
@@ -424,22 +424,12 @@ std::vector<size_t> hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q,
 template <typename T>
 std::vector<size_t> hnsw_engine_basic_4<T>::_query_k(const vec<T>& q,
 																										 size_t k) {
-	auto ret = query_k_alt(q, k * ef_search_mult);
-	ret.resize(k);
-	return ret;
-
-	/*
-	// querying = true;
-	size_t cur_vert = starting_vertex;
-	int layer;
-	for (layer = hadj.size() - 1; layer > 0; --layer)
-		cur_vert = query_k_at_layer(q, layer, {cur_vert}, 1)[0].second;
-	auto ret_combined = query_k_at_layer(q, 0, {cur_vert}, k * ef_search_mult);
+	auto ret_combined = query_k_alt(q, k * ef_search_mult);
+	if (ret_combined.size() > k)
+		ret_combined.resize(k);
 	std::vector<size_t> ret;
 	for (size_t i = 0; i < ret_combined.size() && i < k; ++i) {
 		ret.emplace_back(ret_combined[i].second);
-		// std::cerr << "Returning " << ret.back() << std::endl;
 	}
 	return ret;
-	*/
 }
