@@ -120,8 +120,6 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 
 	// get kNN for each layer
 	size_t new_max_layer = floor(-log(distribution(gen)) * 1 / log(double(M)));
-	// std::cerr << "v_index=" << v_index << " at layer=" << new_max_layer
-	//					<< std::endl;
 	std::vector<std::vector<std::pair<T, size_t>>> kNN_per_layer;
 	if (all_entries.size() > 1) {
 		std::vector<size_t> cur = {starting_vertex};
@@ -150,12 +148,6 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	for (size_t layer = 0; layer < std::min(hadj.size(), new_max_layer + 1);
 			 ++layer) {
 		hadj[layer][v_index] = prune_edges(layer, kNN_per_layer[layer]);
-		// std::cerr << "Just set outgoing edges for " << v_index
-		//					<< " at layer=" << layer << ": ";
-		// for (auto& [_, u] : hadj[layer][v_index]) {
-		//	std::cerr << u << ' ';
-		// }
-		// std::cerr << '\n';
 		//  add bidirectional connections, prune if necessary
 		for (auto& md : kNN_per_layer[layer]) {
 			bool edge_exists = false;
@@ -165,25 +157,11 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 				}
 			}
 			if (!edge_exists) {
-				// std::cerr << "(Inside) About to re-set outgoing edges for " <<
-				// md.second
-				//					<< " at layer=" << layer << " and v_index=" << v_index
-				//					<< ": ";
-				// for (auto& [_, u] : hadj[layer][md.second]) {
-				//	std::cerr << u << ' ';
-				// }
-				// std::cerr << '\n';
 				hadj[layer][md.second].emplace_back(md.first, v_index);
 				hadj[layer][md.second] = prune_edges(layer, hadj[layer][md.second]);
 				hadj_flat[md.second][layer] = convert_el(hadj[layer][md.second]);
 				if (layer == 0)
 					hadj_bottom[md.second] = hadj_flat[md.second][layer];
-				// std::cerr << "(Inside) just re-set outgoing edges for " << md.second
-				//					<< " at layer=" << layer << ": ";
-				// for (auto& [_, u] : hadj[layer][md.second]) {
-				//	std::cerr << u << ' ';
-				// }
-				// std::cerr << '\n';
 			}
 		}
 	}
