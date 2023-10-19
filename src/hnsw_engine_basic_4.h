@@ -110,6 +110,14 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	all_entries.push_back(v);
 
+	auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
+		std::vector<size_t> ret;
+		for (auto& [_, val] : el) {
+			ret.emplace_back(val);
+		}
+		return ret;
+	};
+
 	// get kNN for each layer
 	size_t new_max_layer = floor(-log(distribution(gen)) * 1 / log(double(M)));
 	// std::cerr << "v_index=" << v_index << " at layer=" << new_max_layer
@@ -118,7 +126,7 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	if (all_entries.size() > 1) {
 		std::vector<size_t> cur = {starting_vertex};
 		for (int layer = hadj.size() - 1; layer > int(new_max_layer); --layer) {
-			kNN_per_layer.emplace_back(query_k_at_layer(v, layer, cur, 1));
+			kNN_per_layer.emplace_back(query_k_alt<false>(v, layer, cur, 1));
 			cur.clear();
 			for (auto& md : kNN_per_layer.back()) {
 				cur.emplace_back(md.second);
@@ -127,7 +135,7 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 		for (int layer = std::min(new_max_layer, hadj.size() - 1); layer >= 0;
 				 --layer) {
 			kNN_per_layer.emplace_back(
-					query_k_at_layer(v, layer, cur, ef_construction));
+					query_k_alt<false>(v, layer, cur, ef_construction));
 			cur.clear();
 			for (auto& md : kNN_per_layer.back()) {
 				cur.emplace_back(md.second);
@@ -167,6 +175,9 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 				// std::cerr << '\n';
 				hadj[layer][md.second].emplace_back(md.first, v_index);
 				hadj[layer][md.second] = prune_edges(layer, hadj[layer][md.second]);
+				hadj_flat[md.second][layer] = convert_el(hadj[layer][md.second]);
+				if (layer == 0)
+					hadj_bottom[md.second] = hadj_flat[md.second][layer];
 				// std::cerr << "(Inside) just re-set outgoing edges for " << md.second
 				//					<< " at layer=" << layer << ": ";
 				// for (auto& [_, u] : hadj[layer][md.second]) {
@@ -183,11 +194,25 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 		hadj.back()[v_index] = std::vector<std::pair<T, size_t>>();
 		starting_vertex = v_index;
 	}
+
+	visited.emplace_back();
+	hadj_flat.emplace_back();
+	hadj_bottom.emplace_back();
+	hadj_bottom[v_index] = convert_el(hadj[0][v_index]);
+	for (size_t layer = 0; layer < hadj.size(); ++layer) {
+		if (hadj[layer].contains(v_index)) {
+			hadj_flat[v_index].emplace_back();
+			hadj_flat[v_index][layer] = convert_el(hadj[layer][v_index]);
+		} else {
+			break;
+		}
+	}
 }
 
 template <typename T> void hnsw_engine_basic_4<T>::_build() {
 	assert(all_entries.size() > 0);
 
+	/*
 	auto convert_el = [](std::vector<std::pair<T, size_t>> el) {
 		std::vector<size_t> ret;
 		for (auto& [_, val] : el) {
@@ -212,6 +237,7 @@ template <typename T> void hnsw_engine_basic_4<T>::_build() {
 
 	visited.resize(all_entries.size());
 	visited_recent.reserve(all_entries.size());
+	*/
 
 	/*
 	for (size_t layer = 0; layer < hadj.size(); ++layer) {
@@ -356,8 +382,6 @@ hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t layer,
 		if (cur.first > nearest.top().first && nearest.size() == k) {
 			break;
 		}
-		_mm_prefetch(&all_entries[get_vertex(cur.second)[0]], _MM_HINT_T0);
-		_mm_prefetch(&visited[get_vertex(cur.second)[0]], _MM_HINT_T0);
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
 		auto do_loop_prefetch = [&](size_t i) {
@@ -413,7 +437,7 @@ hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t layer,
 	for (auto& v : visited_recent)
 		visited[v] = false;
 	visited_recent.clear();
-	std::vector<std::pair<T, size_t>> ret;
+	std::vector<measured_data> ret;
 	while (!nearest.empty()) {
 		ret.emplace_back(nearest.top());
 		nearest.pop();

@@ -28,7 +28,8 @@ option(ENABLE_GCOV "Enable gcov" OFF)
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Ofast -ftree-vectorize -ftree-vectorizer-verbose=0 ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Ofast -ftree-vectorize ${OpenMP_CXX_FLAGS}") # Normal
-set(CMAKE_CXX_FLAGS "-Wall -pthread -Ofast -ftree-vectorize ${OpenMP_CXX_FLAGS}") # Normal
+#set(CMAKE_CXX_FLAGS "-Wall -pthread -Ofast -ftree-vectorize ${OpenMP_CXX_FLAGS}") # Normal
+set(CMAKE_CXX_FLAGS "-Wall -pthread -O0 -ftree-vectorize ${OpenMP_CXX_FLAGS}") # Normal
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O0 ${OpenMP_CXX_FLAGS}") # Segfault debugging
 #set(CMAKE_CXX_FLAGS "-Wall -Ofast ${OpenMP_CXX_FLAGS}")
 
