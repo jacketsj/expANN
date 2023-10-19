@@ -52,8 +52,8 @@ struct hnsw_engine_basic_4 : public ann_engine<T, hnsw_engine_basic_4<T>> {
 	prune_edges(size_t layer, std::vector<std::pair<T, size_t>> to);
 	template <bool use_bottomlayer>
 	std::vector<std::pair<T, size_t>>
-	query_k_alt(const vec<T>& q, size_t layer,
-							const std::vector<size_t>& entry_points, size_t k);
+	query_k_at_layer(const vec<T>& q, size_t layer,
+									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "HNSW Engine Basic 4"; }
 	const param_list_t _param_list() {
@@ -128,7 +128,7 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	if (all_entries.size() > 1) {
 		std::vector<size_t> cur = {starting_vertex};
 		for (int layer = max_layer - 1; layer > int(new_max_layer); --layer) {
-			kNN_per_layer.emplace_back(query_k_alt<false>(v, layer, cur, 1));
+			kNN_per_layer.emplace_back(query_k_at_layer<false>(v, layer, cur, 1));
 			cur.clear();
 			for (auto& md : kNN_per_layer.back()) {
 				cur.emplace_back(md.second);
@@ -137,7 +137,7 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 		for (int layer = std::min(new_max_layer, max_layer - 1); layer >= 0;
 				 --layer) {
 			kNN_per_layer.emplace_back(
-					query_k_alt<false>(v, layer, cur, ef_construction));
+					query_k_at_layer<false>(v, layer, cur, ef_construction));
 			cur.clear();
 			for (auto& md : kNN_per_layer.back()) {
 				cur.emplace_back(md.second);
@@ -197,10 +197,9 @@ template <typename T> void hnsw_engine_basic_4<T>::_build() {
 
 template <typename T>
 template <bool use_bottomlayer>
-std::vector<std::pair<T, size_t>>
-hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t layer,
-																		const std::vector<size_t>& entry_points,
-																		size_t k) {
+std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
+		const vec<T>& q, size_t layer, const std::vector<size_t>& entry_points,
+		size_t k) {
 	using measured_data = std::pair<T, size_t>;
 
 	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
@@ -330,7 +329,7 @@ std::vector<size_t> hnsw_engine_basic_4<T>::_query_k(const vec<T>& q,
 	}
 
 	auto ret_combined =
-			query_k_alt<true>(q, 0, {entry_point}, k * ef_search_mult);
+			query_k_at_layer<true>(q, 0, {entry_point}, k * ef_search_mult);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;
