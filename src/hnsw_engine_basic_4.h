@@ -128,11 +128,7 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	if (all_entries.size() > 1) {
 		std::vector<size_t> cur = {starting_vertex};
 		for (int layer = max_layer - 1; layer > int(new_max_layer); --layer) {
-			kNN_per_layer.emplace_back(query_k_at_layer<false>(v, layer, cur, 1));
-			cur.clear();
-			for (auto& md : kNN_per_layer.back()) {
-				cur.emplace_back(md.second);
-			}
+			cur = {query_k_at_layer<false>(v, layer, cur, 1)[0].second};
 		}
 		for (int layer = std::min(new_max_layer, max_layer - 1); layer >= 0;
 				 --layer) {
