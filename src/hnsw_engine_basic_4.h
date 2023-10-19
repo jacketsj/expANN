@@ -55,7 +55,8 @@ struct hnsw_engine_basic_4 : public ann_engine<T, hnsw_engine_basic_4<T>> {
 	prune_edges(size_t layer, std::vector<std::pair<T, size_t>> to);
 	template <bool use_bottomlayer>
 	std::vector<std::pair<T, size_t>>
-	query_k_alt(const vec<T>& v, size_t k, size_t entry_point, size_t layer);
+	query_k_alt(const vec<T>& q, size_t layer,
+							const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() { return "HNSW Engine Basic 4"; }
 	const param_list_t _param_list() {
@@ -308,8 +309,9 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
 template <typename T>
 template <bool use_bottomlayer>
 std::vector<std::pair<T, size_t>>
-hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t k,
-																		size_t entry_point, size_t layer) {
+hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t layer,
+																		const std::vector<size_t>& entry_points,
+																		size_t k) {
 	using measured_data = std::pair<T, size_t>;
 
 	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
@@ -327,8 +329,9 @@ hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t k,
 		return a.first > b.first;
 	};
 	std::vector<measured_data> entry_points_with_dist;
-	entry_points_with_dist.emplace_back(dist2(q, all_entries[entry_point]),
-																			entry_point);
+	for (auto& entry_point : entry_points)
+		entry_points_with_dist.emplace_back(dist2(q, all_entries[entry_point]),
+																				entry_point);
 
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(best_elem)>
@@ -341,8 +344,10 @@ hnsw_engine_basic_4<T>::query_k_alt(const vec<T>& q, size_t k,
 	while (nearest.size() > k)
 		nearest.pop();
 
-	visited[entry_point] = true;
-	visited_recent.emplace_back(entry_point);
+	for (auto& entry_point : entry_points) {
+		visited[entry_point] = true;
+		visited_recent.emplace_back(entry_point);
+	}
 
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
@@ -438,7 +443,8 @@ std::vector<size_t> hnsw_engine_basic_4<T>::_query_k(const vec<T>& q,
 		}
 	}
 
-	auto ret_combined = query_k_alt<true>(q, k * ef_search_mult, entry_point, 0);
+	auto ret_combined =
+			query_k_alt<true>(q, 0, {entry_point}, k * ef_search_mult);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;

@@ -379,20 +379,20 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					}
 				}
 				if (true) {
-					for (size_t edge_count_search_factor : {4}) {
+					for (size_t edge_count_search_factor : {1}) {
 						hnsw_engine_basic_3_jobs.emplace_back(hnsw_engine_basic_3_config(
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
 				if (true) {
-					for (size_t edge_count_search_factor : {4}) {
+					for (size_t edge_count_search_factor : {1}) {
 						hnsw_engine_basic_4_jobs.emplace_back(hnsw_engine_basic_4_config(
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
 				if (false) {
 					// for (size_t edge_count_search_factor : {4, 8}) {
-					for (size_t edge_count_search_factor : {4}) {
+					for (size_t edge_count_search_factor : {1}) {
 						// for (bool use_ecuts : {false, true}) {
 						for (bool use_ecuts : {false}) {
 							hnsw_engine_reference_jobs.emplace_back(
