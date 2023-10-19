@@ -49,9 +49,6 @@ struct hnsw_engine_basic_4 : public ann_engine<T, hnsw_engine_basic_4<T>> {
 	std::vector<char> visited; // booleans
 	std::vector<size_t> visited_recent;
 	std::vector<std::pair<T, size_t>>
-	query_k_at_layer(const vec<T>& q, size_t layer,
-									 const std::vector<size_t>& entry_points, size_t k);
-	std::vector<std::pair<T, size_t>>
 	prune_edges(size_t layer, std::vector<std::pair<T, size_t>> to);
 	template <bool use_bottomlayer>
 	std::vector<std::pair<T, size_t>>
@@ -189,70 +186,6 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 
 template <typename T> void hnsw_engine_basic_4<T>::_build() {
 	assert(all_entries.size() > 0);
-}
-
-template <typename T>
-std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
-		const vec<T>& q, size_t layer, const std::vector<size_t>& entry_points,
-		size_t k) {
-	using measured_data = std::pair<T, size_t>;
-	auto worst_elem = [](const measured_data& a, const measured_data& b) {
-		return a.first < b.first;
-	};
-	auto best_elem = [](const measured_data& a, const measured_data& b) {
-		return a.first > b.first;
-	};
-	std::vector<measured_data> entry_points_with_dist;
-	for (const auto& ep : entry_points) {
-		entry_points_with_dist.emplace_back(dist2(q, all_entries[ep]), ep);
-	}
-	std::priority_queue<measured_data, std::vector<measured_data>,
-											decltype(best_elem)>
-			candidates(entry_points_with_dist.begin(), entry_points_with_dist.end(),
-								 best_elem);
-	std::priority_queue<measured_data, std::vector<measured_data>,
-											decltype(worst_elem)>
-			nearest(entry_points_with_dist.begin(), entry_points_with_dist.end(),
-							worst_elem);
-	while (nearest.size() > k)
-		nearest.pop();
-
-	robin_hood::unordered_flat_set<size_t> visited;
-	for (const auto& ep : entry_points)
-		visited.insert(ep);
-
-	while (!candidates.empty()) {
-		auto cur = candidates.top();
-		candidates.pop();
-		if (cur.first > nearest.top().first && nearest.size() == k) {
-			break;
-		}
-		for (const auto& next : hadj[layer][cur.second]) {
-			_mm_prefetch(&next, _MM_HINT_T0);
-		}
-		for (const auto& [_, next] : hadj[layer][cur.second]) {
-			_mm_prefetch(&all_entries[next], _MM_HINT_T0);
-		}
-		for (const auto& [_, next] : hadj[layer][cur.second]) {
-			if (!visited.contains(next)) {
-				visited.insert(next);
-				T d_next = dist2(q, all_entries[next]);
-				if (nearest.size() < k || d_next < nearest.top().first) {
-					candidates.emplace(d_next, next);
-					nearest.emplace(d_next, next);
-					if (nearest.size() > k)
-						nearest.pop();
-				}
-			}
-		}
-	}
-	std::vector<measured_data> ret;
-	while (!nearest.empty()) {
-		ret.emplace_back(nearest.top());
-		nearest.pop();
-	}
-	reverse(ret.begin(), ret.end());
-	return ret;
 }
 
 template <typename T>
