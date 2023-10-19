@@ -36,7 +36,7 @@ struct hnsw_engine_reference : public ann_engine<T, hnsw_engine_reference<T>> {
 	void _store_vector(vec<T> v);
 	void _build();
 	std::vector<size_t> _query_k(vec<T> v, size_t k);
-	const std::string _name() { return "HNSW Reference Engine(3 ecuts only)"; }
+	const std::string _name() { return "HNSW Reference Engine(no ecuts)"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
@@ -67,6 +67,7 @@ template <typename T> void hnsw_engine_reference<T>::_store_vector(vec<T> v) {
 
 template <typename T>
 bool hnsw_engine_reference<T>::edge_filter(size_t v, size_t u) {
+	return true;
 	for (size_t bin : available_bins) {
 		// an edge is permitted in a bin if it crosses the cut for that bin
 		// TODO check if bin+1 >= current M value here, instead of elabels size
