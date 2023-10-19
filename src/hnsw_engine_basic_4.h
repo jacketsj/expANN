@@ -42,9 +42,8 @@ struct hnsw_engine_basic_4 : public ann_engine<T, hnsw_engine_basic_4<T>> {
 			hadj_flat; // vector -> layer -> edges
 	std::vector<std::vector<size_t>>
 			hadj_bottom; // vector -> edges in bottom layer
-	std::vector<
-			robin_hood::unordered_flat_map<size_t, std::vector<std::pair<T, size_t>>>>
-			hadj;
+	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
+			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	void _store_vector(const vec<T>& v);
 	void _build();
 	std::vector<char> visited; // booleans
@@ -108,6 +107,13 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	all_entries.push_back(v);
 
+	size_t new_max_layer = floor(-log(distribution(gen)) * 1 / log(double(M)));
+
+	hadj_flat_with_lengths.emplace_back();
+	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
+		hadj_flat_with_lengths[v_index].emplace_back();
+	}
+
 	auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
 		std::vector<size_t> ret;
 		for (auto& [_, val] : el) {
@@ -117,7 +123,6 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	};
 
 	// get kNN for each layer
-	size_t new_max_layer = floor(-log(distribution(gen)) * 1 / log(double(M)));
 	std::vector<std::vector<std::pair<T, size_t>>> kNN_per_layer;
 	if (all_entries.size() > 1) {
 		std::vector<size_t> cur = {starting_vertex};
@@ -145,19 +150,23 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	// add the found edges to the graph
 	for (size_t layer = 0; layer < std::min(max_layer, new_max_layer + 1);
 			 ++layer) {
-		hadj[layer][v_index] = prune_edges(layer, kNN_per_layer[layer]);
+		hadj_flat_with_lengths[v_index][layer] =
+				prune_edges(layer, kNN_per_layer[layer]);
 		//  add bidirectional connections, prune if necessary
 		for (auto& md : kNN_per_layer[layer]) {
 			bool edge_exists = false;
-			for (auto& md_other : hadj[layer][md.second]) {
+			for (auto& md_other : hadj_flat_with_lengths[md.second][layer]) {
 				if (md_other.second == v_index) {
 					edge_exists = true;
 				}
 			}
 			if (!edge_exists) {
-				hadj[layer][md.second].emplace_back(md.first, v_index);
-				hadj[layer][md.second] = prune_edges(layer, hadj[layer][md.second]);
-				hadj_flat[md.second][layer] = convert_el(hadj[layer][md.second]);
+				hadj_flat_with_lengths[md.second][layer].emplace_back(md.first,
+																															v_index);
+				hadj_flat_with_lengths[md.second][layer] =
+						prune_edges(layer, hadj_flat_with_lengths[md.second][layer]);
+				hadj_flat[md.second][layer] =
+						convert_el(hadj_flat_with_lengths[md.second][layer]);
 				if (layer == 0)
 					hadj_bottom[md.second] = hadj_flat[md.second][layer];
 			}
@@ -166,23 +175,18 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 
 	// add new layers if necessary
 	while (new_max_layer >= max_layer) {
-		hadj.emplace_back();
 		++max_layer;
-		hadj.back()[v_index] = std::vector<std::pair<T, size_t>>();
 		starting_vertex = v_index;
 	}
 
 	visited.emplace_back();
 	hadj_flat.emplace_back();
 	hadj_bottom.emplace_back();
-	hadj_bottom[v_index] = convert_el(hadj[0][v_index]);
-	for (size_t layer = 0; layer < max_layer; ++layer) {
-		if (hadj[layer].contains(v_index)) {
-			hadj_flat[v_index].emplace_back();
-			hadj_flat[v_index][layer] = convert_el(hadj[layer][v_index]);
-		} else {
-			break;
-		}
+	hadj_bottom[v_index] = convert_el(hadj_flat_with_lengths[v_index][0]);
+	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
+		hadj_flat[v_index].emplace_back();
+		hadj_flat[v_index][layer] =
+				convert_el(hadj_flat_with_lengths[v_index][layer]);
 	}
 }
 
