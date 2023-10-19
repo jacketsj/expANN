@@ -127,8 +127,25 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 	std::vector<std::vector<std::pair<T, size_t>>> kNN_per_layer;
 	if (all_entries.size() > 1) {
 		std::vector<size_t> cur = {starting_vertex};
-		for (int layer = max_layer - 1; layer > int(new_max_layer); --layer) {
-			cur = {query_k_at_layer<false>(v, layer, cur, 1)[0].second};
+		{
+			size_t entry_point = starting_vertex;
+			T ep_dist = dist2(v, all_entries[entry_point]);
+			for (size_t layer = max_layer - 1; layer > new_max_layer; --layer) {
+				bool changed = true;
+				while (changed) {
+					changed = false;
+					for (auto& neighbour : hadj_flat[entry_point][layer]) {
+						_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
+						T neighbour_dist = dist2(v, all_entries[neighbour]);
+						if (neighbour_dist < ep_dist) {
+							entry_point = neighbour;
+							ep_dist = neighbour_dist;
+							changed = true;
+						}
+					}
+				}
+			}
+			cur = {entry_point};
 		}
 		for (int layer = std::min(new_max_layer, max_layer - 1); layer >= 0;
 				 --layer) {
