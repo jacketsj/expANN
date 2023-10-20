@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <queue>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -103,6 +104,13 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		const std::vector<size_t>& contents = mn.to_global_index;
 		to_build.pop();
 
+		// remove duplicates from to_global_index (they WILL occur)
+		{
+			std::set<size_t> contents_set(mn.to_global_index.begin(),
+																		mn.to_global_index.end());
+			mn.to_global_index.assign(contents_set.begin(), contents_set.end());
+		}
+
 		std::cerr << "Building a new node: num_built=" << num_built++
 							<< ", to_build.size()=" << to_build.size()
 							<< ", size=" << contents.size() << std::endl;
@@ -129,9 +137,9 @@ template <typename T> void static_rcg_engine<T>::_build() {
 
 		// find the nearest clusters for each point, and store them
 		// TODO do this recursively with static rcg engine
-		hnsw_engine_basic_4_config cluster_conf(M, 2 * M, ef_search_mult,
-																						ef_construction);
-		hnsw_engine_basic_4<T> cluster_engine(cluster_conf);
+		hnsw_engine_basic_4_config other_conf(M, 2 * M, ef_search_mult,
+																					ef_construction);
+		hnsw_engine_basic_4<T> cluster_engine(other_conf);
 		for (size_t i = 0; i < cluster_centres.size(); ++i) {
 			cluster_engine.store_vector(
 					all_entries[mn.to_global_index[cluster_centres[i]]]);
@@ -162,10 +170,25 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			mn.clusters[i].starting_vertex = contents[cluster_centres[i]];
 		}
 
+		// index everything to figure out which cluster to use
+		hnsw_engine_basic_4<T> entire_engine(other_conf);
+		for (size_t i = 0; i < contents.size(); ++i) {
+			entire_engine.store_vector(all_entries[mn.to_global_index[i]]);
+		}
+		entire_engine.build();
+
 		// actually put everything in the clusters
 		for (size_t i = 0; i < contents.size(); ++i) {
-			for (size_t cluster_index : mn.to_cluster_indices[i])
+			for (size_t cluster_index : mn.to_cluster_indices[i]) {
 				mn.clusters[cluster_index].to_global_index.emplace_back(contents[i]);
+				// put all approx nearest neighbours in too
+				for (size_t local_neighbour_index :
+						 entire_engine.query_k(all_entries[mn.to_global_index[i]], M)) {
+					if (i != local_neighbour_index)
+						mn.clusters[cluster_index].to_global_index.emplace_back(
+								contents[local_neighbour_index]);
+				}
+			}
 		}
 
 		// enqueue each cluster for building/indexing
@@ -238,6 +261,8 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 			if (visited_clusters.contains(cluster_index))
 				continue;
 			visited_clusters.insert(cluster_index);
+			std::cerr << "Entering neighbour queries for " << cur.second
+								<< "(d=" << cur.first << ")" << std::endl;
 			for (size_t global_next :
 					 query_k_at_metanode(mn.clusters[cluster_index], q, k)) {
 				if (!visited.contains(global_next)) {
@@ -251,13 +276,18 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 					}
 				}
 			}
+			std::cerr << "Exiting neighbour queries for " << cur.second
+								<< "(d=" << cur.first << ")" << std::endl;
 		}
 	}
 	std::vector<size_t> ret;
+	std::cerr << "Returning from a metanode: ret=";
 	while (!nearest.empty()) {
+		std::cerr << nearest.top().second << "(d=" << nearest.top().first << "),";
 		ret.emplace_back(nearest.top().second);
 		nearest.pop();
 	}
+	std::cerr << std::endl;
 	reverse(ret.begin(), ret.end());
 	return ret;
 }
