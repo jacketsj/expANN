@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "ann_engine.h"
+#include "hnsw_engine_basic_4.h"
 #include "robin_hood.h"
 #include "topk_t.h"
 
@@ -90,10 +91,10 @@ template <typename T> void static_rcg_engine<T>::_build() {
 	{
 		for (size_t i = 0; i < all_entries.size(); ++i)
 			root.to_global_index.emplace_back(i);
-		to_build.emplace_back(root);
+		to_build.emplace(root);
 	}
 	while (!to_build.empty()) {
-		meta_node& mn = to_build.front().get();
+		metanode& mn = to_build.front().get();
 		const std::vector<size_t>& contents = mn.to_global_index;
 		to_build.pop();
 
@@ -101,18 +102,19 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		for (size_t i = 0; i < contents.size(); ++i) {
 			mn.to_local_index[contents[i]] = i;
 			if (distribution(gen) == 0)
-				mn.cluster_centres.emplace_back(i);
+				cluster_centres.emplace_back(i);
 		}
-		mn.clusters.resize(mn.cluster_centres.size());
+		mn.clusters.resize(cluster_centres.size());
 
 		if (contents.size() <= brute_force_size) {
 			continue;
 		}
 
 		// find the nearest clusters for each point, and store them
-		hnsw_engine_basic_3_config cluster_conf(M, 2 * M, ef_search_mult,
+		// TODO do this recursively with static rcg engine
+		hnsw_engine_basic_4_config cluster_conf(M, 2 * M, ef_search_mult,
 																						ef_construction);
-		hsnw_engine_basic_3 cluster_engine(cluster_conf);
+		hnsw_engine_basic_4<T> cluster_engine(cluster_conf);
 		for (size_t i = 0; i < cluster_centres.size(); ++i) {
 			cluster_engine.store_vector(
 					all_entries[mn.to_global_index[cluster_centres[i]]]);
@@ -127,7 +129,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 
 		// enqueue each cluster for building/indexing
 		for (size_t i = 0; i < mn.clusters.size(); ++i)
-			to_build.emplace_back(mn.clusters[i]);
+			to_build.emplace(mn.clusters[i]);
 	}
 }
 
