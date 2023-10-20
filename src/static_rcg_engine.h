@@ -107,6 +107,10 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			if (distribution(gen) == 0)
 				cluster_centres.emplace_back(i);
 		}
+		if (cluster_centres.empty()) { // if centres are empty (unlikely),
+																	 // arbitrarily add the first element
+			cluster_centres.emplace_back(0);
+		}
 		mn.clusters.resize(cluster_centres.size());
 
 		// convert starting vertex to a local index (assumed to be global index on
