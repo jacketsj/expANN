@@ -26,8 +26,9 @@ struct static_rcg_engine_config {
 			: M(_M), cluster_overlap(_cluster_overlap), C(_C),
 				brute_force_size(_brute_force_size), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction) {
-		assert(C >
-					 M * cluster_overlap); // if this doesn't hold, recursion might break
+		// if these don't hold, recursion might break
+		assert(C > M * cluster_overlap);
+		assert(brute_force_size > M * cluster_overlap);
 	}
 };
 
@@ -96,10 +97,15 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		root.starting_vertex = 0; // arbitrary, should be random (later)
 		to_build.emplace(root);
 	}
+	size_t num_built = 0;
 	while (!to_build.empty()) {
 		metanode& mn = to_build.front().get();
 		const std::vector<size_t>& contents = mn.to_global_index;
 		to_build.pop();
+
+		std::cerr << "Building a new node: num_built=" << num_built++
+							<< ", to_build.size()=" << to_build.size()
+							<< ", size=" << contents.size() << std::endl;
 
 		std::vector<size_t> cluster_centres;
 		for (size_t i = 0; i < contents.size(); ++i) {

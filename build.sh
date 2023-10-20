@@ -38,9 +38,11 @@ cmake -D CMAKE_CXX_COMPILER="$CXX_COMPILER" \
       -D ENABLE_STACK_INFO="$ENABLE_STACK_INFO" \
       -D ENABLE_GCOV="$ENABLE_GCOV" \
       ..
+      #-G Ninja \
 
 # Build the project
-make
+cmake --build .
+#make
 
 cd ..
 
