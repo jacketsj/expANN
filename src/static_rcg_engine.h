@@ -263,8 +263,8 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 			if (visited_clusters.contains(cluster_index))
 				continue;
 			visited_clusters.insert(cluster_index);
-			std::cerr << "Entering neighbour queries for " << cur.second
-								<< "(d=" << cur.first << ")" << std::endl;
+			// std::cerr << "Entering neighbour queries for " << cur.second
+			//					<< "(d=" << cur.first << ")" << std::endl;
 			for (size_t global_next :
 					 query_k_at_metanode(mn.clusters[cluster_index], q, k)) {
 				if (!visited.contains(global_next)) {
@@ -278,14 +278,15 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 					}
 				}
 			}
-			std::cerr << "Exiting neighbour queries for " << cur.second
-								<< "(d=" << cur.first << ")" << std::endl;
+			// std::cerr << "Exiting neighbour queries for " << cur.second
+			//					<< "(d=" << cur.first << ")" << std::endl;
 		}
 	}
 	std::vector<size_t> ret;
-	std::cerr << "Returning from a metanode: ret=";
+	// std::cerr << "Returning from a metanode: ret=";
 	while (!nearest.empty()) {
-		std::cerr << nearest.top().second << "(d=" << nearest.top().first << "),";
+		// std::cerr << nearest.top().second << "(d=" << nearest.top().first <<
+		// "),";
 		ret.emplace_back(nearest.top().second);
 		nearest.pop();
 	}
