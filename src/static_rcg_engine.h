@@ -64,6 +64,9 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 	size_t brute_force_size;
 	size_t ef_search_mult;
 	size_t ef_construction;
+#ifdef RECORD_STATS
+	size_t num_distcomps;
+#endif
 	metanode root;
 	static_rcg_engine(static_rcg_engine_config conf)
 			: rd(), gen(0), distribution(0, conf.C - 1),
@@ -88,6 +91,9 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 		add_param(pl, rC);
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
+#ifdef RECORD_STATS
+		add_param(pl, num_distcomps);
+#endif
 		return pl;
 	}
 };
@@ -99,7 +105,8 @@ void static_rcg_engine<T>::_store_vector(const vec<T>& v) {
 
 template <typename T>
 size_t static_rcg_engine<T>::num_clusters(size_t num_elems) {
-	return num_elems; // C;
+	// return std::floor(std::sqrt(num_elems)) / C;
+	return num_elems / C; // C;
 }
 
 template <typename T> void static_rcg_engine<T>::_build() {
@@ -231,6 +238,10 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		}
 		to_build.emplace(*mn.recursed_elems);
 	}
+#ifdef RECORD_STATS
+	// reset before queries
+	num_distcomps = 0;
+#endif
 }
 
 template <typename T>
@@ -240,6 +251,9 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 	topk_t<T> tk(k);
 	if (mn.to_global_index.size() <= brute_force_size) {
 		for (size_t global_index : mn.to_global_index) {
+#ifdef RECORD_STATS
+			++num_distcomps;
+#endif
 			tk.consider(dist2(q, all_entries[global_index]), global_index);
 		}
 		return tk.to_vector();
@@ -260,9 +274,13 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 		index = mn.to_local_index[index];
 	}
 	std::vector<measured_data> entry_points_with_dist;
-	for (auto& entry_point : entry_points)
+	for (auto& entry_point : entry_points) {
+#ifdef RECORD_STATS
+		++num_distcomps;
+#endif
 		entry_points_with_dist.emplace_back(dist2(q, all_entries[entry_point]),
 																				entry_point);
+	}
 	// candidates stores local indices (so to_cluster_indices can be used)
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(best_elem)>
@@ -303,6 +321,9 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 					 query_k_at_metanode(mn.clusters[cluster_index], q, k)) {
 				if (!visited.contains(global_next)) {
 					visited.insert(global_next);
+#ifdef RECORD_STATS
+					++num_distcomps;
+#endif
 					T d_next = dist2(q, all_entries[global_next]);
 					if (nearest.size() < k || d_next < nearest.top().first) {
 						candidates.emplace(d_next, mn.to_local_index[global_next]);
