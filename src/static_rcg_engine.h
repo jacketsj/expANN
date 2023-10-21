@@ -41,8 +41,7 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 		// TODO use another engine if under brute force size, instead of actual
 		// brute forcing
 		std::unique_ptr<metanode>
-				recursed_cluster_centres; // 1 in rC clusters get indexed here
-		// size_t starting_vertex; // no longer used
+				recursed_elems; // 1 in rC clusters get indexed here
 		robin_hood::unordered_flat_map<size_t, size_t>
 				to_local_index;									 // global index -> metanode local index
 		std::vector<size_t> to_global_index; // metanode local index -> global index
@@ -110,7 +109,6 @@ template <typename T> void static_rcg_engine<T>::_build() {
 	{
 		for (size_t i = 0; i < all_entries.size(); ++i)
 			root.to_global_index.emplace_back(i);
-		// root.starting_vertex = 0; // arbitrary, should be random (later)
 		to_build.emplace(root);
 	}
 	size_t num_built = 0;
@@ -137,45 +135,26 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		total_builds += contents.size();
 		num_built++;
 
-		// TODO recursed cluster centres should actually just be recursed elements
-		// (so this generalizes hnsw again)
-
-		// TODO make exactly C cluster centres instead of approximately 1/C
-		// TODO make a function do this actually (so I can try ~sqrt(n) clusters
-		// too)
-		std::vector<size_t> cluster_centres, recursed_cluster_centres;
+		std::vector<size_t> cluster_centres;
 		for (size_t i = 0; i < contents.size(); ++i)
 			cluster_centres.emplace_back(i);
 		std::shuffle(cluster_centres.begin(), cluster_centres.end(), gen);
-		cluster_centres.resize(
-				std::min(cluster_centres.size(), num_clusters(contents.size())));
-		for (size_t i : cluster_centres) {
-			if (distribution_r(gen) == 0) {
-				recursed_cluster_centres.emplace_back(i);
-			}
-		}
-		/*
-		for (size_t i = 0; i < contents.size(); ++i) {
-			mn.to_local_index[contents[i]] = i;
-			if (distribution(gen) == 0) {
-				cluster_centres.emplace_back(i);
-				if (distribution_r(gen) == 0) {
-					recursed_cluster_centres.emplace_back(i);
-				}
-			}
-		}
-		*/
-		// if (recursed) centres are empty (unlikely), arbitrarily add the first
-		// element
-		if (recursed_cluster_centres.empty()) {
-			cluster_centres.emplace_back(0);
-			recursed_cluster_centres.emplace_back(0);
-		}
+		cluster_centres.resize(std::min(
+				cluster_centres.size(), std::max(1, num_clusters(contents.size()))));
 		mn.clusters.resize(cluster_centres.size());
 
-		// convert starting vertex to a local index (assumed to be global index on
-		// entry)
-		// mn.starting_vertex = mn.to_local_index[mn.starting_vertex];
+		// figure out which elements to put in the "higher level"
+		std::vector<size_t> recursed_elems;
+		for (size_t i = 0; i < contents.size(); ++i) {
+			if (distribution_r(gen) == 0) {
+				recursed_elems.emplace_back(i);
+			}
+		}
+		// if recursed elems are empty (unlikely), arbitrarily add the first
+		// element
+		if (recursed_elems.empty()) {
+			recursed_elems.emplace_back(0);
+		}
 
 		if (contents.size() <= brute_force_size) {
 			continue;
@@ -212,8 +191,6 @@ template <typename T> void static_rcg_engine<T>::_build() {
 				mn.to_cluster_indices[cluster_centres[i]].emplace_back(
 						i); // replace it with i
 			}
-			// initialize cluster starting vertex to a global index
-			// mn.clusters[i].starting_vertex = contents[cluster_centres[i]];
 		}
 
 		// index everything to figure out which cluster to use
@@ -242,13 +219,12 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			to_build.emplace(mn.clusters[i]);
 		}
 
-		mn.recursed_cluster_centres = std::make_unique<metanode>();
-		// enqueue the recursed cluster centres
-		for (size_t i : recursed_cluster_centres) {
-			mn.recursed_cluster_centres->to_global_index.emplace_back(
-					mn.to_global_index[i]);
+		// enqueue the recursed elements
+		mn.recursed_elems = std::make_unique<metanode>();
+		for (size_t i : recursed_elems) {
+			mn.recursed_elems->to_global_index.emplace_back(mn.to_global_index[i]);
 		}
-		to_build.emplace(*mn.recursed_cluster_centres);
+		to_build.emplace(*mn.recursed_elems);
 	}
 }
 
@@ -274,11 +250,10 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 	};
 
 	std::vector<size_t> entry_points =
-			query_k_at_metanode(*mn.recursed_cluster_centres, q, 1);
+			query_k_at_metanode(*mn.recursed_elems, q, 1);
 	for (size_t& index : entry_points) {
 		index = mn.to_local_index[index];
 	}
-	//{mn.starting_vertex};
 	std::vector<measured_data> entry_points_with_dist;
 	for (auto& entry_point : entry_points)
 		entry_points_with_dist.emplace_back(dist2(q, all_entries[entry_point]),
