@@ -396,9 +396,13 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				if (true) {
 					for (size_t edge_count_search_factor : {1}) {
 						for (size_t cluster_overlap : {1}) {
-							static_rcg_engine_jobs.emplace_back(static_rcg_engine_config(
-									k, cluster_overlap, 8 * k, 4 * k * cluster_overlap,
-									num_for_1nn, k * edge_count_search_factor));
+							for (size_t C : {1}) { // 4 * k * cluster_overlap
+								for (size_t brute_force_size : {k + 1}) {
+									static_rcg_engine_jobs.emplace_back(static_rcg_engine_config(
+											k, cluster_overlap, C, brute_force_size, num_for_1nn,
+											k * edge_count_search_factor));
+								}
+							}
 						}
 					}
 				}
