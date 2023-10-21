@@ -120,9 +120,11 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			mn.to_global_index.assign(contents_set.begin(), contents_set.end());
 		}
 
-		std::cerr << "Building a new node: num_built=" << num_built++
-							<< ", to_build.size()=" << to_build.size()
-							<< ", size=" << contents.size() << std::endl;
+		if ((num_built++) % 5000 == 0) {
+			std::cerr << "Building a new metanode: num_built=" << num_built
+								<< ", to_build.size()=" << to_build.size()
+								<< ", size=" << contents.size() << std::endl;
+		}
 
 		std::vector<size_t> cluster_centres, recursed_cluster_centres;
 		for (size_t i = 0; i < contents.size(); ++i) {
@@ -241,9 +243,6 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 	auto best_elem = [](const measured_data& a, const measured_data& b) {
 		return a.first > b.first;
 	};
-
-	// TODO entry points should be determined by a recursive metanode
-	// be careful with global/local indices
 
 	std::vector<size_t> entry_points =
 			query_k_at_metanode(*mn.recursed_cluster_centres, q, 1);
