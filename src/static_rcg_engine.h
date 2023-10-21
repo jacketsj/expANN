@@ -78,8 +78,8 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 	std::vector<vec<T>> all_entries;
 	void _store_vector(const vec<T>& v);
 	void _build();
-	std::vector<size_t> query_k_at_metanode(metanode& mn, const vec<T>& q,
-																					size_t k);
+	std::vector<std::pair<T, size_t>>
+	query_k_at_metanode(metanode& mn, const vec<T>& q, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& q, size_t k);
 	const std::string _name() { return "Static RCG Engine"; }
 	size_t num_clusters(size_t num_elems);
@@ -245,9 +245,9 @@ template <typename T> void static_rcg_engine<T>::_build() {
 }
 
 template <typename T>
-std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
-																															const vec<T>& q,
-																															size_t k) {
+std::vector<std::pair<T, size_t>>
+static_rcg_engine<T>::query_k_at_metanode(metanode& mn, const vec<T>& q,
+																					size_t k) {
 	topk_t<T> tk(k);
 	if (mn.to_global_index.size() <= brute_force_size) {
 		for (size_t global_index : mn.to_global_index) {
@@ -256,7 +256,7 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 #endif
 			tk.consider(dist2(q, all_entries[global_index]), global_index);
 		}
-		return tk.to_vector();
+		return tk.to_combined_vector();
 	}
 
 	// do traversal to get knn
@@ -268,18 +268,10 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 		return a.first > b.first;
 	};
 
-	std::vector<size_t> entry_points =
+	std::vector<std::pair<T, size_t>> entry_points_with_dist =
 			query_k_at_metanode(*mn.recursed_elems, q, 1);
-	for (size_t& index : entry_points) {
+	for (auto& [_, index] : entry_points_with_dist) {
 		index = mn.to_local_index[index];
-	}
-	std::vector<measured_data> entry_points_with_dist;
-	for (auto& entry_point : entry_points) {
-#ifdef RECORD_STATS
-		++num_distcomps;
-#endif
-		entry_points_with_dist.emplace_back(dist2(q, all_entries[entry_point]),
-																				entry_point);
 	}
 	// candidates stores local indices (so to_cluster_indices can be used)
 	std::priority_queue<measured_data, std::vector<measured_data>,
@@ -301,7 +293,7 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 
 	robin_hood::unordered_flat_set<size_t> visited;
 	robin_hood::unordered_flat_set<size_t> visited_clusters;
-	for (auto& entry_point : entry_points) {
+	for (auto& [_, entry_point] : entry_points_with_dist) {
 		visited.insert(entry_point);
 	}
 
@@ -317,14 +309,10 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 			visited_clusters.insert(cluster_index);
 			// std::cerr << "Entering neighbour queries for " << cur.second
 			//					<< "(d=" << cur.first << ")" << std::endl;
-			for (size_t global_next :
+			for (const auto& [d_next, global_next] :
 					 query_k_at_metanode(mn.clusters[cluster_index], q, k)) {
 				if (!visited.contains(global_next)) {
 					visited.insert(global_next);
-#ifdef RECORD_STATS
-					++num_distcomps;
-#endif
-					T d_next = dist2(q, all_entries[global_next]);
 					if (nearest.size() < k || d_next < nearest.top().first) {
 						candidates.emplace(d_next, mn.to_local_index[global_next]);
 						nearest.emplace(d_next, global_next);
@@ -337,12 +325,12 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 			//					<< "(d=" << cur.first << ")" << std::endl;
 		}
 	}
-	std::vector<size_t> ret;
+	std::vector<std::pair<T, size_t>> ret;
 	// std::cerr << "Returning from a metanode: ret=";
 	while (!nearest.empty()) {
 		// std::cerr << nearest.top().second << "(d=" << nearest.top().first <<
 		// "),";
-		ret.emplace_back(nearest.top().second);
+		ret.emplace_back(nearest.top());
 		nearest.pop();
 	}
 	// std::cerr << std::endl;
@@ -352,5 +340,10 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 
 template <typename T>
 std::vector<size_t> static_rcg_engine<T>::_query_k(const vec<T>& q, size_t k) {
-	return query_k_at_metanode(root, q, k * ef_search_mult);
+	std::vector<size_t> ret;
+	auto ret_combined = query_k_at_metanode(root, q, k * ef_search_mult);
+	ret.reserve(ret_combined.size());
+	for (auto& [_, ind] : ret_combined)
+		ret.emplace_back(ind);
+	return ret;
 }

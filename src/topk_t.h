@@ -53,4 +53,15 @@ public:
 		std::reverse(ret.begin(), ret.end()); // sort from closest to furthest
 		return ret;
 	}
+	std::vector<std::pair<T, size_t>> to_combined_vector() const {
+		std::vector<std::pair<T, size_t>> ret;
+		std::priority_queue<dat> dupe(
+				static_cast<const std::priority_queue<dat>&>(*this));
+		while (!dupe.empty()) {
+			ret.push_back(dupe.top());
+			dupe.pop();
+		}
+		std::reverse(ret.begin(), ret.end()); // sort from closest to furthest
+		return ret;
+	}
 };
