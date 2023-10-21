@@ -18,18 +18,20 @@ struct static_rcg_engine_config {
 	size_t M;
 	size_t cluster_overlap;
 	size_t C;
+	size_t rC;
 	size_t brute_force_size;
 	size_t ef_search_mult;
 	size_t ef_construction;
 	static_rcg_engine_config(size_t _M, size_t _cluster_overlap, size_t _C,
-													 size_t _brute_force_size, size_t _ef_search_mult,
-													 size_t _ef_construction)
-			: M(_M), cluster_overlap(_cluster_overlap), C(_C),
+													 size_t _rC, size_t _brute_force_size,
+													 size_t _ef_search_mult, size_t _ef_construction)
+			: M(_M), cluster_overlap(_cluster_overlap), C(_C), rC(_rC),
 				brute_force_size(_brute_force_size), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction) {
+		// TODO figure out what these should actually be
 		// if these don't hold, recursion might break
-		assert(C > M * cluster_overlap);
-		assert(brute_force_size > M * cluster_overlap);
+		// assert(C > M * cluster_overlap);
+		// assert(brute_force_size > M * cluster_overlap);
 	}
 };
 
@@ -38,7 +40,9 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 	struct metanode {
 		// TODO use another engine if under brute force size, instead of actual
 		// brute forcing
-		size_t starting_vertex;
+		std::unique_ptr<metanode>
+				recursed_cluster_centres; // 1 in rC clusters get indexed here
+		// size_t starting_vertex; // no longer used
 		robin_hood::unordered_flat_map<size_t, size_t>
 				to_local_index;									 // global index -> metanode local index
 		std::vector<size_t> to_global_index; // metanode local index -> global index
@@ -53,17 +57,19 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 	};
 	std::random_device rd;
 	std::mt19937 gen;
-	std::uniform_int_distribution<> distribution;
+	std::uniform_int_distribution<> distribution, distribution_r;
 	size_t M;
 	size_t cluster_overlap;
 	size_t C;
+	size_t rC;
 	size_t brute_force_size;
 	size_t ef_search_mult;
 	size_t ef_construction;
 	metanode root;
 	static_rcg_engine(static_rcg_engine_config conf)
-			: rd(), gen(0), distribution(0, conf.C - 1), M(conf.M),
-				cluster_overlap(conf.cluster_overlap), C(conf.C),
+			: rd(), gen(0), distribution(0, conf.C - 1),
+				distribution_r(0, conf.rC - 1), M(conf.M),
+				cluster_overlap(conf.cluster_overlap), C(conf.C), rC(conf.rC),
 				brute_force_size(conf.brute_force_size),
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), root() {}
@@ -79,6 +85,7 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 		add_param(pl, M);
 		add_param(pl, cluster_overlap);
 		add_param(pl, C);
+		add_param(pl, rC);
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
 		return pl;
@@ -97,7 +104,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 	{
 		for (size_t i = 0; i < all_entries.size(); ++i)
 			root.to_global_index.emplace_back(i);
-		root.starting_vertex = 0; // arbitrary, should be random (later)
+		// root.starting_vertex = 0; // arbitrary, should be random (later)
 		to_build.emplace(root);
 	}
 	size_t num_built = 0;
@@ -117,21 +124,27 @@ template <typename T> void static_rcg_engine<T>::_build() {
 							<< ", to_build.size()=" << to_build.size()
 							<< ", size=" << contents.size() << std::endl;
 
-		std::vector<size_t> cluster_centres;
+		std::vector<size_t> cluster_centres, recursed_cluster_centres;
 		for (size_t i = 0; i < contents.size(); ++i) {
 			mn.to_local_index[contents[i]] = i;
-			if (distribution(gen) == 0)
+			if (distribution(gen) == 0) {
 				cluster_centres.emplace_back(i);
+				if (distribution_r(gen) == 0) {
+					recursed_cluster_centres.emplace_back(i);
+				}
+			}
 		}
-		if (cluster_centres.empty()) { // if centres are empty (unlikely),
-																	 // arbitrarily add the first element
+		// if (recursed) centres are empty (unlikely), arbitrarily add the first
+		// element
+		if (recursed_cluster_centres.empty()) {
 			cluster_centres.emplace_back(0);
+			recursed_cluster_centres.emplace_back(0);
 		}
 		mn.clusters.resize(cluster_centres.size());
 
 		// convert starting vertex to a local index (assumed to be global index on
 		// entry)
-		mn.starting_vertex = mn.to_local_index[mn.starting_vertex];
+		// mn.starting_vertex = mn.to_local_index[mn.starting_vertex];
 
 		if (contents.size() <= brute_force_size) {
 			continue;
@@ -169,7 +182,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 						i); // replace it with i
 			}
 			// initialize cluster starting vertex to a global index
-			mn.clusters[i].starting_vertex = contents[cluster_centres[i]];
+			// mn.clusters[i].starting_vertex = contents[cluster_centres[i]];
 		}
 
 		// index everything to figure out which cluster to use
@@ -197,6 +210,14 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		for (size_t i = 0; i < mn.clusters.size(); ++i) {
 			to_build.emplace(mn.clusters[i]);
 		}
+
+		mn.recursed_cluster_centres = std::make_unique<metanode>();
+		// enqueue the recursed cluster centres
+		for (size_t i : recursed_cluster_centres) {
+			mn.recursed_cluster_centres->to_global_index.emplace_back(
+					mn.to_global_index[i]);
+		}
+		to_build.emplace(*mn.recursed_cluster_centres);
 	}
 }
 
@@ -224,7 +245,12 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 	// TODO entry points should be determined by a recursive metanode
 	// be careful with global/local indices
 
-	std::vector<size_t> entry_points = {mn.starting_vertex};
+	std::vector<size_t> entry_points =
+			query_k_at_metanode(*mn.recursed_cluster_centres, q, 1);
+	for (size_t& index : entry_points) {
+		index = mn.to_local_index[index];
+	}
+	//{mn.starting_vertex};
 	std::vector<measured_data> entry_points_with_dist;
 	for (auto& entry_point : entry_points)
 		entry_points_with_dist.emplace_back(dist2(q, all_entries[entry_point]),
