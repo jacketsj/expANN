@@ -36,6 +36,8 @@ struct static_rcg_engine_config {
 template <typename T>
 struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 	struct metanode {
+		// TODO use another engine if under brute force size, instead of actual
+		// brute forcing
 		size_t starting_vertex;
 		robin_hood::unordered_flat_map<size_t, size_t>
 				to_local_index;									 // global index -> metanode local index
