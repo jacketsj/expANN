@@ -99,7 +99,7 @@ void static_rcg_engine<T>::_store_vector(const vec<T>& v) {
 
 template <typename T>
 size_t static_rcg_engine<T>::num_clusters(size_t num_elems) {
-	return C;
+	return num_elems; // C;
 }
 
 template <typename T> void static_rcg_engine<T>::_build() {
@@ -125,6 +125,10 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			mn.to_global_index.assign(contents_set.begin(), contents_set.end());
 		}
 
+		for (size_t i = 0; i < contents.size(); ++i) {
+			mn.to_local_index[contents[i]] = i;
+		}
+
 		if ((total_builds + contents.size()) / 5000 > (total_builds / 5000)) {
 			// if ((num_built++) % 5000 == 0) {
 			std::cerr << "Building a new metanode: num_built=" << num_built
@@ -139,8 +143,9 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		for (size_t i = 0; i < contents.size(); ++i)
 			cluster_centres.emplace_back(i);
 		std::shuffle(cluster_centres.begin(), cluster_centres.end(), gen);
-		cluster_centres.resize(std::min(
-				cluster_centres.size(), std::max(1, num_clusters(contents.size()))));
+		cluster_centres.resize(
+				std::min(cluster_centres.size(),
+								 std::max(size_t(1), num_clusters(contents.size()))));
 		mn.clusters.resize(cluster_centres.size());
 
 		// figure out which elements to put in the "higher level"
