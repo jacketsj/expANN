@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 
+#define RECORD_STATS 1
+
 #define DIM 128
 #include "vec.h"
 
