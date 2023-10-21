@@ -80,6 +80,7 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 																					size_t k);
 	std::vector<size_t> _query_k(const vec<T>& q, size_t k);
 	const std::string _name() { return "Static RCG Engine"; }
+	size_t num_clusters(size_t num_elems);
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
@@ -97,6 +98,11 @@ void static_rcg_engine<T>::_store_vector(const vec<T>& v) {
 	all_entries.push_back(v);
 }
 
+template <typename T>
+size_t static_rcg_engine<T>::num_clusters(size_t num_elems) {
+	return C;
+}
+
 template <typename T> void static_rcg_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 
@@ -108,6 +114,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		to_build.emplace(root);
 	}
 	size_t num_built = 0;
+	size_t total_builds = 0;
 	while (!to_build.empty()) {
 		metanode& mn = to_build.front().get();
 		const std::vector<size_t>& contents = mn.to_global_index;
@@ -120,13 +127,34 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			mn.to_global_index.assign(contents_set.begin(), contents_set.end());
 		}
 
-		if ((num_built++) % 5000 == 0) {
+		if ((total_builds + contents.size()) / 5000 > (total_builds / 5000)) {
+			// if ((num_built++) % 5000 == 0) {
 			std::cerr << "Building a new metanode: num_built=" << num_built
 								<< ", to_build.size()=" << to_build.size()
-								<< ", size=" << contents.size() << std::endl;
+								<< ", size=" << contents.size()
+								<< ", accumulated_buildsize=" << total_builds << std::endl;
 		}
+		total_builds += contents.size();
+		num_built++;
 
+		// TODO recursed cluster centres should actually just be recursed elements
+		// (so this generalizes hnsw again)
+
+		// TODO make exactly C cluster centres instead of approximately 1/C
+		// TODO make a function do this actually (so I can try ~sqrt(n) clusters
+		// too)
 		std::vector<size_t> cluster_centres, recursed_cluster_centres;
+		for (size_t i = 0; i < contents.size(); ++i)
+			cluster_centres.emplace_back(i);
+		std::shuffle(cluster_centres.begin(), cluster_centres.end(), gen);
+		cluster_centres.resize(
+				std::min(cluster_centres.size(), num_clusters(contents.size())));
+		for (size_t i : cluster_centres) {
+			if (distribution_r(gen) == 0) {
+				recursed_cluster_centres.emplace_back(i);
+			}
+		}
+		/*
 		for (size_t i = 0; i < contents.size(); ++i) {
 			mn.to_local_index[contents[i]] = i;
 			if (distribution(gen) == 0) {
@@ -136,6 +164,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 				}
 			}
 		}
+		*/
 		// if (recursed) centres are empty (unlikely), arbitrarily add the first
 		// element
 		if (recursed_cluster_centres.empty()) {
@@ -199,8 +228,8 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			for (size_t cluster_index : mn.to_cluster_indices[i]) {
 				mn.clusters[cluster_index].to_global_index.emplace_back(contents[i]);
 				// put all approx nearest neighbours in too
-				for (size_t local_neighbour_index :
-						 entire_engine.query_k(all_entries[mn.to_global_index[i]], M)) {
+				for (size_t local_neighbour_index : entire_engine.query_k(
+								 all_entries[mn.to_global_index[i]], ef_construction)) {
 					if (i != local_neighbour_index)
 						mn.clusters[cluster_index].to_global_index.emplace_back(
 								contents[local_neighbour_index]);
@@ -315,7 +344,7 @@ std::vector<size_t> static_rcg_engine<T>::query_k_at_metanode(metanode& mn,
 		ret.emplace_back(nearest.top().second);
 		nearest.pop();
 	}
-	std::cerr << std::endl;
+	// std::cerr << std::endl;
 	reverse(ret.begin(), ret.end());
 	return ret;
 }
