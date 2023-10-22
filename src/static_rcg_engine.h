@@ -118,19 +118,21 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			root.to_global_index.emplace_back(i);
 		to_build.emplace(root);
 	}
-	size_t num_built = 0;
-	size_t total_builds = 0;
-	while (!to_build.empty()) {
-		metanode& mn = to_build.front().get();
-		const std::vector<size_t>& contents = mn.to_global_index;
-		to_build.pop();
-
+	auto emplace_to_build = [&](metanode& mn) {
 		// remove duplicates from to_global_index (they WILL occur)
 		{
 			std::set<size_t> contents_set(mn.to_global_index.begin(),
 																		mn.to_global_index.end());
 			mn.to_global_index.assign(contents_set.begin(), contents_set.end());
 		}
+		to_build.emplace(mn);
+	};
+	size_t num_built = 0;
+	size_t total_builds = 0;
+	while (!to_build.empty()) {
+		metanode& mn = to_build.front().get();
+		const std::vector<size_t>& contents = mn.to_global_index;
+		to_build.pop();
 
 		for (size_t i = 0; i < contents.size(); ++i) {
 			mn.to_local_index[contents[i]] = i;
@@ -151,8 +153,8 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			cluster_centres.emplace_back(i);
 		std::shuffle(cluster_centres.begin(), cluster_centres.end(), gen);
 		cluster_centres.resize(
-				std::min(cluster_centres.size(),
-								 std::max(size_t(1), num_clusters(contents.size()))));
+				std::min(cluster_centres.size(), // in case there is only 1 element
+								 std::max(size_t(2), num_clusters(contents.size()))));
 		mn.clusters.resize(cluster_centres.size());
 
 		// figure out which elements to put in the "higher level"
@@ -228,7 +230,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 
 		// enqueue each cluster for building/indexing
 		for (size_t i = 0; i < mn.clusters.size(); ++i) {
-			to_build.emplace(mn.clusters[i]);
+			emplace_to_build(mn.clusters[i]);
 		}
 
 		// enqueue the recursed elements
@@ -236,7 +238,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		for (size_t i : recursed_elems) {
 			mn.recursed_elems->to_global_index.emplace_back(mn.to_global_index[i]);
 		}
-		to_build.emplace(*mn.recursed_elems);
+		emplace_to_build(*mn.recursed_elems);
 	}
 #ifdef RECORD_STATS
 	// reset before queries
@@ -297,6 +299,7 @@ static_rcg_engine<T>::query_k_at_metanode(metanode& mn, const vec<T>& q,
 		visited.insert(entry_point);
 	}
 
+	// TODO use a stack to avoid the recursion, or something
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
 		candidates.pop();
