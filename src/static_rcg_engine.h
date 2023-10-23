@@ -51,8 +51,9 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 				clusters; // metanode centre index (approximatley n/C) -> metanode
 									// indexing cluster with M neighbours per element
 		std::vector<std::vector<size_t>>
-				to_cluster_indices; // metanode local index ->
-														// metanode centre indices (membership)
+				to_cluster_indices; // metanode local index -> metanode centre indices
+														// (membership)
+		size_t depth;
 	};
 	std::random_device rd;
 	std::mt19937 gen;
@@ -82,7 +83,7 @@ struct static_rcg_engine : public ann_engine<T, static_rcg_engine<T>> {
 	query_k_at_metanode(metanode& mn, const vec<T>& q, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& q, size_t k);
 	const std::string _name() { return "Static RCG Engine"; }
-	size_t num_clusters(size_t num_elems);
+	size_t num_clusters(const metanode& mn);
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
@@ -104,18 +105,32 @@ void static_rcg_engine<T>::_store_vector(const vec<T>& v) {
 }
 
 template <typename T>
-size_t static_rcg_engine<T>::num_clusters(size_t num_elems) {
+size_t static_rcg_engine<T>::num_clusters(const metanode& mn) {
+	auto num_elems = mn.to_global_index.size();
+	auto depth = mn.depth;
+	size_t divisor = C;
+	while (depth > 0) {
+		divisor /= 2;
+		--depth;
+	}
+	if (divisor < 1)
+		divisor = 1;
+	return num_elems / divisor;
 	// return std::floor(std::sqrt(num_elems)) / C;
-	return num_elems / C; // C;
+	// return std::max(num_elems / C, C);
+	// if (num_elems / C <= C)
+	// return num_elems;
+	// return num_elems / C; // C;
 }
 
 template <typename T> void static_rcg_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 
-	std::queue<std::reference_wrapper<metanode>> to_build;
+	std::stack<std::reference_wrapper<metanode>> to_build;
 	{
 		for (size_t i = 0; i < all_entries.size(); ++i)
 			root.to_global_index.emplace_back(i);
+		root.depth = 0;
 		to_build.emplace(root);
 	}
 	auto emplace_to_build = [&](metanode& mn) {
@@ -130,7 +145,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 	size_t num_built = 0;
 	size_t total_builds = 0;
 	while (!to_build.empty()) {
-		metanode& mn = to_build.front().get();
+		metanode& mn = to_build.top().get();
 		const std::vector<size_t>& contents = mn.to_global_index;
 		to_build.pop();
 
@@ -139,7 +154,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		}
 
 		if ((total_builds + contents.size()) / 5000 > (total_builds / 5000)) {
-			// if ((num_built++) % 5000 == 0) {
+			//  if ((num_built++) % 5000 == 0) {
 			std::cerr << "Building a new metanode: num_built=" << num_built
 								<< ", to_build.size()=" << to_build.size()
 								<< ", size=" << contents.size()
@@ -148,13 +163,17 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		total_builds += contents.size();
 		num_built++;
 
+		if (contents.size() <= brute_force_size) {
+			continue;
+		}
+
 		std::vector<size_t> cluster_centres;
 		for (size_t i = 0; i < contents.size(); ++i)
 			cluster_centres.emplace_back(i);
 		std::shuffle(cluster_centres.begin(), cluster_centres.end(), gen);
 		cluster_centres.resize(
 				std::min(cluster_centres.size(), // in case there is only 1 element
-								 std::max(size_t(2), num_clusters(contents.size()))));
+								 std::max(size_t(2), num_clusters(mn))));
 		mn.clusters.resize(cluster_centres.size());
 
 		// figure out which elements to put in the "higher level"
@@ -168,10 +187,6 @@ template <typename T> void static_rcg_engine<T>::_build() {
 		// element
 		if (recursed_elems.empty()) {
 			recursed_elems.emplace_back(0);
-		}
-
-		if (contents.size() <= brute_force_size) {
-			continue;
 		}
 
 		// find the nearest clusters for each point, and store them
@@ -230,12 +245,14 @@ template <typename T> void static_rcg_engine<T>::_build() {
 
 		// enqueue each cluster for building/indexing
 		for (size_t i = 0; i < mn.clusters.size(); ++i) {
+			mn.clusters[i].depth = mn.depth + 1;
 			emplace_to_build(mn.clusters[i]);
 		}
 
 		// enqueue the recursed elements
 		mn.recursed_elems = std::make_unique<metanode>();
 		for (size_t i : recursed_elems) {
+			mn.recursed_elems->depth = mn.depth + 1;
 			mn.recursed_elems->to_global_index.emplace_back(mn.to_global_index[i]);
 		}
 		emplace_to_build(*mn.recursed_elems);

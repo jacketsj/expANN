@@ -401,7 +401,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 									 {8}) { //, 8 * 8 * 2}) { // 4 * k * cluster_overlap
 								for (size_t rC : {k}) {
 									for (size_t brute_force_size :
-											 {k * edge_count_search_factor + 1}) {
+											 {k * edge_count_search_factor + 2}) {
 										//{k * C * edge_count_search_factor + 1}) {
 										static_rcg_engine_jobs.emplace_back(
 												static_rcg_engine_config(k, cluster_overlap, C, rC,
