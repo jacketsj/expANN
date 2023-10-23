@@ -29,6 +29,9 @@ struct hnsw_engine_reference : public ann_engine<T, hnsw_engine_reference<T>> {
 	hnswlib::HierarchicalNSW<T>* alg_hnsw;	 // TODO make this a unique ptr
 	hnswlib::L2Space* space;								 // TODO make this a unique ptr
 	std::vector<std::vector<char>> e_labels; // vertex -> cut labels (*num_cuts)
+#ifdef RECORD_STATS
+	size_t num_distcomps;
+#endif
 	hnsw_engine_reference(hnsw_engine_reference_config conf)
 			: M(conf.M), ef_construction(conf.ef_construction),
 				ef_factor(conf.ef_factor), use_ecuts(conf.use_ecuts), rd(), gen(rd()),
@@ -46,6 +49,9 @@ struct hnsw_engine_reference : public ann_engine<T, hnsw_engine_reference<T>> {
 		add_param(pl, ef_construction);
 		add_param(pl, ef_factor);
 		add_param(pl, use_ecuts);
+#ifdef RECORD_STATS
+		add_param(pl, num_distcomps);
+#endif
 		return pl;
 	}
 	bool generate_elabel() { return int_distribution(gen); }
@@ -115,6 +121,12 @@ template <typename T> void hnsw_engine_reference<T>::_build() {
 	}
 	// for (auto& v : all_entries) {
 	//}
+
+#ifdef RECORD_STATS
+	// reset before queries
+	num_distcomps = 0;
+	hnswlib::num_distcomps_global = 0;
+#endif
 }
 
 template <typename T>
@@ -132,5 +144,6 @@ std::vector<size_t> hnsw_engine_reference<T>::_query_k(vec<T> v, size_t k) {
 		ret.push_back(result.top().second);
 		result.pop();
 	}
+	num_distcomps = hnswlib::num_distcomps_global;
 	return ret;
 }
