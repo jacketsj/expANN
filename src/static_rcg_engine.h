@@ -153,7 +153,7 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			mn.to_local_index[contents[i]] = i;
 		}
 
-		if ((total_builds + contents.size()) / 5000 > (total_builds / 5000)) {
+		if ((total_builds + contents.size()) / 500000 > (total_builds / 500000)) {
 			//  if ((num_built++) % 5000 == 0) {
 			std::cerr << "Building a new metanode: num_built=" << num_built
 								<< ", to_build.size()=" << to_build.size()
