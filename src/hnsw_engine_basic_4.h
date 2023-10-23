@@ -33,6 +33,9 @@ struct hnsw_engine_basic_4 : public ann_engine<T, hnsw_engine_basic_4<T>> {
 	size_t ef_search_mult;
 	size_t ef_construction;
 	size_t max_layer;
+#ifdef RECORD_STATS
+	size_t num_distcomps;
+#endif
 	hnsw_engine_basic_4(hnsw_engine_basic_4_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
@@ -62,6 +65,9 @@ struct hnsw_engine_basic_4 : public ann_engine<T, hnsw_engine_basic_4<T>> {
 		add_param(pl, M0);
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
+#ifdef RECORD_STATS
+		add_param(pl, num_distcomps);
+#endif
 		return pl;
 	}
 };
@@ -206,6 +212,11 @@ void hnsw_engine_basic_4<T>::_store_vector(const vec<T>& v) {
 
 template <typename T> void hnsw_engine_basic_4<T>::_build() {
 	assert(all_entries.size() > 0);
+
+#ifdef RECORD_STATS
+	// reset before queries
+	num_distcomps = 0;
+#endif
 }
 
 template <typename T>
@@ -230,9 +241,13 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
 		return a.first > b.first;
 	};
 	std::vector<measured_data> entry_points_with_dist;
-	for (auto& entry_point : entry_points)
+	for (auto& entry_point : entry_points) {
+#ifdef RECORD_STATS
+		++num_distcomps;
+#endif
 		entry_points_with_dist.emplace_back(dist2(q, all_entries[entry_point]),
 																				entry_point);
+	}
 
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(best_elem)>
@@ -286,6 +301,9 @@ std::vector<std::pair<T, size_t>> hnsw_engine_basic_4<T>::query_k_at_layer(
 			if (!visited[next]) {
 				visited[next] = true;
 				visited_recent.emplace_back(next);
+#ifdef RECORD_STATS
+				++num_distcomps;
+#endif
 				T d_next = dist2(q, all_entries[next]);
 				if (nearest.size() < k || d_next < nearest.top().first) {
 					candidates.emplace(d_next, next);
@@ -324,6 +342,9 @@ template <typename T>
 std::vector<size_t> hnsw_engine_basic_4<T>::_query_k(const vec<T>& q,
 																										 size_t k) {
 	size_t entry_point = starting_vertex;
+#ifdef RECORD_STATS
+	++num_distcomps;
+#endif
 	T ep_dist = dist2(all_entries[entry_point], q);
 	for (size_t layer = max_layer - 1; layer > 0; --layer) {
 		bool changed = true;
@@ -331,6 +352,9 @@ std::vector<size_t> hnsw_engine_basic_4<T>::_query_k(const vec<T>& q,
 			changed = false;
 			for (auto& neighbour : hadj_flat[entry_point][layer]) {
 				_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
+#ifdef RECORD_STATS
+				++num_distcomps;
+#endif
 				T neighbour_dist = dist2(q, all_entries[neighbour]);
 				if (neighbour_dist < ep_dist) {
 					entry_point = neighbour;
