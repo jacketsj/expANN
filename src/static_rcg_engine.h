@@ -109,12 +109,14 @@ size_t static_rcg_engine<T>::num_clusters(const metanode& mn) {
 	auto num_elems = mn.to_global_index.size();
 	auto depth = mn.depth;
 	size_t divisor = C;
-	while (depth > 0) {
-		divisor /= 2;
-		--depth;
-	}
-	if (divisor < 1)
+	if (depth >= 1)
 		divisor = 1;
+	// while (depth > 0) {
+	//	divisor /= 2;
+	//	--depth;
+	// }
+	// if (divisor < 1)
+	//	divisor = 1;
 	return num_elems / divisor;
 	// return std::floor(std::sqrt(num_elems)) / C;
 	// return std::max(num_elems / C, C);
@@ -153,11 +155,12 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			mn.to_local_index[contents[i]] = i;
 		}
 
-		if ((total_builds + contents.size()) / 500000 > (total_builds / 500000)) {
+		if ((total_builds + contents.size()) / 500000 > (total_builds / 500000) ||
+				contents.size() >= 5000) {
 			//  if ((num_built++) % 5000 == 0) {
 			std::cerr << "Building a new metanode: num_built=" << num_built
 								<< ", to_build.size()=" << to_build.size()
-								<< ", size=" << contents.size()
+								<< ", size=" << contents.size() << ", depth=" << mn.depth
 								<< ", accumulated_buildsize=" << total_builds << std::endl;
 		}
 		total_builds += contents.size();
@@ -234,12 +237,22 @@ template <typename T> void static_rcg_engine<T>::_build() {
 			for (size_t cluster_index : mn.to_cluster_indices[i]) {
 				mn.clusters[cluster_index].to_global_index.emplace_back(contents[i]);
 				// put all approx nearest neighbours in too
+				size_t num_used = 0;
+				for (size_t local_neighbour_index : entire_engine.hadj_bottom[i]) {
+					if (i != local_neighbour_index) {
+						if (num_used++ < M / (mn.depth + 1))
+							mn.clusters[cluster_index].to_global_index.emplace_back(
+									contents[local_neighbour_index]);
+					}
+				}
+				/*
 				for (size_t local_neighbour_index : entire_engine.query_k(
 								 all_entries[mn.to_global_index[i]], ef_construction)) {
 					if (i != local_neighbour_index)
 						mn.clusters[cluster_index].to_global_index.emplace_back(
 								contents[local_neighbour_index]);
 				}
+				*/
 			}
 		}
 
