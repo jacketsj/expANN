@@ -44,6 +44,13 @@ struct static_rcg_engine_simple
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0), MM(conf.MM),
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), max_layer(0) {}
+	~static_rcg_engine_simple() {
+#ifdef RECORD_STATS
+		for (auto& subind : hadj_bottom_indexed) {
+			num_distcomps += subind->num_distcomps;
+		}
+#endif
+	}
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
@@ -229,9 +236,7 @@ template <typename T> void static_rcg_engine_simple<T>::_build() {
 	num_distcomps = 0;
 #endif
 
-	hnsw_engine_basic_4_config other_conf(
-			std::max(M / 8, size_t(1)), std::max(M / 4, size_t(1)), 1,
-			std::max(ef_construction / 4, size_t(1)));
+	hnsw_engine_basic_4_config other_conf(MM, 2 * MM, 1, 2 * MM);
 	for (size_t i = 0; i < hadj_bottom.size(); ++i) {
 		hadj_bottom_indexed.push_back(
 				std::make_unique<hnsw_engine_basic_4<T>>(other_conf));
