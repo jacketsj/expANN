@@ -236,7 +236,7 @@ template <typename T> void static_rcg_engine_simple<T>::_build() {
 	num_distcomps = 0;
 #endif
 
-	hnsw_engine_basic_4_config other_conf(MM, 2 * MM, 1, 2 * MM);
+	hnsw_engine_basic_4_config other_conf(MM, MM, 2, 2 * MM);
 	for (size_t i = 0; i < hadj_bottom.size(); ++i) {
 		hadj_bottom_indexed.push_back(
 				std::make_unique<hnsw_engine_basic_4<T>>(other_conf));

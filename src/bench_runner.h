@@ -415,9 +415,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				}
 				if (true) {
 					for (size_t edge_count_search_factor : {1}) {
-						static_rcg_engine_simple_jobs.emplace_back(
-								static_rcg_engine_simple_config(k, 2 * k, k, num_for_1nn,
-																								k * edge_count_search_factor));
+						for (size_t MM : {3})
+							static_rcg_engine_simple_jobs.emplace_back(
+									static_rcg_engine_simple_config(
+											k, 2 * k, MM, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
 				if (false) {
