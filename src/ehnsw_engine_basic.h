@@ -111,9 +111,7 @@ ehnsw_engine_basic<T>::prune_edges(size_t layer, size_t from,
 		if (layer == 0 && ret.size() + num_cuts() >= edge_count_mult) {
 			bool found_bin = false;
 			for (size_t bin = 0; bin < bins.size(); ++bin) {
-				if (!bins[bin] &&
-						e_labels[md.second][ret.size() + num_cuts() - edge_count_mult] !=
-								e_labels[from][ret.size() + num_cuts() - edge_count_mult]) {
+				if (!bins[bin] && e_labels[md.second][bin] != e_labels[from][bin]) {
 					bins[bin] = true;
 					found_bin = true;
 				}
