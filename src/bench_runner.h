@@ -30,6 +30,7 @@
 #include "hnsw_engine_basic_2.h"
 #include "hnsw_engine_basic_3.h"
 #include "hnsw_engine_basic_4.h"
+#include "hnsw_engine_basic_clustered.h"
 #include "hnsw_engine_hybrid.h"
 #include "hnsw_engine_reference.h"
 #include "hyper_hnsw_engine.h"
@@ -143,6 +144,9 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			hnsw_engine_basic_3_jobs;
 	std::vector<job<hnsw_engine_basic_4<float>, hnsw_engine_basic_4_config>>
 			hnsw_engine_basic_4_jobs;
+	std::vector<job<hnsw_engine_basic_clustered<float>,
+									hnsw_engine_basic_clustered_config>>
+			hnsw_engine_basic_clustered_jobs;
 	std::vector<job<static_rcg_engine<float>, static_rcg_engine_config>>
 			static_rcg_engine_jobs;
 	std::vector<job<hnsw_engine_reference<float>, hnsw_engine_reference_config>>
@@ -393,6 +397,18 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
+				if (true) {
+					for (size_t edge_count_search_factor : {1}) {
+						for (size_t cluster_size : {4, 16, 32}) {
+							for (size_t cluster_neighbours : {0, 4, 8, 32}) {
+								hnsw_engine_basic_clustered_jobs.emplace_back(
+										hnsw_engine_basic_clustered_config(
+												k, 2 * k, num_for_1nn, k * edge_count_search_factor,
+												cluster_size, cluster_neighbours));
+							}
+						}
+					}
+				}
 				if (false) {
 					for (size_t edge_count_search_factor : {1}) {
 						for (size_t cluster_overlap : {1}) {
@@ -413,7 +429,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						}
 					}
 				}
-				if (true) {
+				if (false) {
 					// for (size_t edge_count_search_factor : {4, 8}) {
 					for (size_t edge_count_search_factor : {1}) {
 						// for (bool use_ecuts : {false, true}) {
@@ -810,15 +826,15 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	return perform_and_store_benchmark_results(
 			ds.name, num_threads, basic_benchmarker, hnsw_engine_jobs,
 			hnsw_engine_2_jobs, hnsw_engine_basic_2_jobs, hnsw_engine_basic_3_jobs,
-			hnsw_engine_basic_4_jobs, static_rcg_engine_jobs,
-			hnsw_engine_reference_jobs, arrangement_engine_jobs, ehnsw_engine_jobs,
-			ehnsw_engine_2_jobs, ehnsw_engine_3_jobs, ehnsw_engine_4_jobs,
-			ehnsw_engine_5_jobs, ehnsw_engine_6_jobs, ehnsw_engine_7_jobs,
-			ehnsw_engine_8_jobs, ensg_engine_jobs, jamana_ehnsw_engine_jobs,
-			filter_ehnsw_engine_jobs, clustered_ehnsw_engine_jobs,
-			hier_arrangement_engine_jobs, hnsw_engine_hybrid_jobs,
-			tree_arrangement_engine_jobs, tree_arrangement_engine_if_jobs,
-			isect_clustering_engine_jobs, projection_hnsw_engine_2_jobs,
-			projection_ehnsw_engine_2_jobs, disk_ehnsw_engine_jobs,
-			hyper_hnsw_engine_jobs);
+			hnsw_engine_basic_4_jobs, hnsw_engine_basic_clustered_jobs,
+			static_rcg_engine_jobs, hnsw_engine_reference_jobs,
+			arrangement_engine_jobs, ehnsw_engine_jobs, ehnsw_engine_2_jobs,
+			ehnsw_engine_3_jobs, ehnsw_engine_4_jobs, ehnsw_engine_5_jobs,
+			ehnsw_engine_6_jobs, ehnsw_engine_7_jobs, ehnsw_engine_8_jobs,
+			ensg_engine_jobs, jamana_ehnsw_engine_jobs, filter_ehnsw_engine_jobs,
+			clustered_ehnsw_engine_jobs, hier_arrangement_engine_jobs,
+			hnsw_engine_hybrid_jobs, tree_arrangement_engine_jobs,
+			tree_arrangement_engine_if_jobs, isect_clustering_engine_jobs,
+			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
+			disk_ehnsw_engine_jobs, hyper_hnsw_engine_jobs);
 }
