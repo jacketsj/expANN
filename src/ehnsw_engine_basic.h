@@ -94,6 +94,7 @@ ehnsw_engine_basic<T>::prune_edges(size_t layer, size_t from,
 
 	sort(to.begin(), to.end());
 	std::vector<std::pair<T, size_t>> ret;
+	std::vector<bool> bins(edge_count_mult - num_cuts());
 	for (const auto& md : to) {
 		_mm_prefetch(&all_entries[md.second], _MM_HINT_T0);
 		if (ret.size() >= edge_count_mult)
@@ -107,11 +108,25 @@ ehnsw_engine_basic<T>::prune_edges(size_t layer, size_t from,
 				break;
 			}
 		}
-		if (ret.size() + num_cuts() >= edge_count_mult) {
-			if (e_labels[md.second][ret.size() + num_cuts() - edge_count_mult] ==
-					e_labels[from][ret.size() + num_cuts() - edge_count_mult])
+		if (layer == 0 && ret.size() + num_cuts() >= edge_count_mult) {
+			bool found_bin = false;
+			for (size_t bin = 0; bin < bins.size(); ++bin) {
+				if (!bins[bin] &&
+						e_labels[md.second][ret.size() + num_cuts() - edge_count_mult] !=
+								e_labels[from][ret.size() + num_cuts() - edge_count_mult]) {
+					bins[bin] = true;
+					found_bin = true;
+				}
+			}
+			if (!found_bin) {
 				choose = false;
+			}
 		}
+		// if (ret.size() + num_cuts() >= edge_count_mult) {
+		//	if (e_labels[md.second][ret.size() + num_cuts() - edge_count_mult] ==
+		//			e_labels[from][ret.size() + num_cuts() - edge_count_mult])
+		//		choose = false;
+		// }
 		if (choose) {
 			ret.emplace_back(md);
 		}
@@ -126,7 +141,7 @@ void ehnsw_engine_basic<T>::_store_vector(const vec<T>& v) {
 	all_entries.push_back(v);
 
 	e_labels.emplace_back();
-	for (size_t cut = 0; cut < M - 10; ++cut)
+	for (size_t cut = 0; cut < M0 - 2 * 10; ++cut)
 		e_labels.back().emplace_back(generate_elabel());
 
 	size_t new_max_layer = floor(-log(distribution(gen)) * 1 / log(double(M)));
