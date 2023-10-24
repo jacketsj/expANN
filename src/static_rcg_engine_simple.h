@@ -53,7 +53,7 @@ struct static_rcg_engine_simple
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	// TODO consider adding more edges to hadj_bottom_indexed than were in
 	// hadj_bottom
-	std::vector<hnsw_engine_basic_4<T>> hadj_bottom_indexed;
+	std::vector<std::unique_ptr<hnsw_engine_basic_4<T>>> hadj_bottom_indexed;
 	void _store_vector(const vec<T>& v);
 	void _build();
 	std::vector<char> visited; // booleans
@@ -65,6 +65,9 @@ struct static_rcg_engine_simple
 	query_k_at_layer(const vec<T>& q, size_t layer,
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
+	std::vector<std::pair<T, size_t>>
+	query_k_recursively(const vec<T>& q, const std::vector<size_t>& entry_points,
+											size_t k);
 	const std::string _name() { return "Static RCG Engine Simplified"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -226,14 +229,16 @@ template <typename T> void static_rcg_engine_simple<T>::_build() {
 	num_distcomps = 0;
 #endif
 
-	hnsw_engine_basic_4_config other_conf(std::max(M / 8, 1), std::max(M / 4, 1),
-																				1, std::max(ef_construction / 4, 1));
+	hnsw_engine_basic_4_config other_conf(
+			std::max(M / 8, size_t(1)), std::max(M / 4, size_t(1)), 1,
+			std::max(ef_construction / 4, size_t(1)));
 	for (size_t i = 0; i < hadj_bottom.size(); ++i) {
-		hadj_bottom_indexed.emplace_back(other_conf);
+		hadj_bottom_indexed.push_back(
+				std::make_unique<hnsw_engine_basic_4<T>>(other_conf));
 		for (size_t j : hadj_bottom[i]) {
-			hadj_bottom_indexed[i].store_vector(all_entries[j]);
+			hadj_bottom_indexed[i]->store_vector(all_entries[j]);
 		}
-		hadj_bottom_indexed[i].build();
+		hadj_bottom_indexed[i]->build();
 	}
 }
 
@@ -364,7 +369,7 @@ static_rcg_engine_simple<T>::query_k_recursively(
 
 	auto get_vertex = [&](const size_t& index) constexpr
 												->std::vector<measured_data> {
-		return hadj_bottom_indexed[index].query_k_combined(q, k);
+		return hadj_bottom_indexed[index]->query_k_combined(q, k);
 	};
 
 	auto worst_elem = [](const measured_data& a, const measured_data& b) {
@@ -404,8 +409,6 @@ static_rcg_engine_simple<T>::query_k_recursively(
 		if (cur.first > nearest.top().first && nearest.size() == k) {
 			break;
 		}
-		constexpr size_t in_advance = 4;
-		constexpr size_t in_advance_extra = 2;
 		for (const auto& [d_next, next] : get_vertex(cur.second)) {
 			if (!visited[next]) {
 				visited[next] = true;
