@@ -89,8 +89,8 @@ class AnnoteFinder(object):
 #f = open('./data/synthetic_uniform_sphere_n50000_dim16_m400_k1/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n30000_dim16_m300_k10/data/all.json')
 #f = open('./data/sift1m_full/data/all.json')
-f = open('./data/sift1m_full_k10/data/all.json')
-#f = open('./data/sift1m_full_k10/data/latest.json')
+#f = open('./data/sift1m_full_k10/data/all.json')
+f = open('./data/sift1m_full_k10/data/latest.json')
 #f = open('./data/synthetic_uniform_sphere_n90000_dim16_m600_k10/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim64_m400_k10/data/latest.json')
@@ -101,7 +101,7 @@ f = open('./data/sift1m_full_k10/data/all.json')
 datavec = json.load(f)
 
 # TODO come up with a better name for this
-enable_sprinkles = True
+enable_sprinkles = False
 sprinkle_param = 'use_ecuts'
 
 engines = set()
@@ -147,6 +147,7 @@ for eng, col in zip(sorted(engines), cols):
         if eng == bd_name:
             xi = benchdata['recall']
             yi = benchdata['time_per_query_ns']
+            #yi = float(benchdata['param_list']['num_distcomps'])
             x.append(xi)
             xall.append(xi)
             #y.append(yi)
