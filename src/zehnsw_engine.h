@@ -273,15 +273,15 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 	std::vector<size_t> starting_points = starting_points_;
 	if (false) {
 		size_t cur = starting_points_[0]; // assumes size of starting points is 1
-		T d_cur = dist2fast(v, all_entries[cur]);
+		T d_cur = dist(v, all_entries[cur]);
 		bool changed = true;
 		while (changed) {
 			changed = false;
 			starting_points.emplace_back(cur);
 			for (const auto& [_, u] : adj[cur]) {
-				// T d_next = dist2fast(v, vals[u]);
-				T d_next = dist2fast(v, vals[u]);
-				// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+				// T d_next = dist(v, vals[u]);
+				T d_next = dist(v, vals[u]);
+				// T d_next = dist(v, all_entries[to_data_index[u]]);
 				if (d_next < d_cur) {
 					changed = true;
 					d_cur = d_next;
@@ -306,12 +306,12 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 		return is_good;
 	};
 	for (const auto& sp : starting_points) {
-		// visit(dist2(v, vals[sp]), sp);
+		// visit(dist(v, vals[sp]), sp);
 		++counterr;
 		++total;
-		visit(dist2fast(v, vals[sp]), sp);
+		visit(dist(v, vals[sp]), sp);
 	}
-	// visit(dist2fast(v, all_entries[to_data_index[sp]]), sp);
+	// visit(dist(v, all_entries[to_data_index[sp]]), sp);
 	while (!to_visit.empty()) {
 		T nd;
 		size_t cur;
@@ -360,7 +360,7 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 					std::cout << "Impossible" << std::endl;
 				}
 				auto& u = neighbour.second;
-				T d_next = dist2fast(v, vals[u]);
+				T d_next = dist(v, vals[u]);
 				visit(d_next, u);
 				//}
 			});
@@ -376,7 +376,7 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 				auto& u = neighbour.second;
 				++counterr;
 				++total;
-				T d_next = dist2fast(v, vals[u]);
+				T d_next = dist(v, vals[u]);
 				visit(d_next, u);
 			});
 		}
@@ -386,9 +386,9 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 			_mm_prefetch(&vals[u], _MM_HINT_T0);
 		}
 		for (const auto& [_, u] : adj[cur]) {
-			T d_next = dist2fast(v, vals[u]);
-			// T d_next = dist2(v, vals[u]);
-			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+			T d_next = dist(v, vals[u]);
+			// T d_next = dist(v, vals[u]);
+			// T d_next = dist(v, all_entries[to_data_index[u]]);
 			visit(d_next, u);
 		}
 		*/
@@ -421,7 +421,7 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 		return is_good;
 	};
 	for (const auto& sp : starting_points)
-		neighbour_buffer.emplace_back(dist2fast(v, vals[sp]), sp);
+		neighbour_buffer.emplace_back(dist(v, vals[sp]), sp);
 	visit_neighbours();
 	while (!to_visit.empty()) {
 		T nd;
@@ -439,11 +439,11 @@ zehnsw_engine<T>::_query_k_internal(const vec<T>& v, size_t k,
 		for (size_t neighbour_index = 0; neighbour_index < adj[cur].size();
 				 ++neighbour_index)
 			neighbour_buffer.emplace_back(
-					dist2fast(v, vals[adj[cur][neighbour_index]]));
+					dist(v, vals[adj[cur][neighbour_index]]));
 		visit_neighbours();
 		// for (const auto& u : adj[cur]) {
-		//	T d_next = dist2fast(v, vals[u]);
-		//	// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+		//	T d_next = dist(v, vals[u]);
+		//	// T d_next = dist(v, all_entries[to_data_index[u]]);
 		//	visit(d_next, u);
 		// }
 	}
@@ -491,16 +491,16 @@ size_t zehnsw_engine<T>::_query_1_internal(const vec<T>& v,
 	auto& vals = layers[layer].vals;
 	// auto& to_data_index = layers[layer].to_data_index;
 	size_t best = starting_point;
-	// T d = dist2fast(v, all_entries[starting_point]);
-	T d = dist2(v, all_entries[starting_point]);
+	// T d = dist(v, all_entries[starting_point]);
+	T d = dist(v, all_entries[starting_point]);
 	bool changed = true;
 	while (changed) {
 		changed = false;
 		for (const auto& [_, u] : adj[best]) {
-			// T d_next = dist2fast(v, vals[u]);
-			T d_next = dist2fast(v, vals[u]);
+			// T d_next = dist(v, vals[u]);
+			T d_next = dist(v, vals[u]);
 			counterr2++;
-			// T d_next = dist2fast(v, all_entries[to_data_index[u]]);
+			// T d_next = dist(v, all_entries[to_data_index[u]]);
 			if (d_next < d) {
 				changed = true;
 				d = d_next;

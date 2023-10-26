@@ -42,6 +42,7 @@
 #include "static_rcg_engine_simple.h"
 #include "tree_arrangement_engine.h"
 #include "tree_arrangement_engine_if.h"
+#include "zehnsw_engine.h"
 
 template <typename Engine, typename EngineConfig> struct job {
 	EngineConfig conf;
@@ -180,6 +181,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			ehnsw_engine_7_jobs;
 	std::vector<job<ehnsw_engine_8<float>, ehnsw_engine_8_config>>
 			ehnsw_engine_8_jobs;
+	std::vector<job<zehnsw_engine<float>, zehnsw_engine_config>>
+			zehnsw_engine_jobs;
 	std::vector<job<ensg_engine<float>, ensg_engine_config>> ensg_engine_jobs;
 	std::vector<job<jamana_ehnsw_engine<float>, jamana_ehnsw_engine_config>>
 			jamana_ehnsw_engine_jobs;
@@ -340,7 +343,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 		// for (size_t k = 30; k <= 30; k += 20) { // will hopfully get good
 		// for (size_t k = 30; k <= 50; k += 20) { // will hopfully get good
 		// for (size_t k = 55; k <= 55; k += 20) { // will hopfully get good
-		for (size_t k = 30; k <= 60; k += 10) { // will hopfully get good
+		// for (size_t k = 30; k <= 60; k += 10) { // will hopfully get good
+		for (size_t k = 40; k <= 40; k += 10) { // will hopfully get good
 			// for (size_t k = 90; k <= 90; k += 7) { // will hopfully get good
 			// for (size_t k = 30; k <= 30; k += 7) { // will hopfully get good
 			// for (size_t k = 40; k <= 40; k += 7) { // will hopfully get good
@@ -371,7 +375,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 1; num_for_1nn *= 4) {
 			// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 2) {
 				if (false) {
 					ensg_engine_jobs.emplace_back(
 							ensg_engine_config(k, num_for_1nn, 1.0f));
@@ -399,16 +403,22 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
-				if (true) {
+				if (false) {
 					for (size_t edge_count_search_factor : {2}) {
 						hnsw_engine_basic_4_jobs.emplace_back(hnsw_engine_basic_4_config(
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
-				if (true) {
+				if (false) {
 					for (size_t edge_count_search_factor : {2}) {
 						ehnsw_engine_basic_jobs.emplace_back(ehnsw_engine_basic_config(
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
+					}
+				}
+				if (true) {
+					for (size_t edge_count_search_factor : {1}) {
+						zehnsw_engine_jobs.emplace_back(
+								zehnsw_engine_config(k, num_for_1nn, edge_count_search_factor));
 					}
 				}
 				if (false) {
@@ -854,10 +864,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			arrangement_engine_jobs, ehnsw_engine_jobs, ehnsw_engine_2_jobs,
 			ehnsw_engine_3_jobs, ehnsw_engine_4_jobs, ehnsw_engine_5_jobs,
 			ehnsw_engine_6_jobs, ehnsw_engine_7_jobs, ehnsw_engine_8_jobs,
-			ensg_engine_jobs, jamana_ehnsw_engine_jobs, filter_ehnsw_engine_jobs,
-			clustered_ehnsw_engine_jobs, hier_arrangement_engine_jobs,
-			hnsw_engine_hybrid_jobs, tree_arrangement_engine_jobs,
-			tree_arrangement_engine_if_jobs, isect_clustering_engine_jobs,
-			projection_hnsw_engine_2_jobs, projection_ehnsw_engine_2_jobs,
-			disk_ehnsw_engine_jobs, hyper_hnsw_engine_jobs);
+			zehnsw_engine_jobs, ensg_engine_jobs, jamana_ehnsw_engine_jobs,
+			filter_ehnsw_engine_jobs, clustered_ehnsw_engine_jobs,
+			hier_arrangement_engine_jobs, hnsw_engine_hybrid_jobs,
+			tree_arrangement_engine_jobs, tree_arrangement_engine_if_jobs,
+			isect_clustering_engine_jobs, projection_hnsw_engine_2_jobs,
+			projection_ehnsw_engine_2_jobs, disk_ehnsw_engine_jobs,
+			hyper_hnsw_engine_jobs);
 }
