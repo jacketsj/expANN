@@ -375,7 +375,7 @@ std::vector<size_t> ehnsw_engine_basic<T>::_query_k(const vec<T>& q, size_t k) {
 	++num_distcomps;
 #endif
 	T ep_dist = dist2(all_entries[entry_point], q);
-	for (size_t layer = max_layer - 1; layer > 0; --layer) {
+	for (size_t layer = max_layer - 1; layer >= 0; --layer) {
 		bool changed = true;
 		while (changed) {
 			changed = false;
