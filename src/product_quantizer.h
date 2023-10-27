@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <vector>
@@ -11,117 +12,76 @@ struct product_quantizer {
 	using Vector_t = vec<float>::Underlying;
 	// TODO fix matrix type as well
 	using Matrix_t = Eigen::MatrixXf;
-	Matrix_t centroids_;
-	size_t subvector_size_, num_subvectors_;
-
 	using codes_t = std::vector<uint8_t>;
-	using approx_distance_table = std::vector<std::vector<double>>;
+	std::vector<Matrix_t> sub_centroids;
+	size_t subvector_size;
 
 	product_quantizer() = default;
+
 	product_quantizer(const std::vector<Vector_t>& centroids,
 										size_t subvector_size)
-			: subvector_size_(subvector_size),
-				num_subvectors_(centroids.size() / subvector_size) {
-		if (centroids.empty()) {
-			throw std::invalid_argument("Centroids vector cannot be empty");
-		}
-		if (subvector_size_ <= 0 || centroids[0].size() % subvector_size_ != 0) {
-			throw std::invalid_argument("Invalid subvector size");
-		}
-		if (subvector_size_ > 256) {
-			throw std::invalid_argument("Subvector size must be less than or equal "
-																	"to 256 for uint8_t encoding");
-		}
-
-		size_t dimension = DIM;
-		centroids_ = Matrix_t(dimension, centroids.size());
-		for (size_t i = 0; i < centroids.size(); ++i) {
-			// if (centroids[i].size() != dimension) {
-			// 	throw std::invalid_argument(
-			// 			"All centroids must have the same dimension");
-			// }
-			centroids_.col(i) = centroids[i];
+			: subvector_size(subvector_size) {
+		size_t num_subvectors = centroids[0].size() / subvector_size;
+		for (size_t i = 0; i < num_subvectors; ++i) {
+			Matrix_t sc(centroids.size(), subvector_size);
+			for (size_t j = 0; j < centroids.size(); ++j)
+				sc.row(j) = centroids[j]
+												.segment(i * subvector_size, subvector_size)
+												.transpose();
+			sub_centroids.push_back(std::move(sc));
 		}
 	}
 
-	codes_t encode(const Vector_t& vector) const {
-		codes_t codes(num_subvectors_);
-		for (size_t i = 0; i < num_subvectors_; ++i) {
-			Vector_t subvector = vector.segment(i * subvector_size_, subvector_size_);
-			codes[i] = static_cast<uint8_t>(
-					(centroids_.middleRows(i * subvector_size_, subvector_size_)
-							 .colwise() -
-					 subvector)
-							.rowwise()
-							.squaredNorm()
-							.minCoeff());
+	codes_t encode(const Vector_t& v) const {
+		/*
+		codes_t codes;
+		for (const auto& sc : sub_centroids) {
+			size_t min_idx = 0;
+			for (size_t i = 1; i < sc.rows(); ++i)
+				if ((v - sc.row(i)).squaredNorm() < (v - sc.row(min_idx)).squaredNorm())
+					min_idx = i;
+			codes.push_back(static_cast<uint8_t>(min_idx));
+		}
+		return codes;
+		*/
+
+		codes_t codes;
+		for (const auto& sc : sub_centroids) {
+			Eigen::VectorXf v_sub =
+					v.segment(codes.size() * subvector_size, subvector_size);
+			Eigen::VectorXf dists =
+					(sc.rowwise() - v_sub.transpose()).rowwise().squaredNorm();
+			ptrdiff_t min_idx;
+			dists.minCoeff(&min_idx);
+			codes.push_back(static_cast<uint8_t>(min_idx));
 		}
 		return codes;
 	}
 
-	Vector_t decode(const codes_t& codes) const {
-		Vector_t reconstructed_vector(centroids_.cols());
-		for (size_t i = 0; i < num_subvectors_; ++i) {
-			reconstructed_vector.segment(i * subvector_size_, subvector_size_) =
-					centroids_.row(codes[i]);
-		}
-		return reconstructed_vector;
-	}
+	std::vector<size_t> get_top_k_vectors(const Vector_t& query,
+																				const std::vector<codes_t>& codes_list,
+																				size_t k) const {
+		std::vector<std::vector<float>> dist_table(
+				sub_centroids.size(), std::vector<float>(sub_centroids[0].rows()));
+		for (size_t i = 0; i < sub_centroids.size(); ++i)
+			for (size_t j = 0; j < sub_centroids[i].rows(); ++j)
+				dist_table[i][j] = (query.segment(i * subvector_size, subvector_size) -
+														sub_centroids[i].row(j))
+															 .squaredNorm();
 
-	approx_distance_table
-	fill_approx_distance_table(const Vector_t& query_vector) const {
-		approx_distance_table table(num_subvectors_,
-																std::vector<double>(subvector_size_));
-		for (size_t i = 0; i < num_subvectors_; ++i) {
-			Vector_t subvector =
-					query_vector.segment(i * subvector_size_, subvector_size_);
-			for (size_t j = 0; j < subvector_size_; ++j) {
-				Vector_t centroid = centroids_.row(i * subvector_size_ + j);
-				table[i][j] = (centroid - subvector).squaredNorm();
-			}
-		}
-		return table;
-	}
-
-	double compute_approx_distance(const approx_distance_table& table,
-																 const std::vector<uint8_t>& codes) const {
-		double distance = 0.0;
-		for (size_t i = 0; i < num_subvectors_; ++i) {
-			distance += table[i][codes[i]];
-		}
-		return distance;
-	}
-
-	std::vector<size_t>
-	get_top_k_vectors(const Vector_t& query,
-										const std::vector<std::vector<uint8_t>>& codes_list,
-										size_t k) const {
-
-		approx_distance_table query_dist_table = fill_approx_distance_table(query);
-
-		// TODO slightly improve this, maybe just sort instead
-		using distance_index_pair = std::pair<double, int>;
-		std::priority_queue<distance_index_pair, std::vector<distance_index_pair>,
-												std::greater<distance_index_pair>>
-				min_heap;
-
+		std::vector<std::pair<float, size_t>> distances(codes_list.size());
 		for (size_t i = 0; i < codes_list.size(); ++i) {
-			double distance =
-					compute_approx_distance(query_dist_table, codes_list[i]);
-			if (min_heap.size() < k) {
-				min_heap.emplace(distance, i);
-			} else if (distance < min_heap.top().first) {
-				min_heap.pop();
-				min_heap.emplace(distance, i);
-			}
+			distances[i].second = i;
+			for (size_t j = 0; j < codes_list[i].size(); ++j)
+				distances[i].first += dist_table[j][codes_list[i][j]];
 		}
 
-		std::vector<size_t> result;
-		while (!min_heap.empty()) {
-			result.push_back(min_heap.top().second);
-			min_heap.pop();
-		}
-		std::reverse(result.begin(), result.end());
+		std::partial_sort(distances.begin(), distances.begin() + k,
+											distances.end());
+
+		std::vector<size_t> result(k);
+		for (size_t i = 0; i < k; ++i)
+			result[i] = distances[i].second;
 		return result;
 	}
 };
