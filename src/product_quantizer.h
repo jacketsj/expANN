@@ -22,38 +22,25 @@ struct product_quantizer {
 										size_t subvector_size)
 			: subvector_size(subvector_size) {
 		size_t num_subvectors = centroids[0].size() / subvector_size;
+		sub_centroids.resize(num_subvectors);
 		for (size_t i = 0; i < num_subvectors; ++i) {
-			Matrix_t sc(centroids.size(), subvector_size);
+			sub_centroids[i] = Matrix_t(subvector_size, centroids.size());
 			for (size_t j = 0; j < centroids.size(); ++j)
-				sc.row(j) = centroids[j]
-												.segment(i * subvector_size, subvector_size)
-												.transpose();
-			sub_centroids.push_back(std::move(sc));
+				sub_centroids[i].col(j) =
+						centroids[j].segment(i * subvector_size, subvector_size);
 		}
 	}
 
 	codes_t encode(const Vector_t& v) const {
-		/*
-		codes_t codes;
-		for (const auto& sc : sub_centroids) {
-			size_t min_idx = 0;
-			for (size_t i = 1; i < sc.rows(); ++i)
-				if ((v - sc.row(i)).squaredNorm() < (v - sc.row(min_idx)).squaredNorm())
-					min_idx = i;
-			codes.push_back(static_cast<uint8_t>(min_idx));
-		}
-		return codes;
-		*/
-
-		codes_t codes;
-		for (const auto& sc : sub_centroids) {
-			Eigen::VectorXf v_sub =
-					v.segment(codes.size() * subvector_size, subvector_size);
-			Eigen::VectorXf dists =
-					(sc.rowwise() - v_sub.transpose()).rowwise().squaredNorm();
-			ptrdiff_t min_idx;
-			dists.minCoeff(&min_idx);
-			codes.push_back(static_cast<uint8_t>(min_idx));
+		codes_t codes(sub_centroids.size());
+		for (size_t i = 0; i < sub_centroids.size(); ++i) {
+			Eigen::VectorXf subvector =
+					v.segment(i * sub_centroids[i].rows(), sub_centroids[i].rows());
+			Eigen::MatrixXf diffs = sub_centroids[i].colwise() - subvector;
+			Eigen::VectorXf dists = diffs.colwise().squaredNorm();
+			Eigen::VectorXf::Index minIndex;
+			dists.minCoeff(&minIndex);
+			codes[i] = static_cast<uint8_t>(minIndex);
 		}
 		return codes;
 	}
@@ -63,28 +50,57 @@ struct product_quantizer {
 																				size_t k) const {
 		k = std::min(k, codes_list.size());
 
-		std::vector<std::vector<float>> dist_table(
-				sub_centroids.size(), std::vector<float>(sub_centroids[0].rows()));
-		for (size_t i = 0; i < sub_centroids.size(); ++i)
-			for (size_t j = 0; j < sub_centroids[i].rows(); ++j)
-				dist_table[i][j] = (query.segment(i * subvector_size, subvector_size) -
-														sub_centroids[i].row(j))
+		// Compute distance table
+		std::vector<Eigen::MatrixXf> distance_tables(sub_centroids.size());
+		for (size_t i = 0; i < sub_centroids.size(); ++i) {
+			distance_tables[i] = (sub_centroids[i].colwise() -
+																query.segment(i * sub_centroids[i].rows(),
+																							sub_centroids[i].rows());)
+															 .colwise()
 															 .squaredNorm();
+		}
 
+		// Compute distances for each vector in codes_list
 		std::vector<std::pair<float, size_t>> distances(codes_list.size());
 		for (size_t i = 0; i < codes_list.size(); ++i) {
-			distances[i].second = i;
-			for (size_t j = 0; j < codes_list[i].size(); ++j)
-				distances[i].first += dist_table[j][codes_list[i][j]];
+			float dist = 0.0;
+			for (size_t j = 0; j < codes_list[i].size(); ++j) {
+				dist += distance_tables[j](0, codes_list[i][j]);
+			}
+			distances[i] = {dist, i};
+		}
+
+		// Find the top-k closest vectors
+		std::partial_sort(distances.begin(), distances.begin() + k,
+											distances.end());
+		std::vector<size_t> result(k);
+		for (size_t i = 0; i < k; ++i) {
+			result[i] = distances[i].second;
+		}
+		return result;
+
+		// no distance table version (works)
+		/*
+		std::vector<std::pair<float, size_t>> distances(codes_list.size());
+
+		for (size_t i = 0; i < codes_list.size(); ++i) {
+			float dist = 0.0f;
+			for (size_t j = 0; j < codes_list[i].size(); ++j) {
+				Eigen::VectorXf centroid = sub_centroids[j].col(codes_list[i][j]);
+				dist += (query.segment(j * centroid.size(), centroid.size()) - centroid)
+										.squaredNorm();
+			}
+			distances[i] = {dist, i};
 		}
 
 		std::partial_sort(distances.begin(), distances.begin() + k,
 											distances.end());
-
 		std::vector<size_t> result(k);
-		for (size_t i = 0; i < k; ++i)
+		for (size_t i = 0; i < k; ++i) {
 			result[i] = distances[i].second;
+		}
 		return result;
+		*/
 	}
 };
 
