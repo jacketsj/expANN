@@ -81,6 +81,9 @@ struct ehnsw_engine_basic_pqn
 		add_param(pl, M0);
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
+		add_param(pl, num_from_pq);
+		add_param(pl, subvector_size);
+		add_param(pl, centroid_count);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 #endif
