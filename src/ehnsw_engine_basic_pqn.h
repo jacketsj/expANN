@@ -156,6 +156,9 @@ ehnsw_engine_basic_pqn<T>::prune_edges(size_t layer, size_t from,
 template <typename T>
 void ehnsw_engine_basic_pqn<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
+	if (v_index % 5000 == 0) {
+		std::cerr << "Progress: Storing vector index=" << v_index << std::endl;
+	}
 	all_entries.push_back(v);
 
 	e_labels.emplace_back();

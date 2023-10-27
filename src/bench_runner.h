@@ -413,7 +413,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
-				if (true) {
+				if (false) {
 					for (size_t edge_count_search_factor : {2}) {
 						ehnsw_engine_basic_jobs.emplace_back(ehnsw_engine_basic_config(
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
