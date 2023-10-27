@@ -10,7 +10,7 @@
 struct product_quantizer {
 	using Vector_t = vec<float>::Underlying;
 	// TODO fix matrix type as well
-	using Matrix_t = Eigen::MatrixXd;
+	using Matrix_t = Eigen::MatrixXf;
 	Matrix_t centroids_;
 	int subvector_size_, num_subvectors_;
 
@@ -45,7 +45,7 @@ struct product_quantizer {
 
 	codes_t encode(const Vector_t& vector) const {
 		codes_t codes(num_subvectors_);
-		for (int i = 0; i < num_subvectors_; ++i) {
+		for (size_t i = 0; i < num_subvectors_; ++i) {
 			Vector_t subvector = vector.segment(i * subvector_size_, subvector_size_);
 			codes[i] = static_cast<uint8_t>(
 					(centroids_.middleRows(i * subvector_size_, subvector_size_)

@@ -23,7 +23,7 @@ struct ehnsw_engine_basic_pqn_config {
 																size_t _ef_construction, size_t _num_from_pq,
 																size_t _subvector_size)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
-				ef_construction(_ef_construction), num_for_pq(_num_for_pq),
+				ef_construction(_ef_construction), num_from_pq(_num_from_pq),
 				subvector_size(_subvector_size) {}
 };
 
@@ -53,8 +53,8 @@ struct ehnsw_engine_basic_pqn
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
 	std::vector<std::vector<size_t>>
-			hadj_bottom;										// vector -> edges in bottom layer
-	std::vector<pq_searcher> pq_tables; // TODO populate and use
+			hadj_bottom;											 // vector -> edges in bottom layer
+	std::vector<pq_searcher<T>> pq_tables; // TODO populate and use
 	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	void _store_vector(const vec<T>& v);
