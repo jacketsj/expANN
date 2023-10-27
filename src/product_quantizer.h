@@ -22,15 +22,15 @@ struct product_quantizer {
 										size_t subvector_size)
 			: subvector_size_(subvector_size),
 				num_subvectors_(centroids.size() / subvector_size) {
-		if (subvector_size_ <= 0 || centroids.size() % subvector_size_ != 0) {
+		if (centroids.empty()) {
+			throw std::invalid_argument("Centroids vector cannot be empty");
+		}
+		if (subvector_size_ <= 0 || centroids[0].size() % subvector_size_ != 0) {
 			throw std::invalid_argument("Invalid subvector size");
 		}
 		if (subvector_size_ > 256) {
 			throw std::invalid_argument("Subvector size must be less than or equal "
 																	"to 256 for uint8_t encoding");
-		}
-		if (centroids.empty()) {
-			throw std::invalid_argument("Centroids vector cannot be empty");
 		}
 
 		size_t dimension = DIM;
