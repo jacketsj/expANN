@@ -94,7 +94,7 @@ ehnsw_engine_basic<T>::prune_edges(size_t layer, size_t from,
 
 	sort(to.begin(), to.end());
 	std::vector<std::pair<T, size_t>> ret;
-	std::vector<bool> bins(edge_count_mult - num_cuts());
+	std::vector<bool> bins(layer > 0 ? 0 : edge_count_mult - num_cuts());
 	for (const auto& md : to) {
 		_mm_prefetch(&all_entries[md.second], _MM_HINT_T0);
 		if (ret.size() >= edge_count_mult)
@@ -143,6 +143,7 @@ void ehnsw_engine_basic<T>::_store_vector(const vec<T>& v) {
 		e_labels.back().emplace_back(generate_elabel());
 
 	size_t new_max_layer = floor(-log(distribution(gen)) * 1 / log(double(M)));
+	// size_t new_max_layer = 0;
 
 	hadj_flat_with_lengths.emplace_back();
 	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
@@ -375,7 +376,7 @@ std::vector<size_t> ehnsw_engine_basic<T>::_query_k(const vec<T>& q, size_t k) {
 	++num_distcomps;
 #endif
 	T ep_dist = dist2(all_entries[entry_point], q);
-	for (size_t layer = max_layer - 1; layer >= 0; --layer) {
+	for (size_t layer = max_layer - 1; layer > 0; --layer) {
 		bool changed = true;
 		while (changed) {
 			changed = false;

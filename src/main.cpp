@@ -16,7 +16,7 @@
 #include "plotter.h"
 #include "randomgeometry.h"
 
-#define NUM_THREADS 6
+#define NUM_THREADS 1
 
 int main() {
 	dataset_loader<float> dsl;
