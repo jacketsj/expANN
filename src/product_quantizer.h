@@ -53,11 +53,11 @@ struct product_quantizer {
 		// Compute distance table
 		std::vector<Eigen::MatrixXf> distance_tables(sub_centroids.size());
 		for (size_t i = 0; i < sub_centroids.size(); ++i) {
-			distance_tables[i] = (sub_centroids[i].colwise() -
-																query.segment(i * sub_centroids[i].rows(),
-																							sub_centroids[i].rows());)
-															 .colwise()
-															 .squaredNorm();
+			distance_tables[i] =
+					(sub_centroids[i].colwise() -
+					 query.segment(i * sub_centroids[i].rows(), sub_centroids[i].rows()))
+							.colwise()
+							.squaredNorm();
 		}
 
 		// Compute distances for each vector in codes_list
