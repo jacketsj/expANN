@@ -61,6 +61,8 @@ struct product_quantizer {
 	std::vector<size_t> get_top_k_vectors(const Vector_t& query,
 																				const std::vector<codes_t>& codes_list,
 																				size_t k) const {
+		k = std::min(k, codes_list.size());
+
 		std::vector<std::vector<float>> dist_table(
 				sub_centroids.size(), std::vector<float>(sub_centroids[0].rows()));
 		for (size_t i = 0; i < sub_centroids.size(); ++i)
