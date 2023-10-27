@@ -51,7 +51,11 @@ struct ehnsw_engine_basic_pqn
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), num_from_pq(conf.num_from_pq),
 				subvector_size(conf.subvector_size),
-				centroid_count(conf.centroid_count), max_layer(0) {}
+				centroid_count(conf.centroid_count), max_layer(0) {
+#ifdef RECORD_STATS
+		num_distcomps = 0;
+#endif
+	}
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
@@ -338,8 +342,8 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_pqn<T>::query_k_at_layer(
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
 		using neighbour_list_t =
-				std::conditional_t<use_bottomlayer, const std::vector<size_t>&,
-													 std::vector<size_t>>;
+				std::conditional_t<use_bottomlayer, std::vector<size_t>,
+													 const std::vector<size_t>&>;
 		auto get_neighbour_list = [&]() constexpr->neighbour_list_t {
 			if constexpr (use_bottomlayer) {
 				return pq_tables[cur.second].get_top_k_vectors(q, num_from_pq);
