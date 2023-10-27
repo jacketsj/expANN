@@ -19,12 +19,13 @@ struct ehnsw_engine_basic_pqn_config {
 	size_t ef_construction;
 	size_t num_from_pq;
 	size_t subvector_size;
+	size_t centroid_count;
 	ehnsw_engine_basic_pqn_config(size_t _M, size_t _M0, size_t _ef_search_mult,
 																size_t _ef_construction, size_t _num_from_pq,
-																size_t _subvector_size)
+																size_t _subvector_size, size_t _centroid_count)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), num_from_pq(_num_from_pq),
-				subvector_size(_subvector_size) {}
+				subvector_size(_subvector_size), centroid_count(_centroid_count) {}
 };
 
 template <typename T>
@@ -40,6 +41,7 @@ struct ehnsw_engine_basic_pqn
 	size_t ef_construction;
 	size_t num_from_pq;
 	size_t subvector_size;
+	size_t centroid_count;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -48,7 +50,8 @@ struct ehnsw_engine_basic_pqn
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), num_from_pq(conf.num_from_pq),
-				subvector_size(conf.subvector_size), max_layer(0) {}
+				subvector_size(conf.subvector_size),
+				centroid_count(conf.centroid_count), max_layer(0) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
@@ -207,6 +210,20 @@ void ehnsw_engine_basic_pqn<T>::_store_vector(const vec<T>& v) {
 		std::reverse(kNN_per_layer.begin(), kNN_per_layer.end());
 	}
 
+	auto update_pqtable = [&](size_t ind) {
+		std::vector<vec<T>> sampled_vectors, all_vectors;
+		std::vector<size_t> indices = hadj_bottom[ind];
+		for (size_t i = 0; i < indices.size(); ++i) {
+			all_vectors.push_back(all_entries[indices[i]]);
+		}
+		std::shuffle(indices.begin(), indices.end(), gen);
+		for (size_t i = 0; i < std::min(centroid_count, indices.size()); ++i) {
+			sampled_vectors.push_back(all_entries[indices[i]]);
+		}
+		pq_tables[ind] =
+				pq_searcher<T>(sampled_vectors, subvector_size, all_vectors);
+	};
+
 	// add the found edges to the graph
 	for (size_t layer = 0; layer < std::min(max_layer, new_max_layer + 1);
 			 ++layer) {
@@ -227,8 +244,10 @@ void ehnsw_engine_basic_pqn<T>::_store_vector(const vec<T>& v) {
 						layer, v_index, hadj_flat_with_lengths[md.second][layer]);
 				hadj_flat[md.second][layer] =
 						convert_el(hadj_flat_with_lengths[md.second][layer]);
-				if (layer == 0)
+				if (layer == 0) {
 					hadj_bottom[md.second] = hadj_flat[md.second][layer];
+					update_pqtable(md.second);
+				}
 			}
 		}
 	}
@@ -243,6 +262,8 @@ void ehnsw_engine_basic_pqn<T>::_store_vector(const vec<T>& v) {
 	hadj_flat.emplace_back();
 	hadj_bottom.emplace_back();
 	hadj_bottom[v_index] = convert_el(hadj_flat_with_lengths[v_index][0]);
+	pq_tables.emplace_back();
+	update_pqtable(v_index);
 	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
 		hadj_flat[v_index].emplace_back();
 		hadj_flat[v_index][layer] =

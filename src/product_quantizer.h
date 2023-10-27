@@ -12,13 +12,14 @@ struct product_quantizer {
 	// TODO fix matrix type as well
 	using Matrix_t = Eigen::MatrixXf;
 	Matrix_t centroids_;
-	int subvector_size_, num_subvectors_;
+	size_t subvector_size_, num_subvectors_;
 
 	using codes_t = std::vector<uint8_t>;
 	using approx_distance_table = std::vector<std::vector<double>>;
 
 	product_quantizer() = default;
-	product_quantizer(const std::vector<Vector_t>& centroids, int subvector_size)
+	product_quantizer(const std::vector<Vector_t>& centroids,
+										size_t subvector_size)
 			: subvector_size_(subvector_size),
 				num_subvectors_(centroids.size() / subvector_size) {
 		if (subvector_size_ <= 0 || centroids.size() % subvector_size_ != 0) {
@@ -32,13 +33,13 @@ struct product_quantizer {
 			throw std::invalid_argument("Centroids vector cannot be empty");
 		}
 
-		int dimension = centroids[0].size();
+		size_t dimension = centroids[0].size();
 		centroids_ = Matrix_t(dimension, centroids.size());
 		for (size_t i = 0; i < centroids.size(); ++i) {
-			if (centroids[i].size() != dimension) {
-				throw std::invalid_argument(
-						"All centroids must have the same dimension");
-			}
+			// if (centroids[i].size() != dimension) {
+			// 	throw std::invalid_argument(
+			// 			"All centroids must have the same dimension");
+			// }
 			centroids_.col(i) = centroids[i];
 		}
 	}
@@ -60,7 +61,7 @@ struct product_quantizer {
 
 	Vector_t decode(const codes_t& codes) const {
 		Vector_t reconstructed_vector(centroids_.cols());
-		for (int i = 0; i < num_subvectors_; ++i) {
+		for (size_t i = 0; i < num_subvectors_; ++i) {
 			reconstructed_vector.segment(i * subvector_size_, subvector_size_) =
 					centroids_.row(codes[i]);
 		}
@@ -71,10 +72,10 @@ struct product_quantizer {
 	fill_approx_distance_table(const Vector_t& query_vector) const {
 		approx_distance_table table(num_subvectors_,
 																std::vector<double>(subvector_size_));
-		for (int i = 0; i < num_subvectors_; ++i) {
+		for (size_t i = 0; i < num_subvectors_; ++i) {
 			Vector_t subvector =
 					query_vector.segment(i * subvector_size_, subvector_size_);
-			for (int j = 0; j < subvector_size_; ++j) {
+			for (size_t j = 0; j < subvector_size_; ++j) {
 				Vector_t centroid = centroids_.row(i * subvector_size_ + j);
 				table[i][j] = (centroid - subvector).squaredNorm();
 			}
@@ -85,7 +86,7 @@ struct product_quantizer {
 	double compute_approx_distance(const approx_distance_table& table,
 																 const std::vector<uint8_t>& codes) const {
 		double distance = 0.0;
-		for (int i = 0; i < num_subvectors_; ++i) {
+		for (size_t i = 0; i < num_subvectors_; ++i) {
 			distance += table[i][codes[i]];
 		}
 		return distance;
@@ -104,7 +105,7 @@ struct product_quantizer {
 												std::greater<distance_index_pair>>
 				min_heap;
 
-		for (int i = 0; i < codes_list.size(); ++i) {
+		for (size_t i = 0; i < codes_list.size(); ++i) {
 			double distance =
 					compute_approx_distance(query_dist_table, codes_list[i]);
 			if (min_heap.size() < k) {
@@ -129,9 +130,13 @@ template <typename T> struct pq_searcher {
 	product_quantizer pq_;
 	std::vector<std::vector<uint8_t>> codes_;
 
+	pq_searcher() = default;
 	pq_searcher(const std::vector<vec<T>>& centroids, int subvector_size,
-							const std::vector<vec<T>>& vectors)
-			: pq_(to_eigenvec(centroids), subvector_size) {
+							const std::vector<vec<T>>& vectors) {
+		std::vector<typename vec<T>::Underlying> centroids_underlying;
+		for (auto& v : centroids)
+			centroids_underlying.emplace_back(v.get_underlying());
+		pq_ = product_quantizer(centroids_underlying, subvector_size);
 		for (const auto& v : vectors) {
 			codes_.push_back(pq_.encode(v.get_underlying()));
 		}
