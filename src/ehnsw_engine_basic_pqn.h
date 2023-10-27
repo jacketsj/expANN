@@ -334,31 +334,40 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_pqn<T>::query_k_at_layer(
 		}
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
+		using neighbour_list_t =
+				std::conditional_t<use_bottomlayer, const std::vector<size_t>&,
+													 std::vector<size_t>>;
+		auto get_neighbour_list = [&]() constexpr->neighbour_list_t {
+			if constexpr (use_bottomlayer) {
+				return pq_tables[cur.second].get_top_k_vectors(q, num_from_pq);
+			} else {
+				return get_vertex(cur.second);
+			}
+		};
+		neighbour_list_t neighbour_list = get_neighbour_list();
 		auto do_loop_prefetch = [&](size_t i) constexpr {
 #ifdef DIM
 			for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
-				_mm_prefetch(((char*)&all_entries[get_vertex(cur.second)[i]]) +
-												 mult * 64,
+				_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
 										 _MM_HINT_T0);
 #endif
-			_mm_prefetch(&visited[get_vertex(cur.second)[i]], _MM_HINT_T0);
+			_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
 		};
 		for (size_t next_i_pre = 0;
-				 next_i_pre < std::min(in_advance, get_vertex(cur.second).size());
+				 next_i_pre < std::min(in_advance, neighbour_list.size());
 				 ++next_i_pre) {
 			do_loop_prefetch(next_i_pre);
 		}
 		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
 				size_t next_i) constexpr {
 			if constexpr (inAdvanceIterExtra) {
-				_mm_prefetch(
-						&get_vertex(cur.second)[next_i + in_advance + in_advance_extra],
-						_MM_HINT_T0);
+				_mm_prefetch(&neighbour_list[next_i + in_advance + in_advance_extra],
+										 _MM_HINT_T0);
 			}
 			if constexpr (inAdvanceIter) {
 				do_loop_prefetch(next_i + in_advance);
 			}
-			const auto& next = get_vertex(cur.second)[next_i];
+			const auto& next = neighbour_list[next_i];
 			if (!visited[next]) {
 				visited[next] = true;
 				visited_recent.emplace_back(next);
@@ -375,15 +384,14 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_pqn<T>::query_k_at_layer(
 			}
 		};
 		size_t next_i = 0;
-		for (;
-				 next_i + in_advance + in_advance_extra < get_vertex(cur.second).size();
+		for (; next_i + in_advance + in_advance_extra < neighbour_list.size();
 				 ++next_i) {
 			loop_iter.template operator()<true, true>(next_i);
 		}
-		for (; next_i + in_advance < get_vertex(cur.second).size(); ++next_i) {
+		for (; next_i + in_advance < neighbour_list.size(); ++next_i) {
 			loop_iter.template operator()<true, false>(next_i);
 		}
-		for (; next_i < get_vertex(cur.second).size(); ++next_i) {
+		for (; next_i < neighbour_list.size(); ++next_i) {
 			loop_iter.template operator()<false, false>(next_i);
 		}
 	}

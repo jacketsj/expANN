@@ -92,7 +92,7 @@ struct product_quantizer {
 		return distance;
 	}
 
-	std::vector<int>
+	std::vector<size_t>
 	get_top_k_vectors(const Vector_t& query,
 										const std::vector<std::vector<uint8_t>>& codes_list,
 										size_t k) const {
@@ -116,7 +116,7 @@ struct product_quantizer {
 			}
 		}
 
-		std::vector<int> result;
+		std::vector<size_t> result;
 		while (!min_heap.empty()) {
 			result.push_back(min_heap.top().second);
 			min_heap.pop();
@@ -145,7 +145,7 @@ template <typename T> struct pq_searcher {
 		}
 	}
 
-	std::vector<int> get_top_k_vectors(const vec<T>& query, int k) const {
+	std::vector<size_t> get_top_k_vectors(const vec<T>& query, size_t k) const {
 		return pq_.get_top_k_vectors(query.get_underlying(), codes_, k);
 	}
 };
