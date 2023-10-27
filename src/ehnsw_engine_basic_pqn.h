@@ -18,10 +18,13 @@ struct ehnsw_engine_basic_pqn_config {
 	size_t ef_search_mult;
 	size_t ef_construction;
 	size_t num_from_pq;
+	size_t subvector_size;
 	ehnsw_engine_basic_pqn_config(size_t _M, size_t _M0, size_t _ef_search_mult,
-																size_t _ef_construction, size_t _num_from_pq)
+																size_t _ef_construction, size_t _num_from_pq,
+																size_t _subvector_size)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
-				ef_construction(_ef_construction), num_for_pq(_num_for_pq) {}
+				ef_construction(_ef_construction), num_for_pq(_num_for_pq),
+				subvector_size(_subvector_size) {}
 };
 
 template <typename T>
@@ -36,6 +39,7 @@ struct ehnsw_engine_basic_pqn
 	size_t ef_search_mult;
 	size_t ef_construction;
 	size_t num_from_pq;
+	size_t subvector_size;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -44,7 +48,7 @@ struct ehnsw_engine_basic_pqn
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), num_from_pq(conf.num_from_pq),
-				max_layer(0) {}
+				subvector_size(conf.subvector_size), max_layer(0) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges

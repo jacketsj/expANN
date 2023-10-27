@@ -35,10 +35,10 @@ template <typename T> class vec {
 	// gch::small_vector<T> internal;
 
 	// Eigen::VectorXf internal;
+public:
 	using Underlying = typename ChooseUnderlying<T>::Underlying;
 	Underlying internal;
 
-public:
 	vec() = default;
 	// vec(size_t dim) : internal(dim) {}
 	vec(const std::vector<T>& v) {
