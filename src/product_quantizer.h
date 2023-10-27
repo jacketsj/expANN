@@ -33,7 +33,7 @@ struct product_quantizer {
 			throw std::invalid_argument("Centroids vector cannot be empty");
 		}
 
-		size_t dimension = centroids[0].size();
+		size_t dimension = DIM;
 		centroids_ = Matrix_t(dimension, centroids.size());
 		for (size_t i = 0; i < centroids.size(); ++i) {
 			// if (centroids[i].size() != dimension) {
@@ -131,9 +131,12 @@ template <typename T> struct pq_searcher {
 	std::vector<std::vector<uint8_t>> codes_;
 
 	pq_searcher() = default;
-	pq_searcher(const std::vector<vec<T>>& centroids, int subvector_size,
+	pq_searcher(std::vector<vec<T>> centroids, int subvector_size,
 							const std::vector<vec<T>>& vectors) {
 		std::vector<typename vec<T>::Underlying> centroids_underlying;
+		if (centroids.empty()) { // fill with origin if empty
+			centroids.emplace_back(std::vector<T>(DIM, 0));
+		}
 		for (auto& v : centroids)
 			centroids_underlying.emplace_back(v.get_underlying());
 		pq_ = product_quantizer(centroids_underlying, subvector_size);
