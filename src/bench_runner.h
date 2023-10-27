@@ -413,7 +413,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
-				if (false) {
+				if (true) {
 					for (size_t edge_count_search_factor : {2}) {
 						ehnsw_engine_basic_jobs.emplace_back(ehnsw_engine_basic_config(
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
@@ -421,10 +421,16 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				}
 				if (true) {
 					for (size_t edge_count_search_factor : {2}) {
-						ehnsw_engine_basic_pqn_jobs.emplace_back(
-								ehnsw_engine_basic_pqn_config(k, 2 * k, num_for_1nn,
-																							k * edge_count_search_factor, 14,
-																							16, 8));
+						for (size_t num_from_pq : {decltype(k)(14), 2 * k}) {
+							for (size_t subvector_size : {16}) {
+								for (size_t centroid_count : {decltype(k)(8), 2 * k}) {
+									ehnsw_engine_basic_pqn_jobs.emplace_back(
+											ehnsw_engine_basic_pqn_config(
+													k, 2 * k, num_for_1nn, k * edge_count_search_factor,
+													num_from_pq, subvector_size, centroid_count));
+								}
+							}
+						}
 					}
 				}
 				if (false) {
