@@ -346,7 +346,14 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_pqn<T>::query_k_at_layer(
 													 const std::vector<size_t>&>;
 		auto get_neighbour_list = [&]() constexpr->neighbour_list_t {
 			if constexpr (use_bottomlayer) {
-				return pq_tables[cur.second].get_top_k_vectors(q, num_from_pq);
+				auto n_filtered =
+						pq_tables[cur.second].get_top_k_vectors(q, num_from_pq);
+				std::vector<size_t> ret;
+				ret.reserve(n_filtered.size());
+				for (size_t i : n_filtered) {
+					ret.emplace_back(get_vertex(cur.second)[i]);
+				}
+				return ret;
 			} else {
 				return get_vertex(cur.second);
 			}
