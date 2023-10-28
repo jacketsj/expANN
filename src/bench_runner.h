@@ -391,7 +391,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 1; num_for_1nn *= 4) {
 			// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 2; num_for_1nn <= 4; num_for_1nn++) {
+			for (size_t num_for_1nn = 3; num_for_1nn <= 4; num_for_1nn++) {
 				if (false) {
 					ensg_engine_jobs.emplace_back(
 							ensg_engine_config(k, num_for_1nn, 1.0f));
