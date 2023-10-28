@@ -391,7 +391,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 1; num_for_1nn *= 4) {
 			// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 2; num_for_1nn <= 4; num_for_1nn++) {
 				if (false) {
 					ensg_engine_jobs.emplace_back(
 							ensg_engine_config(k, num_for_1nn, 1.0f));
@@ -433,8 +433,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				}
 				if (true) {
 					for (size_t edge_count_search_factor : {3}) {
-						for (size_t num_clusters : {4}) {
-							for (size_t cluster_size : {2 * k / 3}) {
+						for (size_t num_clusters : {k / 2, k}) {
+							for (size_t cluster_size : {2 * k / 3, k / 2}) {
 								ehnsw_engine_basic_clustern_jobs.emplace_back(
 										ehnsw_engine_basic_clustern_config(
 												k, 2 * k, num_for_1nn, k * edge_count_search_factor,

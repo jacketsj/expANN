@@ -74,7 +74,7 @@ struct ehnsw_engine_basic_clustern
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine Basic Cluster-N"; }
+	const std::string _name() { return "(noE)HNSW Engine Basic Cluster-N"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
@@ -125,7 +125,8 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_clustern<T>::prune_edges(
 		if (layer == 0 && ret.size() + num_cuts() >= edge_count_mult) {
 			bool found_bin = false;
 			for (size_t bin = 0; bin < bins.size(); ++bin) {
-				if (!bins[bin] && e_labels[md.second][bin] != e_labels[from][bin]) {
+				if (!bins[bin]) {
+					//&& e_labels[md.second][bin] != e_labels[from][bin]) {
 					bins[bin] = true;
 					found_bin = true;
 				}
