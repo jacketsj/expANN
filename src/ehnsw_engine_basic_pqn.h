@@ -157,7 +157,7 @@ template <typename T>
 void ehnsw_engine_basic_pqn<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	if (v_index % 5000 == 0) {
-		std::cerr << "Progress: Storing vector index=" << v_index << std::endl;
+		// std::cerr << "Progress: Storing vector index=" << v_index << std::endl;
 	}
 	all_entries.push_back(v);
 
@@ -270,7 +270,8 @@ template <typename T> void ehnsw_engine_basic_pqn<T>::_build() {
 
 	for (size_t ind = 0; ind < all_entries.size(); ++ind) {
 		if (ind % 5000 == 0) {
-			std::cerr << "Progress: Calculating ind for index=" << ind << std::endl;
+			// std::cerr << "Progress: Calculating ind for index=" << ind <<
+			// std::endl;
 		}
 		std::vector<vec<T>> sampled_vectors, all_vectors;
 		std::vector<size_t> indices = hadj_bottom[ind];
@@ -281,8 +282,8 @@ template <typename T> void ehnsw_engine_basic_pqn<T>::_build() {
 		for (size_t i = 0; i < std::min(centroid_count, indices.size()); ++i) {
 			sampled_vectors.push_back(all_entries[indices[i]]);
 		}
-		pq_tables[ind] =
-				pq_searcher<T>(sampled_vectors, subvector_size, all_vectors);
+		pq_tables[ind] = pq_searcher<T>(sampled_vectors, subvector_size,
+																		hadj_bottom[ind], all_vectors);
 	}
 
 #ifdef RECORD_STATS
@@ -350,13 +351,10 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_pqn<T>::query_k_at_layer(
 													 const std::vector<size_t>&>;
 		auto get_neighbour_list = [&]() constexpr->neighbour_list_t {
 			if constexpr (use_bottomlayer) {
-				auto n_filtered =
-						pq_tables[cur.second].get_top_k_vectors(q, num_from_pq);
 				std::vector<size_t> ret;
-				ret.reserve(n_filtered.size());
-				for (size_t i : n_filtered) {
-					ret.emplace_back(get_vertex(cur.second)[i]);
-				}
+				for (auto& [_, i] :
+						 pq_tables[cur.second].get_top_k_vectors(q, num_from_pq))
+					ret.emplace_back(i);
 				return ret;
 			} else {
 				return get_vertex(cur.second);

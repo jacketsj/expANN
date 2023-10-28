@@ -10,7 +10,7 @@
 
 struct product_quantizer {
 	using Vector_t = vec<float>::Underlying;
-	// TODO fix matrix type as well
+	// TODO fix matrix type as well, plus the VectorXf in the searcher
 	using Matrix_t = Eigen::MatrixXf;
 	using codes_t = std::vector<uint8_t>;
 	std::vector<Matrix_t> sub_centroids;
@@ -45,13 +45,15 @@ struct product_quantizer {
 		return codes;
 	}
 
-	std::vector<size_t> get_top_k_vectors(const Vector_t& query,
-																				const std::vector<codes_t>& codes_list,
-																				size_t k) const {
+	void get_top_k_vectors(const Vector_t& query,
+												 std::vector<Eigen::VectorXf>& distance_tables,
+												 std::vector<std::pair<float, size_t>> ret,
+												 const std::vector<codes_t>& codes_list,
+												 size_t k) const {
 		k = std::min(k, codes_list.size());
 
 		// Compute distance table
-		std::vector<Eigen::MatrixXf> distance_tables(sub_centroids.size());
+		// std::vector<Eigen::VectorXf> distance_tables(sub_centroids.size());
 		for (size_t i = 0; i < sub_centroids.size(); ++i) {
 			distance_tables[i] =
 					(sub_centroids[i].colwise() -
@@ -61,46 +63,56 @@ struct product_quantizer {
 		}
 
 		// Compute distances for each vector in codes_list
-		std::vector<std::pair<float, size_t>> distances(codes_list.size());
 		for (size_t i = 0; i < codes_list.size(); ++i) {
-			float dist = 0.0;
 			for (size_t j = 0; j < codes_list[i].size(); ++j) {
-				dist += distance_tables[j](0, codes_list[i][j]);
+				ret[i].first += distance_tables[j](0, codes_list[i][j]);
 			}
-			distances[i] = {dist, i};
 		}
 
 		// Find the top-k closest vectors
-		std::partial_sort(distances.begin(), distances.begin() + k,
-											distances.end());
-		std::vector<size_t> result(k);
-		for (size_t i = 0; i < k; ++i) {
-			result[i] = distances[i].second;
-		}
-		return result;
+		auto it = ret.begin() + k;
+		std::nth_element(ret.begin(), it, ret.end());
+		ret.resize(k);
+		// std::vector<size_t> result(k);
+		// for (size_t i = 0; i < k; ++i) {
+		//	result[i] = distances[i].second;
+		// }
+		// return result;
 	}
 };
 
 template <typename T> struct pq_searcher {
 	product_quantizer pq_;
 	std::vector<std::vector<uint8_t>> codes_;
+	std::vector<Eigen::VectorXf> distance_tables;
+	std::vector<std::pair<T, size_t>> stored;
+	std::vector<std::pair<T, size_t>> ret;
 
 	pq_searcher() = default;
 	pq_searcher(std::vector<vec<T>> centroids, int subvector_size,
+							const std::vector<size_t>& indices,
 							const std::vector<vec<T>>& vectors) {
 		std::vector<typename vec<T>::Underlying> centroids_underlying;
-		if (centroids.empty()) { // fill with origin if empty
+		if (centroids.empty()) // fill with origin if empty
 			centroids.emplace_back(std::vector<T>(DIM, 0));
-		}
 		for (auto& v : centroids)
 			centroids_underlying.emplace_back(v.get_underlying());
 		pq_ = product_quantizer(centroids_underlying, subvector_size);
-		for (const auto& v : vectors) {
+		for (const auto& v : vectors)
 			codes_.push_back(pq_.encode(v.get_underlying()));
-		}
+		for (const auto& i : indices)
+			stored.emplace_back(0.0, i);
+		distance_tables = std::vector<Eigen::VectorXf>(pq_.sub_centroids.size());
 	}
 
-	std::vector<size_t> get_top_k_vectors(const vec<T>& query, size_t k) const {
-		return pq_.get_top_k_vectors(query.get_underlying(), codes_, k);
+	// std::vector<size_t> get_top_k_vectors(const vec<T>& query, size_t k) const
+	// { 	return pq_.get_top_k_vectors(query.get_underlying(), codes_, k);
+	// }
+	const std::vector<std::pair<T, size_t>>&
+	get_top_k_vectors(const vec<T>& query, size_t k) {
+		ret = stored;
+		pq_.get_top_k_vectors(query.get_underlying(), distance_tables, ret, codes_,
+													k);
+		return ret;
 	}
 };
