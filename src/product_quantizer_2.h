@@ -72,7 +72,7 @@ struct product_quantizer_2 {
 			std::vector<std::pair<float, size_t>> ret) const {
 		// Compute distances for each vector in codes_list
 		for (size_t i = 0; i < codes_list.size(); ++i) {
-			for (size_t j = 0; j < codes_list[i].size(); ++j) {
+			for (size_t j = 0; j < codes_list[i].get().size(); ++j) {
 				ret[i].first += distance_tables[j](0, codes_list[i].get()[j]);
 			}
 		}
@@ -89,7 +89,8 @@ template <typename T> struct pq_searcher_2 {
 				distance_tables(pq.compute_distance_tables(query.get_underlying())) {}
 
 	void compute_distances(
-			const std::vector<std::reference_wrapper<codes_t>>& codes_list,
+			const std::vector<std::reference_wrapper<product_quantizer_2::codes_t>>&
+					codes_list,
 			std::vector<std::pair<float, size_t>>& ret) {
 		pq_.compute_distances(distance_tables, codes_list, ret);
 	}

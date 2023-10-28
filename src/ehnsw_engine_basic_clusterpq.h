@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "ann_engine.h"
+#include "hnsw_engine_basic_4.h"
+#include "product_quantizer_2.h"
 #include "robin_hood.h"
 #include "topk_t.h"
 
@@ -24,8 +26,7 @@ struct ehnsw_engine_basic_clusterpq_config {
 			size_t _num_clusters, size_t _num_centroids, size_t _subvector_size)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), num_clusters(_num_clusters),
-				cluster_overlap(_cluster_overlap), num_centroids(_num_centroids),
-				subvector_size(_subvector_size) {}
+				num_centroids(_num_centroids), subvector_size(_subvector_size) {}
 };
 
 template <typename T>
@@ -86,8 +87,8 @@ struct ehnsw_engine_basic_clusterpq
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
 		add_param(pl, num_clusters);
-		add_param(num_centroids);
-		add_param(subvector_size);
+		add_param(pl, num_centroids);
+		add_param(pl, subvector_size);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 #endif
@@ -276,7 +277,7 @@ template <typename T> void ehnsw_engine_basic_clusterpq<T>::_build() {
 	// index cluster centres
 	hnsw_engine_basic_4_config cluster_conf(M, M0, ef_search_mult,
 																					ef_construction);
-	hnsw_engine_basic_4 cluster_engine(cluster_conf);
+	hnsw_engine_basic_4<T> cluster_engine(cluster_conf);
 	for (size_t i : cluster_centres) {
 		cluster_engine.store_vector(all_entries[i]);
 	}
@@ -296,13 +297,16 @@ template <typename T> void ehnsw_engine_basic_clusterpq<T>::_build() {
 								 gen);
 		centroids_candidates[c].resize(
 				std::min(centroids_candidates.size(), num_centroids));
-		cluster_quantizers.emplace_back(centroids_candidates[c], subvector_size);
+		std::vector<typename vec<T>::Underlying> centroids_val;
+		for (auto& i : centroids_candidates[c])
+			centroids_val.emplace_back(all_entries[i].get_underlying());
+		cluster_quantizers.emplace_back(centroids_val, subvector_size);
 	}
 	// populate the codes
 	for (size_t v = 0; v < all_entries.size(); ++v) {
 		// note the subtraction used to get residuals
 		vcodes.emplace_back(cluster_quantizers[cluster_membership[v]].encode(
-				all_entries[v] - all_entries[cluster_centres[v]]));
+				(all_entries[v] - all_entries[cluster_centres[v]]).get_underlying()));
 	}
 
 #ifdef RECORD_STATS
