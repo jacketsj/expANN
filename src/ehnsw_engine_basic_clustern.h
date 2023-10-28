@@ -329,7 +329,8 @@ ehnsw_engine_basic_clustern<T>::query_k_at_layer(
 
 	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
 		if constexpr (use_bottomlayer) {
-			return hadj_bottom[index];
+			return cluster_centres[index];
+			// return hadj_bottom[index];
 		} else {
 			return hadj_flat[index][layer];
 		}
@@ -374,38 +375,57 @@ ehnsw_engine_basic_clustern<T>::query_k_at_layer(
 		}
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
-		auto do_loop_prefetch = [&](size_t i) constexpr {
+		auto process_neighbour_list = [&](
+				const std::vector<size_t>& neighbour_list) constexpr {
+			std::vector<std::pair<T, size_t>> to_consider;
+			auto do_loop_prefetch = [&](size_t i) constexpr {
 #ifdef DIM
-			for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
-				_mm_prefetch(((char*)&all_entries[get_vertex(cur.second)[i]]) +
-												 mult * 64,
-										 _MM_HINT_T0);
+				for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
+					_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
+											 _MM_HINT_T0);
 #endif
-			_mm_prefetch(&visited[get_vertex(cur.second)[i]], _MM_HINT_T0);
-		};
-		for (size_t next_i_pre = 0;
-				 next_i_pre < std::min(in_advance, get_vertex(cur.second).size());
-				 ++next_i_pre) {
-			do_loop_prefetch(next_i_pre);
-		}
-		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
-				size_t next_i) constexpr {
-			if constexpr (inAdvanceIterExtra) {
-				_mm_prefetch(
-						&get_vertex(cur.second)[next_i + in_advance + in_advance_extra],
-						_MM_HINT_T0);
+				_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
+			};
+			for (size_t next_i_pre = 0;
+					 next_i_pre < std::min(in_advance, neighbour_list.size());
+					 ++next_i_pre) {
+				do_loop_prefetch(next_i_pre);
 			}
-			if constexpr (inAdvanceIter) {
-				do_loop_prefetch(next_i + in_advance);
-			}
-			const auto& next = get_vertex(cur.second)[next_i];
-			if (!visited[next]) {
-				visited[next] = true;
-				visited_recent.emplace_back(next);
+			auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
+					size_t next_i) constexpr {
+				if constexpr (inAdvanceIterExtra) {
+					_mm_prefetch(&neighbour_list[next_i + in_advance + in_advance_extra],
+											 _MM_HINT_T0);
+				}
+				if constexpr (inAdvanceIter) {
+					do_loop_prefetch(next_i + in_advance);
+				}
+				const auto& next = neighbour_list[next_i];
+				if (!visited[next]) {
+					visited[next] = true;
+					visited_recent.emplace_back(next);
 #ifdef RECORD_STATS
-				++num_distcomps;
+					++num_distcomps;
 #endif
-				T d_next = dist2(q, all_entries[next]);
+					T d_next = dist2(q, all_entries[next]);
+					to_consider.emplace_back(d_next, next);
+				}
+			};
+			size_t next_i = 0;
+			for (; next_i + in_advance + in_advance_extra < neighbour_list.size();
+					 ++next_i) {
+				loop_iter.template operator()<true, true>(next_i);
+			}
+			for (; next_i + in_advance < neighbour_list.size(); ++next_i) {
+				loop_iter.template operator()<true, false>(next_i);
+			}
+			for (; next_i < neighbour_list.size(); ++next_i) {
+				loop_iter.template operator()<false, false>(next_i);
+			}
+			return to_consider;
+		};
+		auto consider_list = [&](const std::vector<std::pair<T, size_t>>& cl) {
+			for (auto& [d_next, next] : cl) {
 				if (nearest.size() < k || d_next < nearest.top().first) {
 					candidates.emplace(d_next, next);
 					nearest.emplace(d_next, next);
@@ -414,17 +434,15 @@ ehnsw_engine_basic_clustern<T>::query_k_at_layer(
 				}
 			}
 		};
-		size_t next_i = 0;
-		for (;
-				 next_i + in_advance + in_advance_extra < get_vertex(cur.second).size();
-				 ++next_i) {
-			loop_iter.template operator()<true, true>(next_i);
-		}
-		for (; next_i + in_advance < get_vertex(cur.second).size(); ++next_i) {
-			loop_iter.template operator()<true, false>(next_i);
-		}
-		for (; next_i < get_vertex(cur.second).size(); ++next_i) {
-			loop_iter.template operator()<false, false>(next_i);
+		auto candidate_list = process_neighbour_list(get_vertex(cur.second));
+		consider_list(candidate_list);
+		if constexpr (use_bottomlayer) {
+			auto cluster_index = std::distance(
+					candidate_list.begin(),
+					std::min_element(candidate_list.begin(), candidate_list.end()));
+			auto sub_candidate_list =
+					process_neighbour_list(clusters[cur.second][cluster_index]);
+			consider_list(sub_candidate_list);
 		}
 	}
 	for (auto& v : visited_recent)
