@@ -137,6 +137,9 @@ ehnsw_engine_basic_fast<T>::prune_edges(size_t layer, size_t from,
 
 template <typename T>
 void ehnsw_engine_basic_fast<T>::auto_prune_edges(size_t index, size_t layer) {
+	if ((layer == 0 && hadj_bottom[index].size() <= M0) ||
+			(hadj_flat_with_lengths[index][layer].size() <= M))
+		return;
 	auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
 		std::vector<size_t> ret;
 		ret.reserve(el.size());

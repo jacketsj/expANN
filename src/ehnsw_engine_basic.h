@@ -214,7 +214,7 @@ void ehnsw_engine_basic<T>::_store_vector(const vec<T>& v) {
 				hadj_flat_with_lengths[md.second][layer].emplace_back(md.first,
 																															v_index);
 				hadj_flat_with_lengths[md.second][layer] = prune_edges(
-						layer, v_index, hadj_flat_with_lengths[md.second][layer]);
+						layer, md.second, hadj_flat_with_lengths[md.second][layer]);
 				hadj_flat[md.second][layer] =
 						convert_el(hadj_flat_with_lengths[md.second][layer]);
 				if (layer == 0)

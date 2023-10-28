@@ -387,7 +387,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 1; num_for_1nn *= 4) {
 			// for (size_t num_for_1nn = 10; num_for_1nn <= 10; num_for_1nn *= 2) {
 			// for (size_t num_for_1nn = 1; num_for_1nn <= 4; num_for_1nn *= 2) {
-			for (size_t num_for_1nn = 1; num_for_1nn <= 2; num_for_1nn *= 2) {
+			for (size_t num_for_1nn = 2; num_for_1nn <= 2; num_for_1nn *= 2) {
 				if (false) {
 					ensg_engine_jobs.emplace_back(
 							ensg_engine_config(k, num_for_1nn, 1.0f));
@@ -415,20 +415,20 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
-				if (false) {
-					for (size_t edge_count_search_factor : {2}) {
+				if (true) {
+					for (size_t edge_count_search_factor : {3}) {
 						hnsw_engine_basic_4_jobs.emplace_back(hnsw_engine_basic_4_config(
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
 				if (true) {
-					for (size_t edge_count_search_factor : {2}) {
+					for (size_t edge_count_search_factor : {3}) {
 						ehnsw_engine_basic_jobs.emplace_back(ehnsw_engine_basic_config(
 								k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 					}
 				}
 				if (true) {
-					for (size_t edge_count_search_factor : {2}) {
+					for (size_t edge_count_search_factor : {3}) {
 						ehnsw_engine_basic_fast_jobs.emplace_back(
 								ehnsw_engine_basic_fast_config(k, 2 * k, num_for_1nn,
 																							 k * edge_count_search_factor));
