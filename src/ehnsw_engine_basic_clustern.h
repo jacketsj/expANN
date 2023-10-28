@@ -306,9 +306,10 @@ template <typename T> void ehnsw_engine_basic_clustern<T>::_build() {
 			for (size_t i = 0; i < remaining_outgoing_edges.size(); ++i) {
 				for (; next_cluster_to_try[i] < best_clusters[i].size();
 						 ++next_cluster_to_try[i]) {
-					if (clusters[v][next_cluster_to_try[i]].size() < cluster_size) {
+					size_t ci_to_try = best_clusters[i][next_cluster_to_try[i]].second;
+					if (clusters[v][ci_to_try].size() < cluster_size) {
 						newly_assigned = true;
-						clusters[v][next_cluster_to_try[i]].emplace_back(i);
+						clusters[v][ci_to_try].emplace_back(remaining_outgoing_edges[i]);
 						++next_cluster_to_try[i];
 						break;
 					}
