@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "ann_engine.h"
-#include "product_quantizer.h"
+#include "projection_filter.h"
 #include "robin_hood.h"
 #include "topk_t.h"
 
@@ -273,7 +273,7 @@ template <typename T> void ehnsw_engine_basic_projn<T>::_build() {
 			all_vectors.push_back(all_entries[indices[i]]);
 		}
 		projection_filters[ind] =
-				projection_filters<T>(all_vectors, hadj_bottom[ind]);
+				projection_filter<T>(all_vectors, hadj_bottom[ind]);
 	}
 
 #ifdef RECORD_STATS

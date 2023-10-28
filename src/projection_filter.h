@@ -20,7 +20,7 @@ template <typename T> struct projection_filter {
 		for (size_t i = 0; i < vecs.size(); ++i) {
 			reduced_vecs.emplace_back();
 			for (size_t j = 0; j < 16; ++j) {
-				reduced_vecs.back()[j] = vecs[i][j];
+				reduced_vecs.back()[j] = vecs[i].at(j);
 			}
 		}
 	}
@@ -32,7 +32,7 @@ template <typename T> struct projection_filter {
 		for (size_t i = 0; i < reduced_vecs.size(); ++i) {
 			ret_combined[i].second = global_indices[i];
 		}
-		__m512 reduced_q = _mm512_loadu_ps(&query[0]);
+		__m512 reduced_q = _mm512_loadu_ps(&query.at(0));
 		constexpr size_t prefetch_distance = 2;
 		for (size_t i = 0; i < std::min(prefetch_distance, reduced_vecs.size());
 				 ++i) {

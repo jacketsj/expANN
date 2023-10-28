@@ -62,6 +62,7 @@ public:
 	}
 	const Underlying& get_underlying() const { return internal; }
 	T& operator[](size_t i) { return internal[i]; }
+	const T& at(size_t i) const { return internal[i]; }
 	void operator+=(const vec<T>& oth) {
 		internal += oth.internal;
 		// assert(dim() == oth.dim());
