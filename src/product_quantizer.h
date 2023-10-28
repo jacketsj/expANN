@@ -78,29 +78,6 @@ struct product_quantizer {
 			result[i] = distances[i].second;
 		}
 		return result;
-
-		// no distance table version (works)
-		/*
-		std::vector<std::pair<float, size_t>> distances(codes_list.size());
-
-		for (size_t i = 0; i < codes_list.size(); ++i) {
-			float dist = 0.0f;
-			for (size_t j = 0; j < codes_list[i].size(); ++j) {
-				Eigen::VectorXf centroid = sub_centroids[j].col(codes_list[i][j]);
-				dist += (query.segment(j * centroid.size(), centroid.size()) - centroid)
-										.squaredNorm();
-			}
-			distances[i] = {dist, i};
-		}
-
-		std::partial_sort(distances.begin(), distances.begin() + k,
-											distances.end());
-		std::vector<size_t> result(k);
-		for (size_t i = 0; i < k; ++i) {
-			result[i] = distances[i].second;
-		}
-		return result;
-		*/
 	}
 };
 
