@@ -62,8 +62,8 @@ struct product_quantizer_2 {
 					 query.segment(i * sub_centroids[i].rows(), sub_centroids[i].rows()))
 							.colwise()
 							.squaredNorm();
-			return distance_tables;
 		}
+		return distance_tables;
 	}
 
 	void compute_distances(
@@ -76,6 +76,16 @@ struct product_quantizer_2 {
 				ret[i].first += distance_tables[j](0, codes_list[i].get()[j]);
 			}
 		}
+	}
+
+	float compute_distance(const std::vector<Eigen::VectorXf>& distance_tables,
+												 const codes_t& codes) const {
+		float ret = 0;
+		// Compute distances for each vector in codes_list
+		for (size_t j = 0; j < codes.size(); ++j) {
+			ret += distance_tables[j](0, codes[j]);
+		}
+		return ret;
 	}
 };
 
@@ -93,5 +103,9 @@ template <typename T> struct pq_searcher_2 {
 					codes_list,
 			std::vector<std::pair<float, size_t>>& ret) {
 		pq_.compute_distances(distance_tables, codes_list, ret);
+	}
+
+	T compute_distance(const product_quantizer_2::codes_t& codes) {
+		return pq_.compute_distance(distance_tables, codes);
 	}
 };

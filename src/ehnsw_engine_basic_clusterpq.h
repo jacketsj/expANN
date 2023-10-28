@@ -362,6 +362,15 @@ ehnsw_engine_basic_clusterpq<T>::query_k_at_layer(
 		visited_recent.emplace_back(entry_point);
 	}
 
+	// TODO use a global distance tables list that can be cleared after, similar
+	// to visited
+	std::vector<pq_searcher_2<T>> pqs;
+	if constexpr (use_bottomlayer) {
+		for (size_t i = 0; i < cluster_quantizers.size(); ++i) {
+			pqs.emplace_back(cluster_quantizers[i], q);
+		}
+	}
+
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
 		candidates.pop();
@@ -375,9 +384,9 @@ ehnsw_engine_basic_clusterpq<T>::query_k_at_layer(
 			std::vector<std::pair<T, size_t>> to_consider;
 			auto do_loop_prefetch = [&](size_t i) constexpr {
 #ifdef DIM
-				for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
-					_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
-											 _MM_HINT_T0);
+				// for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
+				//	_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
+				//							 _MM_HINT_T0);
 #endif
 				_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
 			};
@@ -402,7 +411,14 @@ ehnsw_engine_basic_clusterpq<T>::query_k_at_layer(
 #ifdef RECORD_STATS
 					++num_distcomps;
 #endif
-					T d_next = dist2(q, all_entries[next]);
+					T d_next;
+					if constexpr (use_bottomlayer) {
+						d_next =
+								pqs[cluster_membership[next]].compute_distance(vcodes[next]);
+					} else {
+						T d_next = dist2(q, all_entries[next]);
+					}
+					// dist2(q, all_entries[next]);
 					to_consider.emplace_back(d_next, next);
 				}
 			};
@@ -430,9 +446,6 @@ ehnsw_engine_basic_clusterpq<T>::query_k_at_layer(
 			}
 		};
 		auto candidate_list = process_neighbour_list(get_vertex(cur.second));
-		if constexpr (use_bottomlayer) {
-			// candidate_list = TODO
-		}
 		consider_list(candidate_list);
 	}
 	for (auto& v : visited_recent)
@@ -514,6 +527,10 @@ ehnsw_engine_basic_clusterpq<T>::query_k_combined(const vec<T>& q, size_t k) {
 
 	auto ret_combined =
 			query_k_at_layer<true>(q, 0, {entry_point}, k * ef_search_mult);
+	for (size_t i = 0; i < ret_combined.size(); ++i) {
+		ret_combined[i].first = dist2(q, all_entries[ret_combined[i].second]);
+	}
+	std::sort(ret_combined.begin(), ret_combined.end());
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	return ret_combined;
