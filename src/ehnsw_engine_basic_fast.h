@@ -56,7 +56,8 @@ struct ehnsw_engine_basic_fast
 	size_t num_cuts() { return e_labels[0].size(); }
 	std::vector<std::pair<T, size_t>>
 	prune_edges(size_t layer, size_t from, std::vector<std::pair<T, size_t>> to);
-	void auto_prune_edges(size_t from, size_t layer);
+	std::set<std::pair<size_t, size_t>> auto_prune_queue;
+	void auto_prune_edges();
 	template <bool use_bottomlayer>
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
@@ -135,25 +136,27 @@ ehnsw_engine_basic_fast<T>::prune_edges(size_t layer, size_t from,
 	return ret;
 }
 
-template <typename T>
-void ehnsw_engine_basic_fast<T>::auto_prune_edges(size_t index, size_t layer) {
-	if ((layer == 0 && hadj_bottom[index].size() <= M0) ||
-			(hadj_flat_with_lengths[index][layer].size() <= M))
-		return;
-	auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
-		std::vector<size_t> ret;
-		ret.reserve(el.size());
-		for (auto& [_, val] : el) {
-			ret.emplace_back(val);
-		}
-		return ret;
-	};
+template <typename T> void ehnsw_engine_basic_fast<T>::auto_prune_edges() {
+	for (auto [index, layer] : auto_prune_queue) {
+		if ((layer == 0 && hadj_bottom[index].size() <= M0) ||
+				(hadj_flat_with_lengths[index][layer].size() <= M))
+			return;
+		auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
+			std::vector<size_t> ret;
+			ret.reserve(el.size());
+			for (auto& [_, val] : el) {
+				ret.emplace_back(val);
+			}
+			return ret;
+		};
 
-	hadj_flat_with_lengths[index][layer] =
-			prune_edges(layer, index, hadj_flat_with_lengths[index][layer]);
-	hadj_flat[index][layer] = convert_el(hadj_flat_with_lengths[index][layer]);
-	if (layer == 0)
-		hadj_bottom[index] = hadj_flat[index][layer];
+		hadj_flat_with_lengths[index][layer] =
+				prune_edges(layer, index, hadj_flat_with_lengths[index][layer]);
+		hadj_flat[index][layer] = convert_el(hadj_flat_with_lengths[index][layer]);
+		if (layer == 0)
+			hadj_bottom[index] = hadj_flat[index][layer];
+	}
+	auto_prune_queue.empty();
 }
 
 template <typename T>
@@ -234,6 +237,7 @@ void ehnsw_engine_basic_fast<T>::_store_vector(const vec<T>& v) {
 				}
 			}
 			if (!edge_exists) {
+				auto_prune_queue.emplace(md.second, layer);
 				hadj_flat_with_lengths[md.second][layer].emplace_back(md.first,
 																															v_index);
 				hadj_flat[md.second][layer].emplace_back(v_index);
@@ -244,13 +248,9 @@ void ehnsw_engine_basic_fast<T>::_store_vector(const vec<T>& v) {
 	}
 
 	// if v_index is a power of two
-	if (v_index > 0 && (v_index & (v_index - 1) == 0)) {
-		// prune edges for earlier indices
-		for (size_t index = 0; index < v_index; ++index) {
-			for (size_t layer = 0; layer < hadj_flat[index].size(); ++layer)
-				auto_prune_edges(index, layer);
-		}
-	}
+	// if (v_index > 0 && (v_index & (v_index - 1) == 0)) {
+	auto_prune_edges();
+	//}
 
 	// add new layers if necessary
 	while (new_max_layer >= max_layer) {
@@ -277,11 +277,7 @@ template <typename T> void ehnsw_engine_basic_fast<T>::_build() {
 	num_distcomps = 0;
 #endif
 
-	// prune edges for everything (in case necessary from latest adds)
-	for (size_t index = 0; index < all_entries.size(); ++index) {
-		for (size_t layer = 0; layer < hadj_flat[index].size(); ++layer)
-			auto_prune_edges(index, layer);
-	}
+	auto_prune_edges();
 }
 
 template <typename T>
@@ -337,7 +333,9 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 			break;
 		}
 		std::vector<std::pair<size_t, T>> dist_buffer;
-		dist_buffer.reserve(get_vertex(cur.second).size());
+		size_t cur_size =
+				std::min(layer == 0 ? M0 : M, get_vertex(cur.second).size());
+		dist_buffer.reserve(cur_size);
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
 		auto do_loop_prefetch = [&](size_t i) constexpr {
@@ -349,8 +347,7 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 #endif
 			_mm_prefetch(&visited[get_vertex(cur.second)[i]], _MM_HINT_T0);
 		};
-		for (size_t next_i_pre = 0;
-				 next_i_pre < std::min(in_advance, get_vertex(cur.second).size());
+		for (size_t next_i_pre = 0; next_i_pre < std::min(in_advance, cur_size);
 				 ++next_i_pre) {
 			do_loop_prefetch(next_i_pre);
 		}
@@ -375,15 +372,13 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 			}
 		};
 		size_t next_i = 0;
-		for (;
-				 next_i + in_advance + in_advance_extra < get_vertex(cur.second).size();
-				 ++next_i) {
+		for (; next_i + in_advance + in_advance_extra < cur_size; ++next_i) {
 			loop_iter.template operator()<true, true>(next_i);
 		}
-		for (; next_i + in_advance < get_vertex(cur.second).size(); ++next_i) {
+		for (; next_i + in_advance < cur_size; ++next_i) {
 			loop_iter.template operator()<true, false>(next_i);
 		}
-		for (; next_i < get_vertex(cur.second).size(); ++next_i) {
+		for (; next_i < cur_size; ++next_i) {
 			loop_iter.template operator()<false, false>(next_i);
 		}
 		for (const auto& [next, d_next] : dist_buffer) {
