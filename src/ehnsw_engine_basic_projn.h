@@ -273,7 +273,7 @@ template <typename T> void ehnsw_engine_basic_projn<T>::_build() {
 			all_vectors.push_back(all_entries[indices[i]]);
 		}
 		projection_filters[ind] =
-				projection_filter<T>(all_vectors, hadj_bottom[ind]);
+				projection_filter<T>(all_vectors, hadj_bottom[ind], gen);
 	}
 
 #ifdef RECORD_STATS

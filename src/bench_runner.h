@@ -425,7 +425,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				}
 				if (true) {
 					for (size_t edge_count_search_factor : {2}) {
-						for (size_t num_for_proj : {20, 30, 40}) {
+						// for (size_t num_for_proj : {10, 15, 20, 30, 40, 50, 60}) {
+						for (size_t num_for_proj : {30}) {
 							ehnsw_engine_basic_projn_jobs.emplace_back(
 									ehnsw_engine_basic_projn_config(k, 2 * k, num_for_1nn,
 																									k * edge_count_search_factor,
