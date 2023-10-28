@@ -306,7 +306,8 @@ template <typename T> void ehnsw_engine_basic_clusterpq<T>::_build() {
 	for (size_t v = 0; v < all_entries.size(); ++v) {
 		// note the subtraction used to get residuals
 		vcodes.emplace_back(cluster_quantizers[cluster_membership[v]].encode(
-				(all_entries[v] - all_entries[cluster_centres[v]]).get_underlying()));
+				(all_entries[v] - all_entries[cluster_centres[cluster_membership[v]]])
+						.get_underlying()));
 	}
 
 #ifdef RECORD_STATS
@@ -367,7 +368,8 @@ ehnsw_engine_basic_clusterpq<T>::query_k_at_layer(
 	std::vector<pq_searcher_2<T>> pqs;
 	if constexpr (use_bottomlayer) {
 		for (size_t i = 0; i < cluster_quantizers.size(); ++i) {
-			pqs.emplace_back(cluster_quantizers[i], q);
+			pqs.emplace_back(cluster_quantizers[i],
+											 q - all_entries[cluster_centres[i]]);
 		}
 	}
 
