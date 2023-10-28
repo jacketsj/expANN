@@ -58,7 +58,8 @@ struct ehnsw_engine_basic_clusterpq
 	std::vector<std::vector<size_t>>
 			hadj_bottom; // vector -> edges in bottom layer
 	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
-			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
+			hadj_flat_with_lengths;					 // vector -> layer -> edges with lengths
+	std::vector<size_t> cluster_centres; // cluster index -> cluster centre index
 	std::vector<product_quantizer_2>
 			cluster_quantizers;									// cluster index -> quantizer
 	std::vector<size_t> cluster_membership; // vector -> cluster index
@@ -267,7 +268,6 @@ template <typename T> void ehnsw_engine_basic_clusterpq<T>::_build() {
 	assert(all_entries.size() > 0);
 
 	// choose cluster centres
-	std::vector<size_t> cluster_centres;
 	for (size_t i = 0; i < all_entries.size(); ++i) {
 		cluster_centres.emplace_back(i);
 	}
@@ -300,8 +300,9 @@ template <typename T> void ehnsw_engine_basic_clusterpq<T>::_build() {
 	}
 	// populate the codes
 	for (size_t v = 0; v < all_entries.size(); ++v) {
-		vcodes.emplace_back(
-				cluster_quantizers[cluster_membership[v]].encode(all_entries[v]));
+		// note the subtraction used to get residuals
+		vcodes.emplace_back(cluster_quantizers[cluster_membership[v]].encode(
+				all_entries[v] - all_entries[cluster_centres[v]]));
 	}
 
 #ifdef RECORD_STATS
@@ -320,8 +321,7 @@ ehnsw_engine_basic_clusterpq<T>::query_k_at_layer(
 
 	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
 		if constexpr (use_bottomlayer) {
-			return cluster_centres[index];
-			// return hadj_bottom[index];
+			return hadj_bottom[index];
 		} else {
 			return hadj_flat[index][layer];
 		}
@@ -426,15 +426,10 @@ ehnsw_engine_basic_clusterpq<T>::query_k_at_layer(
 			}
 		};
 		auto candidate_list = process_neighbour_list(get_vertex(cur.second));
-		consider_list(candidate_list);
 		if constexpr (use_bottomlayer) {
-			auto cluster_index = std::distance(
-					candidate_list.begin(),
-					std::min_element(candidate_list.begin(), candidate_list.end()));
-			auto sub_candidate_list =
-					process_neighbour_list(clusters[cur.second][cluster_index]);
-			consider_list(sub_candidate_list);
+			// candidate_list = TODO
 		}
+		consider_list(candidate_list);
 	}
 	for (auto& v : visited_recent)
 		visited[v] = false;
