@@ -12,3 +12,6 @@
 [submodule "mmap_allocator"]
 	path = mmap_allocator
 	url = https://github.com/johannesthoma/mmap_allocator.git
+[submodule "oneTBB"]
+	path = oneTBB
+	url = https://github.com/oneapi-src/oneTBB.git

@@ -1,10 +1,16 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
+#include <iostream>
+#include <memory>
+#include <mutex>
 #include <queue>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
+#include <tbb/concurrent_priority_queue.h>
+#include <tbb/concurrent_queue.h>
+#include <tbb/spin_mutex.h>
+#include <tbb/task_group.h>
 #include <vector>
 
 #include "ann_engine.h"
@@ -90,6 +96,10 @@ struct ehnsw_engine_basic_fast_disk_threaded
 	template <typename container>
 	svn<std::pair<T, size_t>> prune_edges(size_t layer, size_t from,
 																				container to);
+	template <bool use_bottomlayer>
+	std::vector<std::pair<T, size_t>>
+	query_k_at_layer_threaded(const vec<T>& q, size_t layer,
+														const std::vector<size_t>& entry_points, size_t k);
 	template <bool use_bottomlayer>
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
@@ -278,9 +288,163 @@ template <typename T> void ehnsw_engine_basic_fast_disk_threaded<T>::_build() {
 template <typename T>
 template <bool use_bottomlayer>
 std::vector<std::pair<T, size_t>>
+ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer_threaded(
+		const vec<T>& q, size_t layer, const std::vector<size_t>& entry_points,
+		size_t k) {
+	using measured_data = std::pair<T, size_t>;
+
+	auto get_vertex = [&](const size_t& index) constexpr
+												->decltype(hadj_bottom[0])& {
+		if constexpr (use_bottomlayer) {
+			return hadj_bottom[index];
+		} else {
+			return hadj_flat[index][layer];
+		}
+	};
+
+	auto worst_elem = [](const measured_data& a, const measured_data& b) {
+		return a.first < b.first;
+	};
+	auto best_elem = [](const measured_data& a, const measured_data& b) {
+		return a.first > b.first;
+	};
+	std::vector<measured_data> entry_points_with_dist;
+	for (auto& entry_point : entry_points) {
+		entry_points_with_dist.emplace_back(dist2(q, all_entries[entry_point]),
+																				entry_point);
+	}
+
+	std::priority_queue<measured_data, std::vector<measured_data>,
+											decltype(best_elem)>
+			candidates(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+								 best_elem);
+	std::priority_queue<measured_data, std::vector<measured_data>,
+											decltype(worst_elem)>
+			nearest(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+							worst_elem);
+	while (nearest.size() > k)
+		nearest.pop();
+
+	for (auto& entry_point : entry_points) {
+		visited[entry_point] = true;
+		visited_recent.emplace_back(entry_point);
+	}
+
+	// 3 types of nodes:
+	// worker node i: filtered_candidates -> compute distances ->
+	// completed_comparisons[i] merge node: completed_comparisons -> internal
+	// candidates priority queue -> best_candidates (sometimes) filter node:
+	// best_candidates -> filtered_candidates + prefetch
+
+	tbb::concurrent_priority_queue<measured_data> computed_next_candidates;
+	tbb::concurrent_queue<measured_data> filtered_next_candidates;
+	std::vector<tbb::concurrent_queue<measured_data>> completed_comparisons(
+			num_worker_threads);
+
+	while (!candidates.empty()) {
+		computed_next_candidates.push(candidates.top());
+		candidates.pop();
+	}
+
+	std::atomic<bool> done(false);
+
+	tbb::task_group g;
+
+	// Worker threads
+	for (int i = 0; i < num_worker_threads; ++i) {
+		g.run([&, i] {
+			measured_data item;
+			while (!done) {
+				std::vector<measured_data> chunk;
+				while (chunk.size() < chunk_size &&
+							 filtered_next_candidates.try_pop(item)) {
+					chunk.push_back(item);
+				}
+
+				if (chunk.empty())
+					continue;
+
+				for (auto& [d, idx] : chunk) {
+					if (!visited[idx]) {
+						T d_next = dist2(q, all_entries[idx]);
+						completed_comparisons[i].push({d_next, idx});
+						visited_recent.emplace_back(idx);
+						visited[idx] = true;
+					}
+				}
+			}
+		});
+	}
+
+	// Merge thread
+	g.run([&] {
+		while (!done) {
+			std::vector<measured_data> chunk;
+			for (int i = 0; i < num_worker_threads; ++i) {
+				while (chunk.size() < chunk_size && !completed_comparisons[i].empty()) {
+					measured_data item;
+					if (completed_comparisons[i].try_pop(item)) {
+						chunk.push_back(item);
+					}
+				}
+			}
+
+			if (!chunk.empty()) {
+				for (auto& p : chunk) {
+					computed_next_candidates.push(p);
+				}
+			}
+		}
+	});
+
+	// Filter thread
+	g.run([&] {
+		measured_data item;
+		while (!done) {
+			std::vector<measured_data> chunk;
+			while (chunk.size() < chunk_size &&
+						 computed_next_candidates.try_pop(item)) {
+				chunk.push_back(item);
+			}
+
+			if (chunk.empty())
+				continue;
+
+			if (chunk[0].first > nearest.top().first && nearest.size() == k) {
+				done = true;
+				break;
+			}
+
+			for (auto& [d, idx] : chunk) {
+				if (!visited[idx]) {
+					filtered_next_candidates.push({d, idx});
+				}
+			}
+		}
+	});
+
+	g.wait();
+
+	// Cleanup
+	for (auto& v : visited_recent)
+		visited[v] = false;
+	visited_recent.clear();
+	std::vector<measured_data> ret;
+	while (!nearest.empty()) {
+		ret.emplace_back(nearest.top());
+		nearest.pop();
+	}
+	// ret now contains the results
+}
+
+template <typename T>
+template <bool use_bottomlayer>
+std::vector<std::pair<T, size_t>>
 ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer(
 		const vec<T>& q, size_t layer, const std::vector<size_t>& entry_points,
 		size_t k) {
+	return query_k_at_layer_threaded<use_bottomlayer>(q, layer, entry_points, k);
+
 	using measured_data = std::pair<T, size_t>;
 
 	auto get_vertex = [&](const size_t& index) constexpr
