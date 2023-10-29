@@ -56,18 +56,20 @@ struct ehnsw_engine_basic_fast_disk
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), max_layer(0) {}
 	filevec<vec<T>> all_entries;
-	filevec<filevec<filevec<size_t>>> hadj_flat; // vector -> layer -> edges
-	filevec<filevec<size_t>> hadj_bottom; // vector -> edges in bottom layer
-	filevec<filevec<filevec<std::pair<T, size_t>>>>
+	std::vector<std::vector<std::vector<size_t>>>
+			hadj_flat; // vector -> layer -> edges
+	std::vector<std::vector<size_t>>
+			hadj_bottom; // vector -> edges in bottom layer
+	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	void _store_vector(const vec<T>& v);
 	void _build();
-	filevec<char> visited; // booleans
-	filevec<size_t> visited_recent;
-	filevec<filevec<char>> e_labels; // vertex -> cut labels (*num_cuts)
+	std::vector<char> visited; // booleans
+	std::vector<size_t> visited_recent;
+	std::vector<std::vector<char>> e_labels; // vertex -> cut labels (*num_cuts)
 	size_t num_cuts() { return e_labels[0].size(); }
 	template <typename alloc>
-	filevec<std::pair<T, size_t>>
+	std::vector<std::pair<T, size_t>>
 	prune_edges(size_t layer, size_t from,
 							std::vector<std::pair<T, size_t>, alloc> to);
 	template <bool use_bottomlayer>
@@ -93,7 +95,7 @@ struct ehnsw_engine_basic_fast_disk
 
 template <typename T>
 template <typename alloc>
-filevec<std::pair<T, size_t>> ehnsw_engine_basic_fast_disk<T>::prune_edges(
+std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast_disk<T>::prune_edges(
 		size_t layer, size_t from, std::vector<std::pair<T, size_t>, alloc> to) {
 	auto edge_count_mult = M;
 	if (layer == 0)
@@ -101,11 +103,11 @@ filevec<std::pair<T, size_t>> ehnsw_engine_basic_fast_disk<T>::prune_edges(
 
 	// reference impl vs paper difference
 	if (to.size() <= edge_count_mult) {
-		filevec<std::pair<T, size_t>> ret = tofv(to);
+		return to;
 	}
 
 	sort(to.begin(), to.end());
-	filevec<std::pair<T, size_t>> ret;
+	std::vector<std::pair<T, size_t>> ret;
 	std::vector<bool> bins(layer > 0 ? 0 : edge_count_mult - num_cuts());
 	for (const auto& md : to) {
 		_mm_prefetch(&all_entries[md.second], _MM_HINT_T0);
@@ -156,8 +158,8 @@ void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
 		hadj_flat_with_lengths[v_index].emplace_back();
 	}
 
-	auto convert_el = [](filevec<std::pair<T, size_t>> el) constexpr {
-		filevec<size_t> ret;
+	auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
+		std::vector<size_t> ret;
 		ret.reserve(el.size());
 		for (auto& [_, val] : el) {
 			ret.emplace_back(val);
@@ -258,7 +260,7 @@ ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
 		size_t k) {
 	using measured_data = std::pair<T, size_t>;
 
-	auto get_vertex = [&](const size_t& index) constexpr->filevec<size_t>& {
+	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
 		if constexpr (use_bottomlayer) {
 			return hadj_bottom[index];
 		} else {

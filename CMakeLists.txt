@@ -74,7 +74,7 @@ file(GLOB SOURCES ${SRC}/*.cpp)
 add_executable(expann ${SOURCES})
 
 find_package(PythonLibs REQUIRED)
-include_directories(${PYTHON_INCLUDE_DIRS})
+include_directories(${PYTHON_INCLUDE_DIRS} mmap_allocator)
 add_library(plt INTERFACE)
 target_include_directories(plt INTERFACE plt)
 
