@@ -56,8 +56,6 @@ struct ehnsw_engine_basic_fast
 	size_t num_cuts() { return e_labels[0].size(); }
 	std::vector<std::pair<T, size_t>>
 	prune_edges(size_t layer, size_t from, std::vector<std::pair<T, size_t>> to);
-	std::set<std::pair<size_t, size_t>> auto_prune_queue;
-	void auto_prune_edges();
 	template <bool use_bottomlayer>
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
@@ -134,29 +132,6 @@ ehnsw_engine_basic_fast<T>::prune_edges(size_t layer, size_t from,
 	}
 
 	return ret;
-}
-
-template <typename T> void ehnsw_engine_basic_fast<T>::auto_prune_edges() {
-	for (auto [index, layer] : auto_prune_queue) {
-		if ((layer == 0 && hadj_bottom[index].size() <= M0) ||
-				(hadj_flat_with_lengths[index][layer].size() <= M))
-			return;
-		auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
-			std::vector<size_t> ret;
-			ret.reserve(el.size());
-			for (auto& [_, val] : el) {
-				ret.emplace_back(val);
-			}
-			return ret;
-		};
-
-		hadj_flat_with_lengths[index][layer] =
-				prune_edges(layer, index, hadj_flat_with_lengths[index][layer]);
-		hadj_flat[index][layer] = convert_el(hadj_flat_with_lengths[index][layer]);
-		if (layer == 0)
-			hadj_bottom[index] = hadj_flat[index][layer];
-	}
-	auto_prune_queue.empty();
 }
 
 template <typename T>
@@ -237,21 +212,17 @@ void ehnsw_engine_basic_fast<T>::_store_vector(const vec<T>& v) {
 				}
 			}
 			if (!edge_exists) {
-				auto_prune_queue.emplace(md.second, layer);
 				hadj_flat_with_lengths[md.second][layer].emplace_back(md.first,
 																															v_index);
-				hadj_flat[md.second][layer].emplace_back(v_index);
+				hadj_flat_with_lengths[md.second][layer] = prune_edges(
+						layer, md.second, hadj_flat_with_lengths[md.second][layer]);
+				hadj_flat[md.second][layer] =
+						convert_el(hadj_flat_with_lengths[md.second][layer]);
 				if (layer == 0)
-					hadj_bottom[md.second].emplace_back(v_index);
-				auto_prune_edges();
+					hadj_bottom[md.second] = hadj_flat[md.second][layer];
 			}
 		}
 	}
-
-	// if v_index is a power of two
-	// if (v_index > 0 && (v_index & (v_index - 1) == 0)) {
-	// auto_prune_edges();
-	//}
 
 	// add new layers if necessary
 	while (new_max_layer >= max_layer) {
@@ -277,8 +248,6 @@ template <typename T> void ehnsw_engine_basic_fast<T>::_build() {
 	// reset before queries
 	num_distcomps = 0;
 #endif
-
-	auto_prune_edges();
 }
 
 template <typename T>
@@ -333,63 +302,63 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 		if (cur.first > nearest.top().first && nearest.size() == k) {
 			break;
 		}
-		std::vector<std::pair<size_t, T>> dist_buffer;
-		size_t cur_size = get_vertex(cur.second).size();
-		// size_t cur_size =
-		// std::min(layer == 0 ? M0 : M, get_vertex(cur.second).size());
-		dist_buffer.reserve(cur_size);
+		std::vector<size_t> neighbour_list; // = get_vertex(cur.second);
+		for (size_t neighbour : get_vertex(cur.second))
+			if (!visited[neighbour]) {
+				neighbour_list.emplace_back(neighbour);
+				visited[neighbour] = true;
+				visited_recent.emplace_back(neighbour);
+			}
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
 		auto do_loop_prefetch = [&](size_t i) constexpr {
 #ifdef DIM
 			for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
-				_mm_prefetch(((char*)&all_entries[get_vertex(cur.second)[i]]) +
-												 mult * 64,
+				_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
 										 _MM_HINT_T0);
 #endif
-			_mm_prefetch(&visited[get_vertex(cur.second)[i]], _MM_HINT_T0);
+			_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
 		};
-		for (size_t next_i_pre = 0; next_i_pre < std::min(in_advance, cur_size);
+		for (size_t next_i_pre = 0;
+				 next_i_pre < std::min(in_advance, neighbour_list.size());
 				 ++next_i_pre) {
 			do_loop_prefetch(next_i_pre);
 		}
 		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
 				size_t next_i) constexpr {
 			if constexpr (inAdvanceIterExtra) {
-				_mm_prefetch(
-						&get_vertex(cur.second)[next_i + in_advance + in_advance_extra],
-						_MM_HINT_T0);
+				_mm_prefetch(&neighbour_list[next_i + in_advance + in_advance_extra],
+										 _MM_HINT_T0);
 			}
 			if constexpr (inAdvanceIter) {
 				do_loop_prefetch(next_i + in_advance);
 			}
-			const auto& next = get_vertex(cur.second)[next_i];
-			if (!visited[next]) {
-				visited[next] = true;
-				visited_recent.emplace_back(next);
+			const auto& next = neighbour_list[next_i];
+			// if (!visited[next]) {
+			// visited[next] = true;
+			// visited_recent.emplace_back(next);
 #ifdef RECORD_STATS
-				++num_distcomps;
+			++num_distcomps;
 #endif
-				dist_buffer.emplace_back(next, dist2(q, all_entries[next]));
-			}
-		};
-		size_t next_i = 0;
-		for (; next_i + in_advance + in_advance_extra < cur_size; ++next_i) {
-			loop_iter.template operator()<true, true>(next_i);
-		}
-		for (; next_i + in_advance < cur_size; ++next_i) {
-			loop_iter.template operator()<true, false>(next_i);
-		}
-		for (; next_i < cur_size; ++next_i) {
-			loop_iter.template operator()<false, false>(next_i);
-		}
-		for (const auto& [next, d_next] : dist_buffer) {
+			T d_next = dist2(q, all_entries[next]);
 			if (nearest.size() < k || d_next < nearest.top().first) {
 				candidates.emplace(d_next, next);
 				nearest.emplace(d_next, next);
 				if (nearest.size() > k)
 					nearest.pop();
 			}
+			//}
+		};
+		size_t next_i = 0;
+		for (; next_i + in_advance + in_advance_extra < neighbour_list.size();
+				 ++next_i) {
+			loop_iter.template operator()<true, true>(next_i);
+		}
+		for (; next_i + in_advance < neighbour_list.size(); ++next_i) {
+			loop_iter.template operator()<true, false>(next_i);
+		}
+		for (; next_i < neighbour_list.size(); ++next_i) {
+			loop_iter.template operator()<false, false>(next_i);
 		}
 	}
 	for (auto& v : visited_recent)
