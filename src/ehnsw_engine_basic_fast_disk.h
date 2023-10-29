@@ -56,6 +56,9 @@ template <typename T> filevec<T> tofv(const std::vector<T>& v) {
 	return result;
 }
 
+ehnsw_engine_basic_fast_disk_config default_conf =
+		ehnsw_engine_basic_fast_disk_config(40, 80, 2, 100);
+
 template <typename T>
 struct ehnsw_engine_basic_fast_disk
 		: public ann_engine<T, ehnsw_engine_basic_fast_disk<T>> {
@@ -68,6 +71,10 @@ struct ehnsw_engine_basic_fast_disk
 	size_t ef_search_mult;
 	size_t ef_construction;
 	size_t max_layer;
+	ehnsw_engine_basic_fast_disk()
+			: rd(), gen(0), distribution(0, 1), M(default_conf.M),
+				M0(default_conf.M0), ef_search_mult(default_conf.ef_search_mult),
+				ef_construction(default_conf.ef_construction), max_layer(0) {}
 	ehnsw_engine_basic_fast_disk(ehnsw_engine_basic_fast_disk_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
