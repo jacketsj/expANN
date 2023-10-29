@@ -1,9 +1,13 @@
 import numpy as np
 import expann_py
 
+from base import BaseANN
+
+print(expann_py)
+
 class ExpAnnWrapper(BaseANN):
     def __init__(self):
-        self.engine = expann_py.AnnEngine()
+        self.engine = expann_py.expANN()
         self.name = self.engine.name()
         self.res = None
 
