@@ -356,7 +356,7 @@ ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer_threaded(
 			size_t item;
 			while (!done) {
 				std::vector<size_t> chunk;
-				while (chunk.size() < chunk_size &&
+				while (chunk.size() < chunk_size && !filtered_next_candidates.empty() &&
 							 filtered_next_candidates.try_pop(item)) {
 					chunk.push_back(item);
 				}
@@ -374,11 +374,11 @@ ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer_threaded(
 
 	// Merge thread
 	g.run([&] {
+		measured_data item;
 		while (!done) {
 			std::vector<measured_data> chunk;
 			for (int i = 0; i < num_worker_threads; ++i) {
 				while (chunk.size() < chunk_size && !completed_comparisons[i].empty()) {
-					measured_data item;
 					if (completed_comparisons[i].try_pop(item)) {
 						chunk.push_back(item);
 					}
@@ -399,7 +399,7 @@ ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer_threaded(
 		measured_data item;
 		while (!done) {
 			std::vector<measured_data> chunk;
-			while (chunk.size() < chunk_size &&
+			while (chunk.size() < chunk_size && !computed_next_candidates.empty() &&
 						 computed_next_candidates.try_pop(item)) {
 				chunk.push_back(item);
 				--in_flight;
@@ -412,7 +412,8 @@ ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer_threaded(
 				continue;
 			}
 
-			if (chunk[0].first > nearest.top().first && nearest.size() == k) {
+			if (in_flight == 0 && chunk[0].first > nearest.top().first &&
+					nearest.size() == k) {
 				done = true;
 				break;
 			}
@@ -441,7 +442,7 @@ ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer_threaded(
 		ret.emplace_back(nearest.top());
 		nearest.pop();
 	}
-	// ret now contains the results
+	return ret;
 }
 
 template <typename T>
