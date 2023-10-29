@@ -12,3 +12,6 @@
 [submodule "mmap_allocator"]
 	path = mmap_allocator
 	url = https://github.com/johannesthoma/mmap_allocator.git
+[submodule "external/pybind11"]
+	path = external/pybind11
+	url = https://github.com/pybind/pybind11.git

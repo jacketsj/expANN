@@ -67,16 +67,25 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 find_package(Threads)
 find_package(nlohmann_json)
 
+add_subdirectory(external/pybind11)
+
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+#find_package(pybind11 CONFIG REQUIRED)
+
 add_subdirectory(eigen)
 
-file(GLOB SOURCES ${SRC}/*.cpp)
+#file(GLOB SOURCES ${SRC}/*.cpp)
+file(GLOB SOURCES ${SRC}/pyrunner.cpp)
 
-add_executable(expann ${SOURCES})
+#add_executable(expann ${SOURCES})
 
-find_package(PythonLibs REQUIRED)
-include_directories(${PYTHON_INCLUDE_DIRS} mmap_allocator)
-add_library(plt INTERFACE)
-target_include_directories(plt INTERFACE plt)
+#find_package(PythonLibs REQUIRED)
+#include_directories(${PYTHON_INCLUDE_DIRS} mmap_allocator)
+#add_library(plt INTERFACE)
+#target_include_directories(plt INTERFACE plt)
 
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
+#target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
+
+pybind11_add_module(expann_py MODULE src/pyrunner.cpp)
+target_link_libraries(expann_py PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
