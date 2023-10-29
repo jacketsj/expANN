@@ -11,6 +11,8 @@
 #include "robin_hood.h"
 #include "topk_t.h"
 
+#include "small_vector.hpp"
+
 #include "file_allocator.h"
 
 //#include "mmappable_vector.h"
@@ -29,6 +31,7 @@ struct ehnsw_engine_basic_fast_disk_config {
 };
 
 template <typename T> using filevec = std::vector<T, file_allocator<T>>;
+template <typename T, unsigned N> using sv = gch::small_vector<T, N>;
 template <typename T> filevec<T> tofv(const filevec<T>& v) { return v; }
 template <typename T> filevec<T> tofv(const std::vector<T>& vec) {
 	filevec<T> result;
@@ -56,11 +59,10 @@ struct ehnsw_engine_basic_fast_disk
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), max_layer(0) {}
 	filevec<vec<T>> all_entries;
-	std::vector<std::vector<std::vector<size_t>>>
-			hadj_flat; // vector -> layer -> edges
-	std::vector<std::vector<size_t>>
-			hadj_bottom; // vector -> edges in bottom layer
-	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
+	filevec<std::vector<std::vector<size_t>>>
+			hadj_flat;														// vector -> layer -> edges
+	filevec<std::vector<size_t>> hadj_bottom; // vector -> edges in bottom layer
+	filevec<std::vector<std::vector<std::pair<T, size_t>>>>
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	void _store_vector(const vec<T>& v);
 	void _build();
