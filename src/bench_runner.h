@@ -447,7 +447,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						}
 					}
 				}
-				if (true) {
+				if (false) {
 					for (size_t edge_count_search_factor : {3}) {
 						// for (size_t num_clusters : {10}) {
 						//	for (size_t num_centroids : {8}) {
@@ -464,7 +464,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						}
 					}
 				}
-				if (false) {
+				if (true) {
 					for (size_t edge_count_search_factor : {3}) {
 						ehnsw_engine_basic_fast_jobs.emplace_back(
 								ehnsw_engine_basic_fast_config(k, 2 * k, num_for_1nn,

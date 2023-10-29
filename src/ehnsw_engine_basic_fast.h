@@ -243,13 +243,14 @@ void ehnsw_engine_basic_fast<T>::_store_vector(const vec<T>& v) {
 				hadj_flat[md.second][layer].emplace_back(v_index);
 				if (layer == 0)
 					hadj_bottom[md.second].emplace_back(v_index);
+				auto_prune_edges();
 			}
 		}
 	}
 
 	// if v_index is a power of two
 	// if (v_index > 0 && (v_index & (v_index - 1) == 0)) {
-	auto_prune_edges();
+	// auto_prune_edges();
 	//}
 
 	// add new layers if necessary
@@ -333,8 +334,9 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 			break;
 		}
 		std::vector<std::pair<size_t, T>> dist_buffer;
-		size_t cur_size =
-				std::min(layer == 0 ? M0 : M, get_vertex(cur.second).size());
+		size_t cur_size = get_vertex(cur.second).size();
+		// size_t cur_size =
+		// std::min(layer == 0 ? M0 : M, get_vertex(cur.second).size());
 		dist_buffer.reserve(cur_size);
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
