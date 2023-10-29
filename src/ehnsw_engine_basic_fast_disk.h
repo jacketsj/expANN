@@ -79,7 +79,7 @@ struct ehnsw_engine_basic_fast_disk
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	void _store_vector(const vec<T>& v);
 	void _build();
-	std::vector<char> visited; // booleans
+	filevec<char> visited; // booleans
 	std::vector<size_t> visited_recent;
 	std::vector<std::vector<char>> e_labels; // vertex -> cut labels (*num_cuts)
 	size_t num_cuts() { return e_labels[0].size(); }
