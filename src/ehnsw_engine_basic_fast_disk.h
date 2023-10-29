@@ -30,13 +30,27 @@ struct ehnsw_engine_basic_fast_disk_config {
 				ef_construction(_ef_construction) {}
 };
 
+#define MAX_LAYERS 12
+#define MAX_NEIGHBOURS 200
+
 template <typename T> using filevec = std::vector<T, file_allocator<T>>;
 template <typename T, unsigned N> using sv = gch::small_vector<T, N>;
+template <typename T> using svl = sv<T, MAX_LAYERS>;
+template <typename T> using svn = sv<T, MAX_NEIGHBOURS>;
 template <typename T> filevec<T> tofv(const filevec<T>& v) { return v; }
-template <typename T> filevec<T> tofv(const std::vector<T>& vec) {
+template <typename T> svn<T> tosvn(const svn<T>& v) { return v; }
+template <typename T> svn<T> tosvn(const std::vector<T>& v) {
+	svn<T> result;
+	result.reserve(v.size());
+	for (const auto& item : v) {
+		result.push_back(item);
+	}
+	return result;
+}
+template <typename T> filevec<T> tofv(const std::vector<T>& v) {
 	filevec<T> result;
-	result.reserve(vec.size());
-	for (const auto& item : vec) {
+	result.reserve(v.size());
+	for (const auto& item : v) {
 		result.push_back(item);
 	}
 	return result;
@@ -59,10 +73,9 @@ struct ehnsw_engine_basic_fast_disk
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), max_layer(0) {}
 	filevec<vec<T>> all_entries;
-	filevec<std::vector<std::vector<size_t>>>
-			hadj_flat;														// vector -> layer -> edges
-	filevec<std::vector<size_t>> hadj_bottom; // vector -> edges in bottom layer
-	filevec<std::vector<std::vector<std::pair<T, size_t>>>>
+	filevec<svl<svn<size_t>>> hadj_flat; // vector -> layer -> edges
+	filevec<svn<size_t>> hadj_bottom;		 // vector -> edges in bottom layer
+	filevec<svl<svn<std::pair<T, size_t>>>>
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	void _store_vector(const vec<T>& v);
 	void _build();
@@ -70,10 +83,9 @@ struct ehnsw_engine_basic_fast_disk
 	std::vector<size_t> visited_recent;
 	std::vector<std::vector<char>> e_labels; // vertex -> cut labels (*num_cuts)
 	size_t num_cuts() { return e_labels[0].size(); }
-	template <typename alloc>
-	std::vector<std::pair<T, size_t>>
-	prune_edges(size_t layer, size_t from,
-							std::vector<std::pair<T, size_t>, alloc> to);
+	template <typename container>
+	svn<std::pair<T, size_t>> prune_edges(size_t layer, size_t from,
+																				container to);
 	template <bool use_bottomlayer>
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
@@ -96,20 +108,23 @@ struct ehnsw_engine_basic_fast_disk
 };
 
 template <typename T>
-template <typename alloc>
-std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast_disk<T>::prune_edges(
-		size_t layer, size_t from, std::vector<std::pair<T, size_t>, alloc> to) {
+template <typename container>
+svn<std::pair<T, size_t>>
+ehnsw_engine_basic_fast_disk<T>::prune_edges(size_t layer, size_t from,
+																						 container to) {
 	auto edge_count_mult = M;
 	if (layer == 0)
 		edge_count_mult = M0;
 
 	// reference impl vs paper difference
 	if (to.size() <= edge_count_mult) {
-		return to;
+		svn<std::pair<T, size_t>> ret = tosvn(to);
+		return ret;
+		// return to;
 	}
 
 	sort(to.begin(), to.end());
-	std::vector<std::pair<T, size_t>> ret;
+	svn<std::pair<T, size_t>> ret;
 	std::vector<bool> bins(layer > 0 ? 0 : edge_count_mult - num_cuts());
 	for (const auto& md : to) {
 		_mm_prefetch(&all_entries[md.second], _MM_HINT_T0);
@@ -160,8 +175,8 @@ void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
 		hadj_flat_with_lengths[v_index].emplace_back();
 	}
 
-	auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
-		std::vector<size_t> ret;
+	auto convert_el = [](svn<std::pair<T, size_t>> el) constexpr {
+		svn<size_t> ret;
 		ret.reserve(el.size());
 		for (auto& [_, val] : el) {
 			ret.emplace_back(val);
@@ -262,7 +277,8 @@ ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
 		size_t k) {
 	using measured_data = std::pair<T, size_t>;
 
-	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
+	auto get_vertex = [&](const size_t& index) constexpr
+												->decltype(hadj_bottom[0])& {
 		if constexpr (use_bottomlayer) {
 			return hadj_bottom[index];
 		} else {
