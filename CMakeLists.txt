@@ -89,3 +89,4 @@ file(GLOB SOURCES ${SRC}/pyrunner.cpp)
 
 pybind11_add_module(expann_py MODULE src/pyrunner.cpp)
 target_link_libraries(expann_py PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
+configure_file(${SRC}/expann.py ${CMAKE_SOURCE_DIR}/build/expann.py COPYONLY)

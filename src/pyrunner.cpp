@@ -9,6 +9,7 @@ namespace py = pybind11;
 PYBIND11_MODULE(expann_py, m) {
 	py::class_<vec<float>>(m, "Vec")
 			.def(py::init<>())
+			.def(py::init<const std::vector<float>&>())
 			//.def_readwrite("data", &vec<float>::data);
 			.def("data",
 					 [](vec<float>& v) {
