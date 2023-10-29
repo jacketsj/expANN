@@ -27,6 +27,7 @@
 #include "ehnsw_engine_basic_clusterpq.h"
 #include "ehnsw_engine_basic_fast.h"
 #include "ehnsw_engine_basic_fast_disk.h"
+#include "ehnsw_engine_basic_fast_disk_threaded.h"
 #include "ehnsw_engine_basic_pqn.h"
 #include "ehnsw_engine_basic_projn.h"
 #include "ensg_engine.h"
@@ -161,6 +162,9 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 	std::vector<job<ehnsw_engine_basic_fast_disk<float>,
 									ehnsw_engine_basic_fast_disk_config>>
 			ehnsw_engine_basic_fast_disk_jobs;
+	std::vector<job<ehnsw_engine_basic_fast_disk_threaded<float>,
+									ehnsw_engine_basic_fast_disk_threaded_config>>
+			ehnsw_engine_basic_fast_disk_threaded_jobs;
 	std::vector<job<ehnsw_engine_basic_clustern<float>,
 									ehnsw_engine_basic_clustern_config>>
 			ehnsw_engine_basic_clustern_jobs;
@@ -468,18 +472,26 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						}
 					}
 				}
-				if (true) {
+				if (false) {
 					for (size_t edge_count_search_factor : {3}) {
 						ehnsw_engine_basic_fast_jobs.emplace_back(
 								ehnsw_engine_basic_fast_config(k, 2 * k, num_for_1nn,
 																							 k * edge_count_search_factor));
 					}
 				}
-				if (true) {
+				if (false) {
 					for (size_t edge_count_search_factor : {3}) {
 						ehnsw_engine_basic_fast_disk_jobs.emplace_back(
 								ehnsw_engine_basic_fast_disk_config(
 										k, 2 * k, num_for_1nn, k * edge_count_search_factor));
+					}
+				}
+				if (true) {
+					for (size_t edge_count_search_factor : {3}) {
+						ehnsw_engine_basic_fast_disk_threaded_jobs.emplace_back(
+								ehnsw_engine_basic_fast_disk_threaded_config(
+										k, 2 * k, num_for_1nn, k * edge_count_search_factor, 8,
+										100));
 					}
 				}
 				if (false) {
@@ -952,6 +964,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			hnsw_engine_2_jobs, hnsw_engine_basic_2_jobs, hnsw_engine_basic_3_jobs,
 			hnsw_engine_basic_4_jobs, ehnsw_engine_basic_jobs,
 			ehnsw_engine_basic_fast_jobs, ehnsw_engine_basic_fast_disk_jobs,
+			ehnsw_engine_basic_fast_disk_threaded_jobs,
 			ehnsw_engine_basic_clustern_jobs, ehnsw_engine_basic_pqn_jobs,
 			ehnsw_engine_basic_clusterpq_jobs, ehnsw_engine_basic_projn_jobs,
 			hnsw_engine_basic_clustered_jobs, static_rcg_engine_jobs,

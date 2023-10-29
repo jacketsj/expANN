@@ -19,24 +19,29 @@
 //#include "mmappable_vector.h"
 // using namespace mmap_allocator_namespace;
 
-struct ehnsw_engine_basic_fast_disk_config {
+struct ehnsw_engine_basic_fast_disk_threaded_config {
 	size_t M;
 	size_t M0;
 	size_t ef_search_mult;
 	size_t ef_construction;
-	ehnsw_engine_basic_fast_disk_config(size_t _M, size_t _M0,
-																			size_t _ef_search_mult,
-																			size_t _ef_construction)
+	size_t num_worker_threads;
+	size_t chunk_size;
+	ehnsw_engine_basic_fast_disk_threaded_config(size_t _M, size_t _M0,
+																							 size_t _ef_search_mult,
+																							 size_t _ef_construction,
+																							 size_t _num_worker_threads,
+																							 size_t _chunk_size)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
-				ef_construction(_ef_construction) {}
-	static ehnsw_engine_basic_fast_disk_config default_conf() {
-		return ehnsw_engine_basic_fast_disk_config(40, 80, 2, 100);
+				ef_construction(_ef_construction),
+				num_worker_threads(_num_worker_threads), chunk_size(_chunk_size) {}
+	static ehnsw_engine_basic_fast_disk_threaded_config default_conf() {
+		return ehnsw_engine_basic_fast_disk_threaded_config(40, 80, 2, 100, 8, 100);
 	}
 };
 
 template <typename T>
-struct ehnsw_engine_basic_fast_disk
-		: public ann_engine<T, ehnsw_engine_basic_fast_disk<T>> {
+struct ehnsw_engine_basic_fast_disk_threaded
+		: public ann_engine<T, ehnsw_engine_basic_fast_disk_threaded<T>> {
 	std::random_device rd;
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
@@ -45,20 +50,32 @@ struct ehnsw_engine_basic_fast_disk
 	size_t M0;
 	size_t ef_search_mult;
 	size_t ef_construction;
+	size_t num_worker_threads;
+	size_t chunk_size;
 	size_t max_layer;
-	ehnsw_engine_basic_fast_disk()
+	ehnsw_engine_basic_fast_disk_threaded()
 			: rd(), gen(0), distribution(0, 1),
-				M(ehnsw_engine_basic_fast_disk_config::default_conf().M),
-				M0(ehnsw_engine_basic_fast_disk_config::default_conf().M0),
+				M(ehnsw_engine_basic_fast_disk_threaded_config::default_conf().M),
+				M0(ehnsw_engine_basic_fast_disk_threaded_config::default_conf().M0),
 				ef_search_mult(
-						ehnsw_engine_basic_fast_disk_config::default_conf().ef_search_mult),
-				ef_construction(ehnsw_engine_basic_fast_disk_config::default_conf()
-														.ef_construction),
+						ehnsw_engine_basic_fast_disk_threaded_config::default_conf()
+								.ef_search_mult),
+				ef_construction(
+						ehnsw_engine_basic_fast_disk_threaded_config::default_conf()
+								.ef_construction),
+				num_worker_threads(
+						ehnsw_engine_basic_fast_disk_threaded_config::default_conf()
+								.num_worker_threads),
+				chunk_size(ehnsw_engine_basic_fast_disk_threaded_config::default_conf()
+											 .chunk_size),
 				max_layer(0) {}
-	ehnsw_engine_basic_fast_disk(ehnsw_engine_basic_fast_disk_config conf)
+	ehnsw_engine_basic_fast_disk_threaded(
+			ehnsw_engine_basic_fast_disk_threaded_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
-				ef_construction(conf.ef_construction), max_layer(0) {}
+				ef_construction(conf.ef_construction),
+				num_worker_threads(conf.num_worker_threads),
+				chunk_size(conf.chunk_size), max_layer(0) {}
 	filevec<vec<T>> all_entries;
 	filevec<svl<svn<size_t>>> hadj_flat; // vector -> layer -> edges
 	filevec<svn<size_t>> hadj_bottom;		 // vector -> edges in bottom layer
@@ -79,13 +96,15 @@ struct ehnsw_engine_basic_fast_disk
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine Basic Fast Disk"; }
+	const std::string _name() { return "EHNSW Engine Basic Fast Disk Threaded"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
 		add_param(pl, M0);
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
+		add_param(pl, num_worker_threads);
+		add_param(pl, chunk_size);
 		return pl;
 	}
 	bool generate_elabel() {
@@ -97,8 +116,8 @@ struct ehnsw_engine_basic_fast_disk
 template <typename T>
 template <typename container>
 svn<std::pair<T, size_t>>
-ehnsw_engine_basic_fast_disk<T>::prune_edges(size_t layer, size_t from,
-																						 container to) {
+ehnsw_engine_basic_fast_disk_threaded<T>::prune_edges(size_t layer, size_t from,
+																											container to) {
 	auto edge_count_mult = M;
 	if (layer == 0)
 		edge_count_mult = M0;
@@ -147,7 +166,7 @@ ehnsw_engine_basic_fast_disk<T>::prune_edges(size_t layer, size_t from,
 }
 
 template <typename T>
-void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
+void ehnsw_engine_basic_fast_disk_threaded<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	all_entries.push_back(v);
 
@@ -252,14 +271,14 @@ void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
 	}
 }
 
-template <typename T> void ehnsw_engine_basic_fast_disk<T>::_build() {
+template <typename T> void ehnsw_engine_basic_fast_disk_threaded<T>::_build() {
 	assert(all_entries.size() > 0);
 }
 
 template <typename T>
 template <bool use_bottomlayer>
 std::vector<std::pair<T, size_t>>
-ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
+ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer(
 		const vec<T>& q, size_t layer, const std::vector<size_t>& entry_points,
 		size_t k) {
 	using measured_data = std::pair<T, size_t>;
@@ -376,8 +395,8 @@ ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
 }
 
 template <typename T>
-std::vector<size_t> ehnsw_engine_basic_fast_disk<T>::_query_k(const vec<T>& q,
-																															size_t k) {
+std::vector<size_t>
+ehnsw_engine_basic_fast_disk_threaded<T>::_query_k(const vec<T>& q, size_t k) {
 	size_t entry_point = starting_vertex;
 	T ep_dist = dist2(all_entries[entry_point], q);
 	for (size_t layer = max_layer - 1; layer > 0; --layer) {
@@ -409,7 +428,8 @@ std::vector<size_t> ehnsw_engine_basic_fast_disk<T>::_query_k(const vec<T>& q,
 
 template <typename T>
 std::vector<std::pair<T, size_t>>
-ehnsw_engine_basic_fast_disk<T>::query_k_combined(const vec<T>& q, size_t k) {
+ehnsw_engine_basic_fast_disk_threaded<T>::query_k_combined(const vec<T>& q,
+																													 size_t k) {
 	size_t entry_point = starting_vertex;
 	T ep_dist = dist2(all_entries[entry_point], q);
 	for (int layer = max_layer - 1; layer >= 0; --layer) {
