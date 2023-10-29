@@ -9,3 +9,6 @@
 	url = https://github.com/nmslib/hnswlib.git
 [submodule "hnswlib/"]
 	url = https://github.com/jacketsj/hnswlib-exp.git
+[submodule "mmap_allocator"]
+	path = mmap_allocator
+	url = https://github.com/johannesthoma/mmap_allocator.git

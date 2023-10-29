@@ -11,6 +11,11 @@
 #include "robin_hood.h"
 #include "topk_t.h"
 
+#include "file_allocator.h"
+
+//#include "mmappable_vector.h"
+// using namespace mmap_allocator_namespace;
+
 struct ehnsw_engine_basic_fast_disk_config {
 	size_t M;
 	size_t M0;
@@ -22,6 +27,17 @@ struct ehnsw_engine_basic_fast_disk_config {
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction) {}
 };
+
+template <typename T> using filevec = std::vector<T, file_allocator<T>>;
+template <typename T> filevec<T> tofv(const filevec<T>& v) { return v; }
+template <typename T> filevec<T> tofv(const std::vector<T>& vec) {
+	filevec<T> result;
+	result.reserve(vec.size());
+	for (const auto& item : vec) {
+		result.push_back(item);
+	}
+	return result;
+}
 
 template <typename T>
 struct ehnsw_engine_basic_fast_disk
@@ -39,21 +55,21 @@ struct ehnsw_engine_basic_fast_disk
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), max_layer(0) {}
-	std::vector<vec<T>> all_entries;
-	std::vector<std::vector<std::vector<size_t>>>
-			hadj_flat; // vector -> layer -> edges
-	std::vector<std::vector<size_t>>
-			hadj_bottom; // vector -> edges in bottom layer
-	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
+	filevec<vec<T>> all_entries;
+	filevec<filevec<filevec<size_t>>> hadj_flat; // vector -> layer -> edges
+	filevec<filevec<size_t>> hadj_bottom; // vector -> edges in bottom layer
+	filevec<filevec<filevec<std::pair<T, size_t>>>>
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	void _store_vector(const vec<T>& v);
 	void _build();
-	std::vector<char> visited; // booleans
-	std::vector<size_t> visited_recent;
-	std::vector<std::vector<bool>> e_labels; // vertex -> cut labels (*num_cuts)
+	filevec<char> visited; // booleans
+	filevec<size_t> visited_recent;
+	filevec<filevec<char>> e_labels; // vertex -> cut labels (*num_cuts)
 	size_t num_cuts() { return e_labels[0].size(); }
-	std::vector<std::pair<T, size_t>>
-	prune_edges(size_t layer, size_t from, std::vector<std::pair<T, size_t>> to);
+	template <typename alloc>
+	filevec<std::pair<T, size_t>>
+	prune_edges(size_t layer, size_t from,
+							std::vector<std::pair<T, size_t>, alloc> to);
 	template <bool use_bottomlayer>
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
@@ -76,19 +92,20 @@ struct ehnsw_engine_basic_fast_disk
 };
 
 template <typename T>
-std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast_disk<T>::prune_edges(
-		size_t layer, size_t from, std::vector<std::pair<T, size_t>> to) {
+template <typename alloc>
+filevec<std::pair<T, size_t>> ehnsw_engine_basic_fast_disk<T>::prune_edges(
+		size_t layer, size_t from, std::vector<std::pair<T, size_t>, alloc> to) {
 	auto edge_count_mult = M;
 	if (layer == 0)
 		edge_count_mult = M0;
 
 	// reference impl vs paper difference
 	if (to.size() <= edge_count_mult) {
-		return to;
+		filevec<std::pair<T, size_t>> ret = tofv(to);
 	}
 
 	sort(to.begin(), to.end());
-	std::vector<std::pair<T, size_t>> ret;
+	filevec<std::pair<T, size_t>> ret;
 	std::vector<bool> bins(layer > 0 ? 0 : edge_count_mult - num_cuts());
 	for (const auto& md : to) {
 		_mm_prefetch(&all_entries[md.second], _MM_HINT_T0);
@@ -139,8 +156,8 @@ void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
 		hadj_flat_with_lengths[v_index].emplace_back();
 	}
 
-	auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
-		std::vector<size_t> ret;
+	auto convert_el = [](filevec<std::pair<T, size_t>> el) constexpr {
+		filevec<size_t> ret;
 		ret.reserve(el.size());
 		for (auto& [_, val] : el) {
 			ret.emplace_back(val);
@@ -241,7 +258,7 @@ ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
 		size_t k) {
 	using measured_data = std::pair<T, size_t>;
 
-	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
+	auto get_vertex = [&](const size_t& index) constexpr->filevec<size_t>& {
 		if constexpr (use_bottomlayer) {
 			return hadj_bottom[index];
 		} else {
