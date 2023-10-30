@@ -66,13 +66,12 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(Threads)
 find_package(nlohmann_json)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 add_subdirectory(external/pybind11)
 
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 #find_package(pybind11 CONFIG REQUIRED)
-
-add_subdirectory(eigen)
 
 #file(GLOB SOURCES ${SRC}/*.cpp)
 file(GLOB SOURCES ${SRC}/pyrunner.cpp)
@@ -88,7 +87,7 @@ file(GLOB SOURCES ${SRC}/pyrunner.cpp)
 #target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
 
 pybind11_add_module(expann_py MODULE src/pyrunner.cpp)
-target_link_libraries(expann_py PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
+target_link_libraries(expann_py PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen)
 configure_file(${SRC}/expann.py ${CMAKE_SOURCE_DIR}/build/expann.py COPYONLY)
 configure_file(${SRC}/base.py ${CMAKE_SOURCE_DIR}/build/base.py COPYONLY)
 configure_file(${SRC}/base_ood.py ${CMAKE_SOURCE_DIR}/build/base_ood.py COPYONLY)

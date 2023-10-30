@@ -10,7 +10,7 @@
 
 //#include "distance.h"
 
-#include <eigen3/Eigen/Dense>
+#include <Eigen/Dense>
 
 #include "small_vector.hpp"
 
