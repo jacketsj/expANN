@@ -44,9 +44,16 @@ public:
 	vec() = default;
 	// vec(size_t dim) : internal(dim) {}
 	vec(const std::vector<T>& v) {
+#ifndef DIM
 		internal.resize(v.size());
+#endif
 		for (size_t i = 0; i < size_t(v.size()); ++i)
 			internal[i] = v[i];
+#ifdef DIM
+		for (size_t i = size_t(v.size()); i < DIM; ++i) {
+			internal[i] = 0;
+		}
+#endif
 		// for (const auto& val : v)
 		//	internal.emplace_back(val);
 	}
