@@ -1,6 +1,6 @@
 #pragma once
 
-#define DIM 192
+#define DIM 512
 
 #include <cassert>
 #include <cmath>
