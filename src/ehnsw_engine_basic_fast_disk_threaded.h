@@ -7,11 +7,10 @@
 #include <mutex>
 #include <queue>
 #include <string>
-#include <tbb/concurrent_priority_queue.h>
-#include <tbb/concurrent_queue.h>
-#include <tbb/spin_mutex.h>
-#include <tbb/task_group.h>
 #include <vector>
+
+#include <tbb/global_control.h>
+#include <tbb/parallel_for.h>
 
 #include "ann_engine.h"
 #include "file_helpers.h"
@@ -330,110 +329,116 @@ ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer_threaded(
 		visited_recent.emplace_back(entry_point);
 	}
 
-	// 3 types of nodes:
-	// worker node i: filtered_next_candidates -> compute distances ->
-	// completed_comparisons[i] merge node: completed_comparisons -> internal
-	// candidates priority queue -> best_candidates (sometimes) filter node:
-	// best_candidates -> filtered_next_candidates + prefetch
-
-	tbb::concurrent_priority_queue<measured_data> computed_next_candidates;
-	tbb::concurrent_queue<size_t> filtered_next_candidates;
-	std::vector<tbb::concurrent_queue<measured_data>> completed_comparisons(
-			num_worker_threads);
+	tbb::global_control gcontrol(tbb::global_control::max_allowed_parallelism,
+															 num_worker_threads);
 
 	while (!candidates.empty()) {
-		computed_next_candidates.push(candidates.top());
-		candidates.pop();
-	}
-
-	std::atomic<bool> done(false);
-
-	tbb::task_group g;
-
-	// Worker threads
-	for (int i = 0; i < num_worker_threads; ++i) {
-		g.run([&, i] {
-			size_t item;
-			while (!done) {
-				std::vector<size_t> chunk;
-				while (chunk.size() < chunk_size && !filtered_next_candidates.empty() &&
-							 filtered_next_candidates.try_pop(item)) {
-					chunk.push_back(item);
-				}
-
-				if (chunk.empty())
-					continue;
-
-				for (auto& idx : chunk) {
-					T d_next = dist2(q, all_entries[idx]);
-					completed_comparisons[i].push({d_next, idx});
-				}
-			}
-		});
-	}
-
-	// Merge thread
-	g.run([&] {
-		measured_data item;
-		while (!done) {
-			std::vector<measured_data> chunk;
-			for (int i = 0; i < num_worker_threads; ++i) {
-				while (chunk.size() < chunk_size && !completed_comparisons[i].empty()) {
-					if (completed_comparisons[i].try_pop(item)) {
-						chunk.push_back(item);
-					}
-				}
-			}
-
-			if (!chunk.empty()) {
-				for (auto& p : chunk) {
-					computed_next_candidates.push(p);
-				}
-			}
-		}
-	});
-
-	// Filter thread
-	g.run([&] {
-		size_t in_flight = computed_next_candidates.size();
-		measured_data item;
-		while (!done) {
-			std::vector<measured_data> chunk;
-			while (chunk.size() < chunk_size && !computed_next_candidates.empty() &&
-						 computed_next_candidates.try_pop(item)) {
-				chunk.push_back(item);
-				--in_flight;
-			}
-
-			if (chunk.empty()) {
-				if (in_flight == 0) {
-					done = true;
-				}
-				continue;
-			}
-
-			if (in_flight == 0 && chunk[0].first > nearest.top().first &&
+		std::vector<measured_data> next_candidates;
+		while (!candidates.empty() && next_candidates.size() < chunk_size) {
+			// while (!candidates.empty() && next_candidates.size() < 1) {
+			auto cur = candidates.top();
+			candidates.pop();
+			if (next_candidates.empty() && cur.first > nearest.top().first &&
 					nearest.size() == k) {
-				done = true;
 				break;
 			}
-
-			for (auto& [_, cur] : chunk) {
-				for (size_t idx : get_vertex(cur)) {
-					if (!visited[idx]) {
-						filtered_next_candidates.push(idx);
-						visited_recent.emplace_back(idx);
-						visited[idx] = true;
-						++in_flight;
-					}
+			for (size_t neighbour : get_vertex(cur.second))
+				if (!visited[neighbour]) {
+					// prefetch from disk
+					for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
+						_mm_prefetch(((char*)&all_entries[neighbour]) + mult * 64,
+												 _MM_HINT_T0);
+					next_candidates.emplace_back(0, neighbour);
+					visited[neighbour] = true;
+					visited_recent.emplace_back(neighbour);
 				}
+		}
+		// for (auto& [d_next, next] : next_candidates) {
+		//	d_next = dist2(q, all_entries[next]);
+		//}
+		tbb::parallel_for(
+				tbb::blocked_range<size_t>(0, next_candidates.size()),
+				[&](const tbb::blocked_range<size_t>& range) {
+					for (size_t i = range.begin(); i != range.end(); ++i) {
+						auto& [d_next, next] = next_candidates[i];
+						d_next = dist2(q, all_entries[next]);
+					}
+				},
+				tbb::simple_partitioner());
+		for (auto& [d_next, next] : next_candidates) {
+			if (nearest.size() < k || d_next < nearest.top().first) {
+				candidates.emplace(d_next, next);
+				nearest.emplace(d_next, next);
+				if (nearest.size() > k)
+					nearest.pop();
 			}
 		}
-	});
+	}
+	/*
+	while (!candidates.empty()) {
+		auto cur = candidates.top();
+		candidates.pop();
+		if (cur.first > nearest.top().first && nearest.size() == k) {
+			break;
+		}
+		std::vector<size_t> neighbour_list; // = get_vertex(cur.second);
+		for (size_t neighbour : get_vertex(cur.second))
+			if (!visited[neighbour]) {
+				neighbour_list.emplace_back(neighbour);
+				visited[neighbour] = true;
+				visited_recent.emplace_back(neighbour);
+			}
+		constexpr size_t in_advance = 4;
+		constexpr size_t in_advance_extra = 2;
+		auto do_loop_prefetch = [&](size_t i) constexpr {
+#ifdef DIM
+			for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
+				_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
+										 _MM_HINT_T0);
+#endif
+			_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
+		};
+		for (size_t next_i_pre = 0;
+				 next_i_pre < std::min(in_advance, neighbour_list.size());
+				 ++next_i_pre) {
+			do_loop_prefetch(next_i_pre);
+		}
+		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
+				size_t next_i) constexpr {
+			if constexpr (inAdvanceIterExtra) {
+				_mm_prefetch(&neighbour_list[next_i + in_advance + in_advance_extra],
+										 _MM_HINT_T0);
+			}
+			if constexpr (inAdvanceIter) {
+				do_loop_prefetch(next_i + in_advance);
+			}
+			const auto& next = neighbour_list[next_i];
+			// if (!visited[next]) {
+			// visited[next] = true;
+			// visited_recent.emplace_back(next);
+			T d_next = dist2(q, all_entries[next]);
+			if (nearest.size() < k || d_next < nearest.top().first) {
+				candidates.emplace(d_next, next);
+				nearest.emplace(d_next, next);
+				if (nearest.size() > k)
+					nearest.pop();
+			}
+			//}
+		};
+		size_t next_i = 0;
+		for (; next_i + in_advance + in_advance_extra < neighbour_list.size();
+				 ++next_i) {
+			loop_iter.template operator()<true, true>(next_i);
+		}
+		for (; next_i + in_advance < neighbour_list.size(); ++next_i) {
+			loop_iter.template operator()<true, false>(next_i);
+		}
+		for (; next_i < neighbour_list.size(); ++next_i) {
+			loop_iter.template operator()<false, false>(next_i);
+		}
+	}
+	*/
 
-	g.wait();
-
-	// Cleanup
 	for (auto& v : visited_recent)
 		visited[v] = false;
 	visited_recent.clear();
@@ -442,6 +447,7 @@ ehnsw_engine_basic_fast_disk_threaded<T>::query_k_at_layer_threaded(
 		ret.emplace_back(nearest.top());
 		nearest.pop();
 	}
+	reverse(ret.begin(), ret.end());
 	return ret;
 }
 
