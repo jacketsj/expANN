@@ -1,5 +1,7 @@
 #pragma once
 
+#define DIM 192
+
 #include <cassert>
 #include <cmath>
 #include <nlohmann/json.hpp>
@@ -8,7 +10,7 @@
 
 //#include "distance.h"
 
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 
 #include "small_vector.hpp"
 
