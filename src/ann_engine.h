@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <execution>
 #include <map>
 #include <string>
 #include <vector>
@@ -28,7 +30,7 @@ template <typename T, class Derived> struct ann_engine {
 	query_k_batch(const std::vector<vec<T>>& vs, size_t k) {
 		std::vector<std::vector<size_t>> ret(vs.size());
 		std::transform(std::execution::par_unseq, vs.begin(), vs.end(), ret.begin(),
-									 [k](const vec<T>& v) { return query_k(v, k); });
+									 [&](const vec<T>& v) { return query_k(v, k); });
 		return ret;
 	}
 };
