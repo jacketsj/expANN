@@ -28,7 +28,7 @@ template <typename T, class Derived> struct ann_engine {
 	}
 	const std::vector<std::vector<size_t>>
 	query_k_batch(const std::vector<vec<T>>& vs, size_t k) {
-		std::vector<std::vector<size_t>> ret(vs.size());
+		std::vector<std::vector<size_t>> ret();
 		for (const auto& v : vs) {
 			ret.emplace_back(query_k(v, k));
 		}
