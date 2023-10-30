@@ -171,6 +171,10 @@ void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	all_entries.push_back(v);
 
+	if (v_index % 5000 == 0) {
+		std::cerr << "Storing vector no. " << v_index << std::endl;
+	}
+
 	e_labels.emplace_back();
 	for (size_t cut = 0; cut < M0 - 2 * 10; ++cut)
 		e_labels.back().emplace_back(generate_elabel());
