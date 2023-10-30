@@ -78,5 +78,8 @@ include_directories(${PYTHON_INCLUDE_DIRS} mmap_allocator)
 add_library(plt INTERFACE)
 target_include_directories(plt INTERFACE plt)
 
+#add_subdirectory(oneTBB)
+find_package(TBB REQUIRED)
+
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
+target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen TBB::tbb)
