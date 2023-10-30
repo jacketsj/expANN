@@ -3,6 +3,7 @@
 
 #include "ann_engine.h"
 #include "ehnsw_engine_basic_fast_disk.h"
+#include "ehnsw_engine_basic_fast.h"
 
 namespace py = pybind11;
 
@@ -18,13 +19,12 @@ PYBIND11_MODULE(expann_py, m) {
 					 })
 			.def("size", &vec<float>::size);
 
-	py::class_<ehnsw_engine_basic_fast_disk<float>>(m, "expANN")
+	py::class_<ehnsw_engine_basic_fast<float>>(m, "expANN")
 			.def(py::init<>())
-			.def("name", &ehnsw_engine_basic_fast_disk<float>::name)
-			.def("param_list", &ehnsw_engine_basic_fast_disk<float>::param_list)
-			.def("store_vector", &ehnsw_engine_basic_fast_disk<float>::store_vector)
-			.def("build", &ehnsw_engine_basic_fast_disk<float>::build)
-			.def("query_k", &ehnsw_engine_basic_fast_disk<float>::query_k)
-			.def("query_k_batch",
-					 &ehnsw_engine_basic_fast_disk<float>::query_k_batch);
+			.def("name", &ehnsw_engine_basic_fast<float>::name)
+			.def("param_list", &ehnsw_engine_basic_fast<float>::param_list)
+			.def("store_vector", &ehnsw_engine_basic_fast<float>::store_vector)
+			.def("build", &ehnsw_engine_basic_fast<float>::build)
+			.def("query_k", &ehnsw_engine_basic_fast<float>::query_k)
+			.def("query_k_batch", &ehnsw_engine_basic_fast<float>::query_k_batch);
 }
