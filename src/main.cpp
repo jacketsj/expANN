@@ -3,7 +3,6 @@
 
 #define RECORD_STATS 1
 
-#define DIM 128
 #include "vec.h"
 
 #include "arrangement_engine.h"
