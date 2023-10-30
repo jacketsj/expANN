@@ -1,3 +1,5 @@
+set -euo pipefail
+
 # Default values for CMake flags
 CXX_COMPILER="/usr/bin/g++"
 ENABLE_STACK_INFO="OFF"
@@ -45,4 +47,3 @@ cmake --build .
 #make
 
 cd ..
-
