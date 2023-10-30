@@ -66,8 +66,6 @@ struct ehnsw_engine_basic_fast_disk
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	void _store_vector(const vec<T>& v);
 	void _build();
-	filevec<char> visited; // booleans
-	std::vector<size_t> visited_recent;
 	std::vector<std::vector<char>> e_labels; // vertex -> cut labels (*num_cuts)
 	size_t num_cuts() { return e_labels[0].size(); }
 	template <typename container>
@@ -241,7 +239,6 @@ void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
 		starting_vertex = v_index;
 	}
 
-	visited.emplace_back();
 	hadj_flat.emplace_back();
 	hadj_bottom.emplace_back();
 	hadj_bottom[v_index] = convert_el(hadj_flat_with_lengths[v_index][0]);
@@ -254,6 +251,8 @@ void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
 
 template <typename T> void ehnsw_engine_basic_fast_disk<T>::_build() {
 	assert(all_entries.size() > 0);
+
+	std::cerr << "Finished building" << std::endl;
 }
 
 template <typename T>
@@ -296,9 +295,9 @@ ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
 	while (nearest.size() > k)
 		nearest.pop();
 
+	robin_hood::unordered_flat_set<size_t> visited;
 	for (auto& entry_point : entry_points) {
-		visited[entry_point] = true;
-		visited_recent.emplace_back(entry_point);
+		visited.insert(entry_point);
 	}
 
 	while (!candidates.empty()) {
@@ -309,10 +308,9 @@ ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
 		}
 		std::vector<size_t> neighbour_list; // = get_vertex(cur.second);
 		for (size_t neighbour : get_vertex(cur.second))
-			if (!visited[neighbour]) {
+			if (!visited.contains(neighbour)) {
 				neighbour_list.emplace_back(neighbour);
-				visited[neighbour] = true;
-				visited_recent.emplace_back(neighbour);
+				visited.insert(neighbour);
 			}
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
@@ -322,7 +320,6 @@ ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
 				_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
 										 _MM_HINT_T0);
 #endif
-			_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
 		};
 		for (size_t next_i_pre = 0;
 				 next_i_pre < std::min(in_advance, neighbour_list.size());
@@ -339,9 +336,6 @@ ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
 				do_loop_prefetch(next_i + in_advance);
 			}
 			const auto& next = neighbour_list[next_i];
-			// if (!visited[next]) {
-			// visited[next] = true;
-			// visited_recent.emplace_back(next);
 			T d_next = dist2(q, all_entries[next]);
 			if (nearest.size() < k || d_next < nearest.top().first) {
 				candidates.emplace(d_next, next);
@@ -363,9 +357,6 @@ ehnsw_engine_basic_fast_disk<T>::query_k_at_layer(
 			loop_iter.template operator()<false, false>(next_i);
 		}
 	}
-	for (auto& v : visited_recent)
-		visited[v] = false;
-	visited_recent.clear();
 	std::vector<measured_data> ret;
 	while (!nearest.empty()) {
 		ret.emplace_back(nearest.top());
@@ -392,6 +383,19 @@ std::vector<size_t> ehnsw_engine_basic_fast_disk<T>::_query_k(const vec<T>& q,
 					ep_dist = neighbour_dist;
 					changed = true;
 				}
+			}
+		}
+	}
+	bool changed = true;
+	while (changed) {
+		changed = false;
+		for (auto& neighbour : hadj_bottom[entry_point]) {
+			_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
+			T neighbour_dist = dist2(q, all_entries[neighbour]);
+			if (neighbour_dist < ep_dist) {
+				entry_point = neighbour;
+				ep_dist = neighbour_dist;
+				changed = true;
 			}
 		}
 	}
