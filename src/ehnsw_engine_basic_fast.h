@@ -37,10 +37,6 @@ struct ehnsw_engine_basic_fast
 #ifdef RECORD_STATS
 	size_t num_distcomps;
 #endif
-	ehnsw_engine_basic_fast()
-			: rd(), gen(0), distribution(0, 1), M(default_conf.M),
-				M0(default_conf.M0), ef_search_mult(default_conf.ef_search_mult),
-				ef_construction(default_conf.ef_construction), max_layer(0) {}
 	ehnsw_engine_basic_fast(ehnsw_engine_basic_fast_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
