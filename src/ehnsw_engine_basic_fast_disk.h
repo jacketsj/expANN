@@ -172,7 +172,7 @@ void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	all_entries.push_back(v);
 
-	if (v_index < 20 || v_index.size() % 2500 == 0) {
+	if (v_index < 20 || v_index % 2500 == 0) {
 		std::cerr << "Adding vector no. " << v_index << std::endl;
 	}
 
