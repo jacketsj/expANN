@@ -24,5 +24,7 @@ PYBIND11_MODULE(expann_py, m) {
 			.def("param_list", &ehnsw_engine_basic_fast_disk<float>::param_list)
 			.def("store_vector", &ehnsw_engine_basic_fast_disk<float>::store_vector)
 			.def("build", &ehnsw_engine_basic_fast_disk<float>::build)
-			.def("query_k", &ehnsw_engine_basic_fast_disk<float>::query_k);
+			.def("query_k", &ehnsw_engine_basic_fast_disk<float>::query_k)
+			.def("query_k_batch",
+					 &ehnsw_engine_basic_fast_disk<float>::query_k_batch);
 }

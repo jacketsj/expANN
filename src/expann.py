@@ -12,18 +12,17 @@ class ExpAnnWrapper(BaseANN):
         self.res = None
 
     def fit(self, dataset):
-        # Assuming dataset is a 2D numpy array where each row is a vector
         for vector in dataset:
             v = expann_py.Vec(vector.tolist())
             self.engine.store_vector(v)
         self.engine.build()
 
     def query(self, X, k):
-        result_indices = []
+        query_vectors = []
         for query_vector in X:
             v = expann_py.Vec(query_vector.tolist())
-            indices = self.engine.query_k(v, k)
-            result_indices.append(indices)
+            query_vectors.append(v)
+        result_indices = self.engine.query_k_batch(query_vectors, k)
         self.res = np.array(result_indices)
 
     def get_results(self):
