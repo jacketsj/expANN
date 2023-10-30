@@ -24,4 +24,11 @@ template <typename T, class Derived> struct ann_engine {
 	const std::vector<size_t> query_k(const vec<T>& v, size_t k) {
 		return static_cast<Derived*>(this)->_query_k(v, k);
 	}
+	const std::vector<std::vector<size_t>>
+	query_k_batch(const std::vector<vec<T>>& vs, size_t k) {
+		std::vector<std::vector<size_t>> ret(vs.size());
+		std::transform(std::execution::par_unseq, vs.begin(), vs.end(), ret.begin(),
+									 [k](const vec<T>& v) { return query_k(v, k); });
+		return ret;
+	}
 };
