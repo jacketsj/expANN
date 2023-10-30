@@ -1,11 +1,11 @@
 import numpy as np
 import expann_py
 
-from base import BaseANN
+from base import BaseOODANN
 
 print(expann_py)
 
-class ExpAnnWrapper(BaseANN):
+class ExpAnnWrapper(BaseOODANN):
     def __init__(self):
         self.engine = expann_py.expANN()
         self.name = self.engine.name()

@@ -112,3 +112,7 @@ class BaseANN(object):
         (in kilobytes), or None if this information is not available."""
         # return in kB for backwards compatibility
         return psutil.Process().memory_info().rss / 1024
+
+class BaseOODANN(BaseANN):
+    def track(self):
+        return "ood"
