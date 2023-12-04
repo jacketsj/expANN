@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <queue>
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -171,8 +172,8 @@ void ehnsw_engine_basic_fast_disk<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	all_entries.push_back(v);
 
-	if (v_index % 5000 == 0) {
-		std::cerr << "Storing vector no. " << v_index << std::endl;
+	if (v_index < 20 || v_index % 2500 == 0) {
+		std::cerr << "Adding vector no. " << v_index << std::endl;
 	}
 
 	e_labels.emplace_back();
