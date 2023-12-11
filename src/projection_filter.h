@@ -39,6 +39,9 @@ template <typename T> struct projection_filter {
 		for (size_t i = 0; i < reduced_vecs.size(); ++i) {
 			ret_combined[i].second = global_indices[i];
 		}
+
+#ifdef __AVX512F__
+		// AVX512 supported code
 		__m512 reduced_q = _mm512_loadu_ps(&query.at(offset));
 		constexpr size_t prefetch_distance = 12;
 		for (size_t i = 0; i < std::min(prefetch_distance, reduced_vecs.size());
@@ -59,6 +62,17 @@ template <typename T> struct projection_filter {
 			__m512 squared_diff = _mm512_mul_ps(diff, diff);
 			ret_combined[i].first = _mm512_reduce_add_ps(squared_diff);
 		}
+#else
+		// Non-AVX512 code
+		for (size_t i = 0; i < reduced_vecs.size(); ++i) {
+			T sum = 0;
+			for (size_t j = 0; j < query.size(); ++j) {
+				T diff = reduced_vecs[i][j + offset] - query.at(j);
+				sum += diff * diff;
+			}
+			ret_combined[i].first = sum;
+		}
+#endif
 
 		auto it = ret_combined.begin() + k;
 		std::nth_element(ret_combined.begin(), it, ret_combined.end());
