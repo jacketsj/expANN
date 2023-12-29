@@ -418,7 +418,7 @@ ehnsw_engine_basic_clusterpq<T>::query_k_at_layer(
 						d_next =
 								pqs[cluster_membership[next]].compute_distance(vcodes[next]);
 					} else {
-						T d_next = dist2(q, all_entries[next]);
+						d_next = dist2(q, all_entries[next]);
 					}
 					// dist2(q, all_entries[next]);
 					to_consider.emplace_back(d_next, next);

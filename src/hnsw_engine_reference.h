@@ -71,7 +71,7 @@ template <typename T> void hnsw_engine_reference<T>::_store_vector(vec<T> v) {
 		all_entries_f.push_back(v[i]);
 
 	e_labels.emplace_back();
-	for (size_t cut = 0; cut + 1 < 2 * M; ++cut)
+	for (size_t cut = 0; cut + 1 < size_t(2 * M); ++cut)
 		e_labels.back().emplace_back(char(bool(generate_elabel())));
 }
 
