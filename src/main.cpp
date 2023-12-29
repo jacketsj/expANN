@@ -1,3 +1,5 @@
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <string>
 
@@ -16,48 +18,74 @@
 #include "plotter.h"
 #include "randomgeometry.h"
 
-#define NUM_THREADS 4
+std::string getCommandLineOption(char** begin, char** end,
+																 const std::string& option) {
+	char** itr = std::find(begin, end, option);
+	if (itr != end && ++itr != end) {
+		return std::string(*itr);
+	}
+	return "";
+}
 
-int main() {
+bool commandLineOptionExists(char** begin, char** end,
+														 const std::string& option) {
+	return std::find(begin, end, option) != end;
+}
+
+int main(int argc, char* argv[]) {
+	std::string dataset;
+	std::string ds_name;
+	int num_threads = 1; // Default number of threads
+
+	if (commandLineOptionExists(argv, argv + argc, "--dataset")) {
+		dataset = getCommandLineOption(argv, argv + argc, "--dataset");
+	} else {
+		std::cout << "Enter dataset type (Synthetic/Sift1M): ";
+		std::cin >> dataset;
+	}
+
+	if (commandLineOptionExists(argv, argv + argc, "--ds_name")) {
+		ds_name = getCommandLineOption(argv, argv + argc, "--ds_name");
+	} else {
+		std::cout << "Enter dataset name (leave blank for default): ";
+		std::getline(std::cin >> std::ws, ds_name);
+		if (ds_name.empty()) {
+			ds_name = dataset;
+		}
+	}
+
+	if (commandLineOptionExists(argv, argv + argc, "--num_threads")) {
+		num_threads =
+				std::stoi(getCommandLineOption(argv, argv + argc, "--num_threads"));
+	}
+	std::cout << "Using " << num_threads << " threads." << std::endl;
+
 	dataset_loader<float> dsl;
-	if (true) {
-		// auto bdm = perform_benchmarks(dsl.load_sift1m_custom(
-		//		"datasets/sift/sift_base.fvecs", "datasets/sift/sift_query.fvecs",
-		//		"datasets/sift/sift_groundtruth.ivecs", 10, 8));
-		auto bdm = perform_benchmarks(
+	std::optional<bench_data_manager> bdm;
+
+	if (dataset == "Sift1M") {
+		size_t k = 10; // default value for k
+		bdm = perform_benchmarks(
 				dsl.load_sift1m("datasets/sift/sift_base.fvecs",
 												"datasets/sift/sift_query.fvecs",
-												"datasets/sift/sift_groundtruth.ivecs", 10),
-				NUM_THREADS);
-		auto ds_name = bdm.dataset_name;
-		std::string data_prefix = "./data/" + ds_name + "/";
-		bdm.save(data_prefix);
-		std::string plot_prefix = "./plots/" + ds_name + "/";
-		make_plots(bdm.get_latest(data_prefix), plot_prefix + "latest_");
-		make_plots(bdm.get_all(data_prefix), plot_prefix + "/all_");
-
-		return 0;
+												"datasets/sift/sift_groundtruth.ivecs", k),
+				num_threads);
+	} else if (dataset == "Synthetic") {
+		size_t n, m, d, k;
+		std::cout << "Enter Synthetic dataset parameters n, m, d, k: ";
+		std::cin >> n >> m >> d >> k;
+		bdm = perform_benchmarks(
+				dsl.load_synethetic_uniform_sphere_points(n, m, k, d), num_threads);
+	} else {
+		std::cerr << "Invalid dataset type!" << std::endl;
+		return 1;
 	}
 
-	// for (size_t n = 50000 * 1; n <= 50000 * 10 * 1; n *= 10) {
-	for (size_t n = 56000 * 1; n <= 56000 * 1 * 1; n *= 10) {
-		// for (size_t n = 16000 * 1; n <= 16000 * 1 * 1; n *= 10) {
-		// for (size_t n = 66000 * 1; n <= 66000 * 1 * 1; n *= 10) {
-		// for (size_t n = 50000 * 1; n <= 50000 * 1 * 1; n *= 10) {
-		// size_t m = 400 * (n / 50000);
-		// size_t m = 400;
-		size_t m = 400;
-		// if (n < 500000)
-		//	m = 400;
-		size_t d = 128;
-		size_t k = 10;
-		auto bdm = perform_benchmarks(
-				dsl.load_synethetic_uniform_sphere_points(n, m, k, d), NUM_THREADS);
-		auto ds_name = bdm.dataset_name;
-		std::string data_prefix = "./data/" + ds_name + "/";
-		bdm.save(data_prefix);
-		std::string plot_prefix = "./plots/" + ds_name + "/";
-		make_plots(bdm.get_latest(data_prefix), plot_prefix + "latest_");
-		make_plots(bdm.get_all(data_prefix), plot_prefix + "/all_");
-	}
+	std::string data_prefix = "./data/" + ds_name + "/";
+	bdm->save(data_prefix);
+	std::string plot_prefix = "./plots/" + ds_name + "/";
+	make_plots(bdm->get_latest(data_prefix), plot_prefix + "latest_");
+	make_plots(bdm->get_all(data_prefix), plot_prefix + "/all_");
+
+	return 0;
 }
