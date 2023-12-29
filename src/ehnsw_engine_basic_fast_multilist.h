@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <queue>
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -11,20 +12,21 @@
 #include "robin_hood.h"
 #include "topk_t.h"
 
-struct ehnsw_engine_basic_fast_config {
+struct ehnsw_engine_basic_fast_multilist_config {
 	size_t M;
 	size_t M0;
 	size_t ef_search_mult;
 	size_t ef_construction;
-	ehnsw_engine_basic_fast_config(size_t _M, size_t _M0, size_t _ef_search_mult,
-																 size_t _ef_construction)
+	ehnsw_engine_basic_fast_multilist_config(size_t _M, size_t _M0,
+																					 size_t _ef_search_mult,
+																					 size_t _ef_construction)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction) {}
 };
 
 template <typename T>
-struct ehnsw_engine_basic_fast
-		: public ann_engine<T, ehnsw_engine_basic_fast<T>> {
+struct ehnsw_engine_basic_fast_multilist
+		: public ann_engine<T, ehnsw_engine_basic_fast_multilist<T>> {
 	std::random_device rd;
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
@@ -37,7 +39,8 @@ struct ehnsw_engine_basic_fast
 #ifdef RECORD_STATS
 	size_t num_distcomps;
 #endif
-	ehnsw_engine_basic_fast(ehnsw_engine_basic_fast_config conf)
+	ehnsw_engine_basic_fast_multilist(
+			ehnsw_engine_basic_fast_multilist_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), max_layer(0) {}
@@ -62,7 +65,7 @@ struct ehnsw_engine_basic_fast
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine Basic Fast"; }
+	const std::string _name() { return "EHNSW Engine Basic Fast Multilist"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
@@ -82,8 +85,8 @@ struct ehnsw_engine_basic_fast
 
 template <typename T>
 std::vector<std::pair<T, size_t>>
-ehnsw_engine_basic_fast<T>::prune_edges(size_t layer, size_t from,
-																				std::vector<std::pair<T, size_t>> to) {
+ehnsw_engine_basic_fast_multilist<T>::prune_edges(
+		size_t layer, size_t from, std::vector<std::pair<T, size_t>> to) {
 	auto edge_count_mult = M;
 	if (layer == 0)
 		edge_count_mult = M0;
@@ -135,7 +138,7 @@ ehnsw_engine_basic_fast<T>::prune_edges(size_t layer, size_t from,
 }
 
 template <typename T>
-void ehnsw_engine_basic_fast<T>::_store_vector(const vec<T>& v) {
+void ehnsw_engine_basic_fast_multilist<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	all_entries.push_back(v);
 
@@ -241,7 +244,7 @@ void ehnsw_engine_basic_fast<T>::_store_vector(const vec<T>& v) {
 	}
 }
 
-template <typename T> void ehnsw_engine_basic_fast<T>::_build() {
+template <typename T> void ehnsw_engine_basic_fast_multilist<T>::_build() {
 	assert(all_entries.size() > 0);
 
 #ifdef RECORD_STATS
@@ -252,7 +255,8 @@ template <typename T> void ehnsw_engine_basic_fast<T>::_build() {
 
 template <typename T>
 template <bool use_bottomlayer>
-std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
+std::vector<std::pair<T, size_t>>
+ehnsw_engine_basic_fast_multilist<T>::query_k_at_layer(
 		const vec<T>& q, size_t layer, const std::vector<size_t>& entry_points,
 		size_t k) {
 	using measured_data = std::pair<T, size_t>;
@@ -374,8 +378,8 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 }
 
 template <typename T>
-std::vector<size_t> ehnsw_engine_basic_fast<T>::_query_k(const vec<T>& q,
-																												 size_t k) {
+std::vector<size_t>
+ehnsw_engine_basic_fast_multilist<T>::_query_k(const vec<T>& q, size_t k) {
 	size_t entry_point = starting_vertex;
 #ifdef RECORD_STATS
 	++num_distcomps;
@@ -413,7 +417,8 @@ std::vector<size_t> ehnsw_engine_basic_fast<T>::_query_k(const vec<T>& q,
 
 template <typename T>
 std::vector<std::pair<T, size_t>>
-ehnsw_engine_basic_fast<T>::query_k_combined(const vec<T>& q, size_t k) {
+ehnsw_engine_basic_fast_multilist<T>::query_k_combined(const vec<T>& q,
+																											 size_t k) {
 	size_t entry_point = starting_vertex;
 #ifdef RECORD_STATS
 	++num_distcomps;
