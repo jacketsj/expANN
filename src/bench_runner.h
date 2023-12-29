@@ -475,7 +475,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 																							 k * edge_count_search_factor));
 					}
 				}
-				if (true) {
+				if (false) {
 					for (size_t edge_count_search_factor : {3}) {
 						ehnsw_engine_basic_fast_disk_jobs.emplace_back(
 								ehnsw_engine_basic_fast_disk_config(
