@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import math
 import pprint
 
+
 class AnnoteFinder(object):
     """callback for matplotlib to display an annotation when points are
     clicked on.  The point which is closest to the click and within
@@ -16,13 +17,12 @@ class AnnoteFinder(object):
     
     This doesn't really work well on log scale plots
     """
-
     def __init__(self, xdata, ydata, annotes, ax=None, xtol=None, ytol=None):
         self.data = list(zip(xdata, ydata, annotes))
         if xtol is None:
-            xtol = ((max(xdata) - min(xdata))/float(len(xdata)))*4
+            xtol = ((max(xdata) - min(xdata)) / float(len(xdata))) * 4
         if ytol is None:
-            ytol = ((max(ydata) - min(ydata))/float(len(ydata)))*4
+            ytol = ((max(ydata) - min(ydata)) / float(len(ydata))) * 4
         self.xtol = xtol
         self.ytol = ytol
         if ax is None:
@@ -36,7 +36,7 @@ class AnnoteFinder(object):
         """
         return the distance between two points
         """
-        return(math.sqrt((x1 - x2)**2 + (y1 - y2)**2))
+        return (math.sqrt((x1 - x2)**2 + (y1 - y2)**2))
 
     def __call__(self, event):
 
@@ -49,10 +49,10 @@ class AnnoteFinder(object):
                 # print(event.xdata, event.ydata)
                 for x, y, a in self.data:
                     # print(x, y, a)
-                    if ((clickX-self.xtol < x < clickX+self.xtol) and
-                            (clickY-self.ytol < y < clickY+self.ytol)):
-                        annotes.append(
-                            (self.distance(x, clickX, y, clickY), x, y, a))
+                    if ((clickX - self.xtol < x < clickX + self.xtol)
+                            and (clickY - self.ytol < y < clickY + self.ytol)):
+                        annotes.append((self.distance(x, clickX, y,
+                                                      clickY), x, y, a))
                 if annotes:
                     annotes.sort()
                     distance, x, y, annote = annotes[0]
@@ -76,7 +76,10 @@ class AnnoteFinder(object):
                 for m in markers:
                     m.set_visible(False)
                 self.ax.figure.canvas.draw_idle()
-            t = ax.text(x, y, " - %s" % (annote), bbox=dict(facecolor='gray', alpha=0.5))
+            t = ax.text(x,
+                        y,
+                        " - %s" % (annote),
+                        bbox=dict(facecolor='gray', alpha=0.5))
             m = ax.scatter([x], [y], marker='d', c='r', zorder=10000)
             self.drawnAnnotations[(x, y)] = (t, m)
             self.ax.figure.canvas.draw_idle()
@@ -86,11 +89,12 @@ class AnnoteFinder(object):
         for x, y, a in annotesToDraw:
             self.drawAnnote(self.ax, x, y, a)
 
+
 #f = open('./data/synthetic_uniform_sphere_n50000_dim16_m400_k1/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n30000_dim16_m300_k10/data/all.json')
 #f = open('./data/sift1m_full/data/all.json')
-#f = open('./data/sift1m_full_k10/data/all.json')
-f = open('./data/sift1m_full_k10/data/latest.json')
+f = open('./data/sift1m_full_k10/data/all.json')
+#f = open('./data/sift1m_full_k10/data/latest.json')
 #f = open('./data/synthetic_uniform_sphere_n90000_dim16_m600_k10/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/all.json')
 #f = open('./data/synthetic_uniform_sphere_n56000_dim64_m400_k10/data/latest.json')
@@ -147,13 +151,15 @@ for eng, col in zip(sorted(engines), cols):
         if eng == bd_name:
             xi = benchdata['recall']
             yi = benchdata['time_per_query_ns']
+            #if xi < 0.9:
+            #    continue
             #yi = float(benchdata['param_list']['num_distcomps'])
             x.append(xi)
             xall.append(xi)
             #y.append(yi)
             #yall.append(yi)
-            y.append(1e9/yi)
-            yall.append(1e9/yi)
+            y.append(1e9 / yi)
+            yall.append(1e9 / yi)
             s.append(4)
             #annotations[(xi, yi)] = str(benchdata)
             annotationsall.append(pprint.pformat(benchdata))
