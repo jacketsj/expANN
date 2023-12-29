@@ -45,8 +45,8 @@ struct ehnsw_engine_basic_fast_multilist
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), max_layer(0) {}
 	std::vector<vec<T>> all_entries;
-	std::vector<std::vector<std::vector<size_t>>>
-			hadj_flat; // vector -> layer -> edges
+	std::vector<std::vector<std::vector<size_t>>> hadj_flat,
+			hadj_flat_no_prune; // vector -> layer -> edges
 	std::vector<std::vector<size_t>>
 			hadj_bottom; // vector -> edges in bottom layer
 	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
@@ -97,6 +97,14 @@ ehnsw_engine_basic_fast_multilist<T>::prune_edges(
 	}
 
 	sort(to.begin(), to.end());
+
+	hadj_flat_no_prune[from][layer].clear();
+	for (const auto& [_, to_index] : to) {
+		hadj_flat_no_prune[from][layer].emplace_back(to_index);
+		if (hadj_flat_no_prune[from][layer].size() >= edge_count_mult)
+			break;
+	}
+
 	std::vector<std::pair<T, size_t>> ret;
 	std::vector<bool> bins(layer > 0 ? 0 : edge_count_mult - num_cuts());
 	for (const auto& md : to) {
@@ -150,8 +158,10 @@ void ehnsw_engine_basic_fast_multilist<T>::_store_vector(const vec<T>& v) {
 	// size_t new_max_layer = 0;
 
 	hadj_flat_with_lengths.emplace_back();
+	hadj_flat_no_prune.emplace_back();
 	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
 		hadj_flat_with_lengths[v_index].emplace_back();
+		hadj_flat_no_prune[v_index].emplace_back();
 	}
 
 	auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
@@ -261,7 +271,11 @@ ehnsw_engine_basic_fast_multilist<T>::query_k_at_layer(
 		size_t k) {
 	using measured_data = std::pair<T, size_t>;
 
-	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
+	auto get_vertex = [&](const size_t& index,
+												bool no_prune) constexpr->std::vector<size_t>& {
+		if (no_prune) {
+			return hadj_flat_no_prune[index][layer];
+		}
 		if constexpr (use_bottomlayer) {
 			return hadj_bottom[index];
 		} else {
@@ -300,14 +314,17 @@ ehnsw_engine_basic_fast_multilist<T>::query_k_at_layer(
 		visited_recent.emplace_back(entry_point);
 	}
 
+	bool no_prune = false;
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
 		candidates.pop();
 		if (cur.first > nearest.top().first && nearest.size() == k) {
-			break;
+			if (no_prune)
+				break;
+			no_prune = true;
 		}
-		std::vector<size_t> neighbour_list; // = get_vertex(cur.second);
-		for (size_t neighbour : get_vertex(cur.second))
+		std::vector<size_t> neighbour_list;
+		for (size_t neighbour : get_vertex(cur.second, no_prune))
 			if (!visited[neighbour]) {
 				neighbour_list.emplace_back(neighbour);
 				visited[neighbour] = true;
