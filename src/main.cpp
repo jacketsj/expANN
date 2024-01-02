@@ -18,6 +18,8 @@
 #include "plotter.h"
 #include "randomgeometry.h"
 
+using json = nlohmann::json;
+
 std::string getCommandLineOption(char** begin, char** end,
 																 const std::string& option) {
 	char** itr = std::find(begin, end, option);
@@ -32,53 +34,74 @@ bool commandLineOptionExists(char** begin, char** end,
 	return std::find(begin, end, option) != end;
 }
 
-int main(int argc, char* argv[]) {
-	std::string dataset;
-	std::string ds_name;
-	int num_threads = 1; // Default number of threads
-
-	if (commandLineOptionExists(argv, argv + argc, "--dataset")) {
-		dataset = getCommandLineOption(argv, argv + argc, "--dataset");
-	} else {
-		std::cout << "Enter dataset type (Synthetic/Sift1M): ";
-		std::cin >> dataset;
-	}
-
-	if (commandLineOptionExists(argv, argv + argc, "--ds_name")) {
-		ds_name = getCommandLineOption(argv, argv + argc, "--ds_name");
-	} else {
-		std::cout << "Enter dataset name (leave blank for default): ";
-		std::getline(std::cin >> std::ws, ds_name);
-		if (ds_name.empty()) {
-			ds_name = dataset;
+template <typename T>
+T getParameter(int argc, char* argv[], const json& config,
+							 const std::string& paramName, const std::string& prompt) {
+	if (commandLineOptionExists(argv, argv + argc, ("--" + paramName).c_str())) {
+		if constexpr (std::is_same<T, std::string>::value) {
+			return getCommandLineOption(argv, argv + argc, "--" + paramName);
+		} else {
+			return std::stoi(
+					getCommandLineOption(argv, argv + argc, "--" + paramName));
 		}
+	} else if (config.contains(paramName)) {
+		return config[paramName].get<T>();
+	} else {
+		std::cout << prompt;
+		T value;
+		std::cin >> value;
+		return value;
+	}
+}
+
+int main(int argc, char* argv[]) {
+	std::ifstream configFile("config.json");
+	json config;
+	if (configFile) {
+		configFile >> config;
 	}
 
-	if (commandLineOptionExists(argv, argv + argc, "--num_threads")) {
-		num_threads =
-				std::stoi(getCommandLineOption(argv, argv + argc, "--num_threads"));
-	}
-	std::cout << "Using " << num_threads << " threads." << std::endl;
+	std::string dataset = getParameter<std::string>(
+			argc, argv, config, "dataset", "Enter dataset type (Synthetic/Sift1M): ");
+	std::string ds_name = getParameter<std::string>(argc, argv, config, "ds_name",
+																									"Enter dataset name: ");
+	int num_threads = getParameter<int>(argc, argv, config, "num_threads",
+																			"Enter number of threads: ");
 
 	dataset_loader<float> dsl;
 	std::optional<bench_data_manager> bdm;
 
 	if (dataset == "Sift1M") {
-		size_t k = 10; // default value for k
+		size_t k = getParameter<size_t>(argc, argv, config, "k",
+																		"Enter Sift1M dataset parameter k: ");
+		std::cout << "Using Sift1M dataset with k=" << k << std::endl;
 		bdm = perform_benchmarks(
 				dsl.load_sift1m("datasets/sift/sift_base.fvecs",
 												"datasets/sift/sift_query.fvecs",
 												"datasets/sift/sift_groundtruth.ivecs", k),
 				num_threads);
 	} else if (dataset == "Synthetic") {
-		size_t n, m, d, k;
-		std::cout << "Enter Synthetic dataset parameters n, m, d, k: ";
-		std::cin >> n >> m >> d >> k;
+		size_t n = getParameter<size_t>(argc, argv, config, "n",
+																		"Enter Synthetic dataset parameter n: ");
+		size_t m = getParameter<size_t>(argc, argv, config, "m",
+																		"Enter Synthetic dataset parameter m: ");
+		size_t d = getParameter<size_t>(argc, argv, config, "d",
+																		"Enter Synthetic dataset parameter d: ");
+		size_t k = getParameter<size_t>(argc, argv, config, "k",
+																		"Enter Synthetic dataset parameter k: ");
+
+		std::cout << "Using Synthetic dataset with n,m,d,k=" << n << ',' << m << ','
+							<< d << ',' << k << std::endl;
 		bdm = perform_benchmarks(
 				dsl.load_synethetic_uniform_sphere_points(n, m, k, d), num_threads);
 	} else {
 		std::cerr << "Invalid dataset type!" << std::endl;
 		return 1;
+	}
+
+	if (ds_name.empty()) {
+		ds_name =
+				dataset; // Default dataset name to the type of dataset if not specified
 	}
 
 	std::string data_prefix = "./data/" + ds_name + "/";
