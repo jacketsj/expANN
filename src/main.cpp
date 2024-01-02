@@ -55,7 +55,10 @@ T getParameter(int argc, char* argv[], const json& config,
 }
 
 int main(int argc, char* argv[]) {
-	std::ifstream configFile("config.json");
+	std::string configFileName = "config.json";
+	if (commandLineOptionExists(argv, argv + argc, "--config"))
+		configFileName = getCommandLineOption(argv, argv + argc, "--config");
+	std::ifstream configFile(configFileName);
 	json config;
 	if (configFile) {
 		configFile >> config;

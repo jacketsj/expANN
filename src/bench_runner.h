@@ -118,27 +118,23 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			hnsw_engine_reference_jobs;
 	std::vector<job<ensg_engine<float>, ensg_engine_config>> ensg_engine_jobs;
 
-	for (size_t k = 30; k <= 40; k += 10) { // will hopfully get good
-		for (size_t num_for_1nn = 3; num_for_1nn <= 3; num_for_1nn++) {
+	for (size_t k = 60; k <= 100; k += 20) {
+		for (size_t num_for_1nn = 3; num_for_1nn <= 6; num_for_1nn += 3) {
 			if (true) {
 				ensg_engine_jobs.emplace_back(ensg_engine_config(k, num_for_1nn, 1.0f));
 			}
-			if (true) {
-				for (size_t edge_count_search_factor : {2, 3}) {
+			for (size_t edge_count_search_factor : {2, 3}) {
+				if (true) {
 					ehnsw_engine_basic_fast_jobs.emplace_back(
 							ehnsw_engine_basic_fast_config(k, 2 * k, num_for_1nn,
 																						 k * edge_count_search_factor));
 				}
-			}
-			if (true) {
-				for (size_t edge_count_search_factor : {2, 3}) {
+				if (true) {
 					ehnsw_engine_basic_fast_multilist_jobs.emplace_back(
 							ehnsw_engine_basic_fast_multilist_config(
 									k, 2 * k, num_for_1nn, k * edge_count_search_factor));
 				}
-			}
-			if (true) {
-				for (size_t edge_count_search_factor : {1}) {
+				if (true) {
 					for (bool use_ecuts : {false}) {
 						hnsw_engine_reference_jobs.emplace_back(
 								hnsw_engine_reference_config(k, edge_count_search_factor * k,
