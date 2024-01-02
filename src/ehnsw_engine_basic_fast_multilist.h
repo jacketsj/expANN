@@ -17,11 +17,13 @@ struct ehnsw_engine_basic_fast_multilist_config {
 	size_t M0;
 	size_t ef_search_mult;
 	size_t ef_construction;
+	bool use_cuts;
 	ehnsw_engine_basic_fast_multilist_config(size_t _M, size_t _M0,
 																					 size_t _ef_search_mult,
-																					 size_t _ef_construction)
+																					 size_t _ef_construction,
+																					 bool _use_cuts)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
-				ef_construction(_ef_construction) {}
+				ef_construction(_ef_construction), use_cuts(_use_cuts) {}
 };
 
 template <typename T>
@@ -35,6 +37,7 @@ struct ehnsw_engine_basic_fast_multilist
 	size_t M0;
 	size_t ef_search_mult;
 	size_t ef_construction;
+	bool use_cuts;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -43,7 +46,8 @@ struct ehnsw_engine_basic_fast_multilist
 			ehnsw_engine_basic_fast_multilist_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
-				ef_construction(conf.ef_construction), max_layer(0) {}
+				ef_construction(conf.ef_construction), use_cuts(conf.use_cuts),
+				max_layer(0) {}
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>> hadj_flat,
 			hadj_flat_no_prune; // vector -> layer -> edges
@@ -56,7 +60,7 @@ struct ehnsw_engine_basic_fast_multilist
 	std::vector<char> visited; // booleans
 	std::vector<size_t> visited_recent;
 	std::vector<std::vector<bool>> e_labels; // vertex -> cut labels (*num_cuts)
-	size_t num_cuts() { return e_labels[0].size(); }
+	size_t num_cuts() { return use_cuts ? e_labels[0].size() : 0; }
 	std::vector<std::pair<T, size_t>>
 	prune_edges(size_t layer, size_t from, std::vector<std::pair<T, size_t>> to);
 	template <bool use_bottomlayer>
@@ -65,7 +69,10 @@ struct ehnsw_engine_basic_fast_multilist
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
-	const std::string _name() { return "EHNSW Engine Basic Fast Multilist"; }
+	const std::string _name() {
+		return use_cuts ? "EHNSW Engine Basic Fast Multilist"
+										: "HNSW Engine Basic Fast Multilist";
+	}
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);

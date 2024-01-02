@@ -124,15 +124,19 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				ensg_engine_jobs.emplace_back(ensg_engine_config(k, num_for_1nn, 1.0f));
 			}
 			for (size_t edge_count_search_factor : {2, 3}) {
-				if (true) {
-					ehnsw_engine_basic_fast_jobs.emplace_back(
-							ehnsw_engine_basic_fast_config(k, 2 * k, num_for_1nn,
-																						 k * edge_count_search_factor));
-				}
-				if (true) {
-					ehnsw_engine_basic_fast_multilist_jobs.emplace_back(
-							ehnsw_engine_basic_fast_multilist_config(
-									k, 2 * k, num_for_1nn, k * edge_count_search_factor));
+				for (bool use_cuts : {false, true}) {
+					if (true) {
+						ehnsw_engine_basic_fast_jobs.emplace_back(
+								ehnsw_engine_basic_fast_config(k, 2 * k, num_for_1nn,
+																							 k * edge_count_search_factor,
+																							 use_cuts));
+					}
+					if (true) {
+						ehnsw_engine_basic_fast_multilist_jobs.emplace_back(
+								ehnsw_engine_basic_fast_multilist_config(
+										k, 2 * k, num_for_1nn, k * edge_count_search_factor,
+										use_cuts));
+					}
 				}
 				if (true) {
 					for (bool use_ecuts : {false}) {
