@@ -29,6 +29,7 @@ struct ehnsw_engine_basic_fast_multilist_config {
 template <typename T>
 struct ehnsw_engine_basic_fast_multilist
 		: public ann_engine<T, ehnsw_engine_basic_fast_multilist<T>> {
+	using config = ehnsw_engine_basic_fast_multilist_config;
 	std::random_device rd;
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;

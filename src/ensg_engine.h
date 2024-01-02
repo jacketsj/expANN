@@ -37,6 +37,7 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
 				re_improve_wait_ratio(conf.re_improve_wait_ratio),
 				num_cuts(conf.edge_count_mult - 1) {}
+	using config = ensg_engine_config;
 	std::vector<vec<T>> all_entries;
 	robin_hood::unordered_flat_map<size_t, std::vector<size_t>>
 			adj; // vertex -> cut -> outgoing_edge data_index

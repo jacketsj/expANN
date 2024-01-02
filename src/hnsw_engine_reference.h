@@ -36,6 +36,7 @@ struct hnsw_engine_reference : public ann_engine<T, hnsw_engine_reference<T>> {
 			: M(conf.M), ef_construction(conf.ef_construction),
 				ef_factor(conf.ef_factor), use_ecuts(conf.use_ecuts), rd(), gen(rd()),
 				int_distribution(0, 1), alg_hnsw(nullptr), space(nullptr) {}
+	using config = hnsw_engine_reference_config;
 	// std::vector<vec<T>> all_entries;
 	size_t dim;
 	std::vector<T> all_entries_f;

@@ -45,6 +45,7 @@ struct ehnsw_engine_basic_fast
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), use_cuts(conf.use_cuts),
 				max_layer(0) {}
+	using config = ehnsw_engine_basic_fast_config;
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
