@@ -135,16 +135,16 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 
 	for (size_t k = 60; k <= 100; k += 20) {
 		for (size_t num_for_1nn = 3; num_for_1nn <= 6; num_for_1nn += 3) {
-			if (false) {
+			if (true) {
 				ADD_JOB(ensg_engine<float>, k, num_for_1nn, 1.0f);
 			}
 			for (size_t edge_count_search_factor : {2, 3}) {
 				for (bool use_cuts : {false, true}) {
-					if (true) {
+					if (false) {
 						ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 										k * edge_count_search_factor, use_cuts);
 					}
-					if (true) {
+					if (false) {
 						ADD_JOB(ehnsw_engine_basic_fast_multilist<float>, k, 2 * k,
 										num_for_1nn, k * edge_count_search_factor, use_cuts);
 					}
