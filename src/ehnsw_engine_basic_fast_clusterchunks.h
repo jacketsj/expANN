@@ -12,6 +12,8 @@
 #include "robin_hood.h"
 #include "topk_t.h"
 
+#include "ehnsw_engine_basic_fast.h"
+
 struct ehnsw_engine_basic_fast_clusterchunks_config {
 	size_t M;
 	size_t M0;
@@ -62,6 +64,9 @@ struct ehnsw_engine_basic_fast_clusterchunks
 			hadj_bottom; // vector -> edges in bottom layer
 	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
+	std::vector<vec<T>> centroids;
+	std::vector<std::vector<size_t>> clusters;
+	std::vector<std::vector<size_t>> hadj_bottom_projected;
 	void _store_vector(const vec<T>& v);
 	void _build();
 	std::vector<char> visited; // booleans
@@ -70,12 +75,11 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	size_t num_cuts() { return use_cuts ? e_labels[0].size() : 0; }
 	std::vector<std::pair<T, size_t>>
 	prune_edges(size_t layer, size_t from, std::vector<std::pair<T, size_t>> to);
-	template <bool use_bottomlayer>
+	template <bool use_bottomlayer, bool use_clusters>
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
 	const std::string _name() {
 		return use_cuts ? "EHNSW Engine Basic Fast Cluster-Chunks"
 										: "HNSW Engine Basic Fast Cluster-Chunks";
@@ -202,7 +206,7 @@ void ehnsw_engine_basic_fast_clusterchunks<T>::_store_vector(const vec<T>& v) {
 		for (int layer = std::min(new_max_layer, max_layer - 1); layer >= 0;
 				 --layer) {
 			kNN_per_layer.emplace_back(
-					query_k_at_layer<false>(v, layer, cur, ef_construction));
+					query_k_at_layer<false, false>(v, layer, cur, ef_construction));
 			cur.clear();
 			for (auto& md : kNN_per_layer.back()) {
 				cur.emplace_back(md.second);
@@ -259,6 +263,53 @@ void ehnsw_engine_basic_fast_clusterchunks<T>::_store_vector(const vec<T>& v) {
 template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 	assert(all_entries.size() > 0);
 
+	// start by setting centroids to the values of the second-to-last layer
+	for (size_t i = 0; i < all_entries.size(); ++i) {
+		if (hadj_flat[i].size() > 1) {
+			centroids.emplace_back(all_entries[i]);
+		}
+	}
+	for (size_t iter = 0; iter < 30; ++iter) {
+		ehnsw_engine_basic_fast<T> sub_engine(ehnsw_engine_basic_fast_config(
+				M, M0, ef_search_mult, ef_construction, use_cuts));
+		for (auto& v : centroids)
+			sub_engine.store_vector(v);
+		sub_engine.build();
+		clusters.resize(centroids.size());
+		for (size_t i = 0; i < all_entries.size(); ++i) {
+			clusters[sub_engine.query_k(all_entries[i], 1)[0]].emplace_back(i);
+		}
+		for (size_t centroid_index = 0; centroid_index < centroids.size();
+				 ++centroid_index) {
+			auto& centroid = centroids[centroid_index];
+			centroid.clear();
+			for (size_t elem_index : clusters[centroid_index]) {
+				centroid += all_entries[elem_index];
+			}
+			if (!clusters[centroid_index].empty()) {
+				centroid /= clusters[centroid_index].size();
+			}
+		}
+		// TODO make use of min/max sizes
+	}
+	std::vector<size_t> reverse_clusters(all_entries.size());
+	for (size_t i = 0; i < clusters.size(); ++i) {
+		for (size_t j : clusters[i])
+			reverse_clusters[j] = i;
+	}
+
+	hadj_bottom_projected.resize(all_entries.size());
+	for (size_t i = 0; i < all_entries.size(); ++i) {
+		robin_hood::unordered_flat_set<size_t> added;
+		for (size_t j : hadj_bottom[i]) {
+			size_t cluster_index = reverse_clusters[j];
+			if (!added.contains(cluster_index)) {
+				hadj_bottom_projected[i].emplace_back(cluster_index);
+				added.insert(cluster_index);
+			}
+		}
+	}
+
 #ifdef RECORD_STATS
 	// reset before queries
 	num_distcomps = 0;
@@ -266,7 +317,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 }
 
 template <typename T>
-template <bool use_bottomlayer>
+template <bool use_bottomlayer, bool use_clusters>
 std::vector<std::pair<T, size_t>>
 ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_layer(
 		const vec<T>& q, size_t layer, const std::vector<size_t>& entry_points,
@@ -318,13 +369,23 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_layer(
 		if (cur.first > nearest.top().first && nearest.size() == k) {
 			break;
 		}
-		std::vector<size_t> neighbour_list; // = get_vertex(cur.second);
-		for (size_t neighbour : get_vertex(cur.second))
-			if (!visited[neighbour]) {
-				neighbour_list.emplace_back(neighbour);
-				visited[neighbour] = true;
-				visited_recent.emplace_back(neighbour);
+		std::vector<size_t> neighbour_list;
+		if constexpr (use_clusters && use_bottomlayer) {
+			for (size_t cluster_neighbour : hadj_bottom_projected[cur.second]) {
+				if (!visited[cluster_neighbour]) {
+					for (size_t neighbour : clusters[cluster_neighbour])
+						neighbour_list.emplace_back(neighbour);
+					visited[cluster_neighbour] = true;
+					visited_recent.emplace_back(cluster_neighbour);
+				}
 			}
+		} else
+			for (size_t neighbour : get_vertex(cur.second))
+				if (!visited[neighbour]) {
+					neighbour_list.emplace_back(neighbour);
+					visited[neighbour] = true;
+					visited_recent.emplace_back(neighbour);
+				}
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
 		auto do_loop_prefetch = [&](size_t i) constexpr {
@@ -333,7 +394,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_layer(
 				_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
 										 _MM_HINT_T0);
 #endif
-			_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
+			//_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
 		};
 		for (size_t next_i_pre = 0;
 				 next_i_pre < std::min(in_advance, neighbour_list.size());
@@ -417,7 +478,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 	}
 
 	auto ret_combined =
-			query_k_at_layer<true>(q, 0, {entry_point}, k * ef_search_mult);
+			query_k_at_layer<true, true>(q, 0, {entry_point}, k * ef_search_mult);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;
@@ -425,39 +486,4 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 		ret.emplace_back(ret_combined[i].second);
 	}
 	return ret;
-}
-
-template <typename T>
-std::vector<std::pair<T, size_t>>
-ehnsw_engine_basic_fast_clusterchunks<T>::query_k_combined(const vec<T>& q,
-																													 size_t k) {
-	size_t entry_point = starting_vertex;
-#ifdef RECORD_STATS
-	++num_distcomps;
-#endif
-	T ep_dist = dist2(all_entries[entry_point], q);
-	for (int layer = max_layer - 1; layer >= 0; --layer) {
-		bool changed = true;
-		while (changed) {
-			changed = false;
-			for (auto& neighbour : hadj_flat[entry_point][layer]) {
-				_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
-#ifdef RECORD_STATS
-				++num_distcomps;
-#endif
-				T neighbour_dist = dist2(q, all_entries[neighbour]);
-				if (neighbour_dist < ep_dist) {
-					entry_point = neighbour;
-					ep_dist = neighbour_dist;
-					changed = true;
-				}
-			}
-		}
-	}
-
-	auto ret_combined =
-			query_k_at_layer<true>(q, 0, {entry_point}, k * ef_search_mult);
-	if (ret_combined.size() > k)
-		ret_combined.resize(k);
-	return ret_combined;
 }
