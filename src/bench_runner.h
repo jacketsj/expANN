@@ -43,16 +43,17 @@ template <typename Engine, typename EngineConfig> struct job {
 			}
 			meta[meta.size() - 1] = ')';
 
-			std::printf("Running job %zu/%zu (tid=%zu): %s\n", job_index, total_jobs,
-									thread_id, meta.c_str());
+			std::printf("Running job %zu/%zu (tid=%zu): %s\n", job_index + 1,
+									total_jobs, thread_id, meta.c_str());
 			result = basic_benchmarker.get_benchmark_data(eng);
 
 			std::string res_str = std::holds_alternative<bench_data>(result)
 																? std::get<bench_data>(result).to_string()
 																: std::get<std::string>(result);
 
-			std::printf("Completed job %zu/%zu (tid=%zu): %s\nResult:%s\n", job_index,
-									total_jobs, thread_id, meta.c_str(), res_str.c_str());
+			std::printf("Completed job %zu/%zu (tid=%zu): %s\nResult:%s\n",
+									job_index + 1, total_jobs, thread_id, meta.c_str(),
+									res_str.c_str());
 		}
 	}
 };
@@ -135,8 +136,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 
 	for (size_t k = 60; k <= 100; k += 20) {
 		for (size_t num_for_1nn = 3; num_for_1nn <= 6; num_for_1nn += 3) {
-			if (true) {
-				ADD_JOB(ensg_engine<float>, k, num_for_1nn, 1.0f);
+			for (bool use_cuts : {false, true}) {
+				if (true) {
+					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
+				}
 			}
 			for (size_t edge_count_search_factor : {2, 3}) {
 				for (bool use_cuts : {false, true}) {
