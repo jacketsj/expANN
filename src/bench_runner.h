@@ -143,8 +143,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
 				}
 			}
-			for (size_t edge_count_search_factor : {3, 3}) {
-				for (bool use_cuts : {false, true}) {
+			for (size_t edge_count_search_factor : {3}) {
+				for (bool use_cuts : {false}) {
 					if (true) {
 						ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 										k * edge_count_search_factor, use_cuts);
