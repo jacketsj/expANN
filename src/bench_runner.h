@@ -136,22 +136,21 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 hnsw_engine_reference<float>, ensg_engine<float>>
 			job_lists;
 
-	for (size_t k = 60; k <= 100; k += 20) {
-		for (size_t num_for_1nn = 3; num_for_1nn <= 6; num_for_1nn += 3) {
+	for (size_t k = 60; k <= 60; k += 20) {
+		for (size_t num_for_1nn = 6; num_for_1nn <= 6; num_for_1nn += 3) {
 			for (bool use_cuts : {false, true}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
 				}
 			}
-			for (size_t edge_count_search_factor : {2, 3}) {
+			for (size_t edge_count_search_factor : {3, 3}) {
 				for (bool use_cuts : {false, true}) {
 					if (true) {
 						ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 										k * edge_count_search_factor, use_cuts);
 					}
-					for (size_t min_cluster_size : {16, 32}) {
-						for (size_t max_cluster_size :
-								 {min_cluster_size * 2, min_cluster_size * 4}) {
+					for (size_t min_cluster_size : {32}) {
+						for (size_t max_cluster_size : {min_cluster_size * 4}) {
 							if (true) {
 								ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>, k, 2 * k,
 												num_for_1nn, k * edge_count_search_factor, use_cuts,
