@@ -324,7 +324,7 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 				_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
 										 _MM_HINT_T0);
 #endif
-			_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
+			//_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
 		};
 		for (size_t next_i_pre = 0;
 				 next_i_pre < std::min(in_advance, neighbour_list.size());
