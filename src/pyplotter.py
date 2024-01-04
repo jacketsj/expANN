@@ -94,8 +94,8 @@ class AnnoteFinder(object):
 #f = open('./data/synthetic_uniform_sphere_n30000_dim16_m300_k10/data/all.json')
 #f = open('./data/sift1m_full/data/all.json')
 #f = open('./data/sift1m_full_k10/data/all.json')
-f = open(
-    './data/newyearnewdata_synthetic_n_56000_m_400_d_128_k_10/data/all.json')
+#f = open('./data/newyearnewdata_synthetic_n_56000_m_400_d_128_k_10/data/all.json')
+f = open('./data/newyearnewdata_sift_k_10/data/latest.json')
 #f = open('./data/newyearnewsift/data/all.json')
 #f = open('./data/sift1m_full_k10/data/latest.json')
 #f = open('./data/synthetic_uniform_sphere_n90000_dim16_m600_k10/data/all.json')
