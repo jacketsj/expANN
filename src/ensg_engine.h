@@ -153,6 +153,7 @@ void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
 		for (auto& [_, cur_index] : adj_pruned[i]) {
 			if (!added_to_adj.contains(cur_index)) {
 				adj[i].emplace_back(cur_index);
+				added_to_adj.emplace(cur_index);
 			}
 		}
 	}
