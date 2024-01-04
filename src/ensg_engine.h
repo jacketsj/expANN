@@ -15,11 +15,12 @@
 struct ensg_engine_config {
 	size_t edge_count_mult;
 	size_t num_for_1nn;
+	bool use_cuts;
 	float re_improve_wait_ratio;
 	ensg_engine_config(size_t _edge_count_mult, size_t _num_for_1nn,
-										 float _re_improve_wait_ratio = 1.0f)
+										 bool _use_cuts, float _re_improve_wait_ratio = 1.0f)
 			: edge_count_mult(_edge_count_mult), num_for_1nn(_num_for_1nn),
-				re_improve_wait_ratio(_re_improve_wait_ratio) {}
+				use_cuts(_use_cuts), re_improve_wait_ratio(_re_improve_wait_ratio) {}
 };
 
 template <typename T>
@@ -30,17 +31,22 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	size_t starting_vertex;
 	size_t edge_count_mult;
 	size_t num_for_1nn;
+	bool use_cuts;
 	float re_improve_wait_ratio;
 	const size_t num_cuts;
 	ensg_engine(ensg_engine_config conf)
 			: rd(), gen(rd()), int_distribution(0, 1),
 				edge_count_mult(conf.edge_count_mult), num_for_1nn(conf.num_for_1nn),
+				use_cuts(conf.use_cuts),
 				re_improve_wait_ratio(conf.re_improve_wait_ratio),
 				num_cuts(conf.edge_count_mult - 1) {}
 	using config = ensg_engine_config;
 	std::vector<vec<T>> all_entries;
-	robin_hood::unordered_flat_map<size_t, std::vector<size_t>>
-			adj; // vertex -> cut -> outgoing_edge data_index
+	robin_hood::unordered_flat_map<size_t, std::vector<size_t>> adj;
+	// vertex -> cut -> outgoing_edge data_index
+	robin_hood::unordered_flat_map<size_t, std::vector<std::pair<T, size_t>>>
+			adj_pruned, adj_unfiltered;
+	// vertex -> cut -> outgoing_edge distance + data_index
 	robin_hood::unordered_flat_map<size_t,
 																 std::vector<std::tuple<T, size_t, size_t>>>
 			edge_ranks; // vertex -> closest connected [distance, bin, edge_index]
@@ -58,11 +64,12 @@ struct ensg_engine : public ann_engine<T, ensg_engine<T>> {
 	const std::vector<std::pair<T, size_t>>
 	_query_k_internal_wrapper(const vec<T>& v, size_t k, bool include_visited);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	const std::string _name() { return "ENSG Engine"; }
+	const std::string _name() { return use_cuts ? "ENSG Engine" : "NSG Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, edge_count_mult);
 		add_param(pl, num_for_1nn);
+		add_param(pl, use_cuts);
 		add_param(pl, re_improve_wait_ratio);
 		return pl;
 	}
@@ -84,38 +91,70 @@ bool ensg_engine<T>::is_valid_edge(size_t i, size_t j, size_t bin) {
 
 template <typename T>
 void ensg_engine<T>::add_edge_directional(size_t i, size_t j, T d) {
-	// keep track of all bins that have been used already
-	std::set<size_t> used_bins;
-	// iterate through all the edges, smallest to biggest, while maintaining a
-	// current edge. Greedily improve the currently visited bin each time.
-	// don't bother if nothing will get modified
-	if (edge_ranks[i].size() < edge_count_mult ||
-			d < std::get<0>(edge_ranks[i].back())) {
-		for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
-			used_bins.insert(bin);
-			if (j == adj[i][edge_index]) {
-				// duplicate edge found, discard and return
-				// will only happen if no swaps have occurred so far
-				return;
+	if (use_cuts) {
+		// keep track of all bins that have been used already
+		std::set<size_t> used_bins;
+		// iterate through all the edges, smallest to biggest, while maintaining a
+		// current edge. Greedily improve the currently visited bin each time.
+		// don't bother if nothing will get modified
+		if (edge_ranks[i].size() < edge_count_mult ||
+				d < std::get<0>(edge_ranks[i].back())) {
+			for (auto& [other_d, bin, edge_index] : edge_ranks[i]) {
+				used_bins.insert(bin);
+				if (j == adj[i][edge_index]) {
+					// duplicate edge found, discard and return
+					// will only happen if no swaps have occurred so far
+					return;
+				}
+				if (d < other_d && is_valid_edge(i, j, bin)) {
+					// (i,j) is a better edge than (i, adj[i][edge_index]) for the
+					// current bin, so swap
+					std::swap(j, adj[i][edge_index]);
+					std::swap(d, other_d);
+				}
 			}
-			if (d < other_d && is_valid_edge(i, j, bin)) {
-				// (i,j) is a better edge than (i, adj[i][edge_index]) for the current
-				// bin, so swap
-				std::swap(j, adj[i][edge_index]);
-				std::swap(d, other_d);
-			}
+			// iterate through all unused bins, use one of them if it is compatible
+			if (used_bins.size() < edge_count_mult)
+				for (size_t bin = 0; bin < num_cuts + 1; ++bin)
+					if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
+						size_t edge_index = adj[i].size();
+						adj[i].emplace_back(j);
+						edge_ranks[i].emplace_back(d, bin, edge_index);
+						break;
+					}
+			// sort edge ranks by increasing distance again
+			std::sort(edge_ranks[i].begin(), edge_ranks[i].end());
 		}
-		// iterate through all unused bins, use one of them if it is compatible
-		if (used_bins.size() < edge_count_mult)
-			for (size_t bin = 0; bin < num_cuts + 1; ++bin)
-				if (!used_bins.contains(bin) && is_valid_edge(i, j, bin)) {
-					size_t edge_index = adj[i].size();
-					adj[i].emplace_back(j);
-					edge_ranks[i].emplace_back(d, bin, edge_index);
+	} else {
+		// ** add to adj_unfiltered
+		adj_unfiltered[i].emplace_back(d, j);
+		std::sort(adj_unfiltered[i].begin(), adj_unfiltered[i].end());
+		if (adj_unfiltered[i].size() > edge_count_mult * 2)
+			adj_unfiltered[i].resize(edge_count_mult * 2);
+		// ** add to adj_pruned
+		adj_pruned[i].clear();
+		adj_pruned[i].emplace_back(adj_unfiltered[i][0]);
+		for (auto& [cur_dist, cur_index] : adj_unfiltered[i]) {
+			bool can_use = true;
+			for (auto& [prev_dist, prev_index] : adj_pruned[i]) {
+				if (dist(all_entries[cur_index], all_entries[prev_index]) < cur_dist) {
+					can_use = false;
 					break;
 				}
-		// sort edge ranks by increasing distance again
-		std::sort(edge_ranks[i].begin(), edge_ranks[i].end());
+			}
+			if (can_use)
+				adj_pruned[i].emplace_back(cur_dist, cur_index);
+			if (adj_pruned[i].size() >= edge_count_mult)
+				break;
+		}
+		// ** copy all to to adj (without duplicates)
+		adj[i].clear();
+		robin_hood::unordered_flat_set<size_t> added_to_adj;
+		for (auto& [_, cur_index] : adj_pruned[i]) {
+			if (!added_to_adj.contains(cur_index)) {
+				adj[i].emplace_back(cur_index);
+			}
+		}
 	}
 }
 
