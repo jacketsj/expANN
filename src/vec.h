@@ -54,6 +54,7 @@ public:
 	void set_dim(size_t dim) { internal.resize(dim); }
 	size_t size() const { return size_t(internal.size()); }
 	size_t dim() const { return size(); }
+	void clear() { internal.setZero(); }
 	std::string to_string() const {
 		std::string ret;
 		for (const auto& val : internal)
