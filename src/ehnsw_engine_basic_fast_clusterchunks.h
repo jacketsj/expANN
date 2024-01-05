@@ -66,6 +66,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	std::vector<vec<T>> centroids;
 	std::vector<std::vector<size_t>> clusters;
+	std::vector<size_t> reverse_clusters;
 	std::vector<std::vector<size_t>> hadj_bottom_projected;
 	void _store_vector(const vec<T>& v);
 	void _build();
@@ -79,6 +80,10 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
 									 const std::vector<size_t>& entry_points, size_t k);
+	std::vector<std::pair<T, size_t>>
+	query_k_at_bottom_via_clusters(const vec<T>& q, size_t layer,
+																 const std::vector<size_t>& entry_points,
+																 size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	const std::string _name() {
 		return use_cuts ? "EHNSW Engine Basic Fast Cluster-Chunks"
@@ -292,7 +297,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		}
 		// TODO make use of min/max sizes
 	}
-	std::vector<size_t> reverse_clusters(all_entries.size());
+	reverse_clusters.resize(all_entries.size());
 	for (size_t i = 0; i < clusters.size(); ++i) {
 		for (size_t j : clusters[i])
 			reverse_clusters[j] = i;
@@ -454,6 +459,157 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_layer(
 }
 
 template <typename T>
+std::vector<std::pair<T, size_t>>
+ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
+		const vec<T>& q, size_t layer,
+		const std::vector<size_t>& non_cluster_entry_points, size_t k) {
+	using measured_data = std::pair<T, size_t>;
+
+	auto worst_elem = [](const measured_data& a, const measured_data& b) {
+		return a.first < b.first;
+	};
+	auto best_elem = [](const measured_data& a, const measured_data& b) {
+		return a.first > b.first;
+	};
+	std::vector<measured_data> entry_points_with_dist;
+	std::vector<measured_data> non_cluster_entry_points_with_dist;
+	for (auto& entry_point : non_cluster_entry_points) {
+#ifdef RECORD_STATS
+		++num_distcomps;
+		++num_distcomps;
+#endif
+		size_t cluster_index = reverse_clusters[entry_point];
+		entry_points_with_dist.emplace_back(dist2(q, centroids[cluster_index]),
+																				cluster_index);
+		non_cluster_entry_points_with_dist.emplace_back(
+				dist2(q, all_entries[entry_point]), entry_point);
+	}
+
+	std::priority_queue<measured_data, std::vector<measured_data>,
+											decltype(best_elem)>
+			candidates(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+								 best_elem);
+	std::priority_queue<measured_data, std::vector<measured_data>,
+											decltype(worst_elem)>
+			nearest(non_cluster_entry_points_with_dist.begin(),
+							non_cluster_entry_points_with_dist.end(), worst_elem);
+	while (nearest.size() > k)
+		nearest.pop();
+
+	for (auto& [_, cluster_entry_point] : entry_points_with_dist) {
+		visited[cluster_entry_point] = true;
+		visited_recent.emplace_back(cluster_entry_point);
+	}
+
+	while (!candidates.empty()) {
+		auto cur = candidates.top();
+		candidates.pop();
+		// if (cur.first > nearest.top().first && nearest.size() == k) {
+		//	break;
+		// }
+		// std::vector<size_t> neighbour_list;
+		// for (size_t cluster_neighbour : hadj_bottom_projected[cur.second]) {
+		//	for (size_t neighbour : clusters[cluster_neighbour]) {
+		//		if (!visited[neighbour]) {
+		//			neighbour_list.emplace_back(neighbour);
+		//			visited[neighbour] = true;
+		//			visited_recent.emplace_back(neighbour);
+		//		}
+		//		// visited[cluster_neighbour] = true;
+		//		// visited_recent.emplace_back(cluster_neighbour);
+		//	}
+		//}
+		std::vector<size_t> cluster_neighbour_list;
+		const auto& member_list = clusters[cur.second];
+		auto loop_with_prefetches =
+				[&](const std::vector<size_t>& member_list,
+						const std::vector<vec<T>>& vec_list,
+						std::function<void(const size_t&)> inner_loop_fn) {
+					constexpr size_t in_advance = 4;
+					constexpr size_t in_advance_extra = 2;
+					auto do_loop_prefetch = [&](size_t i) constexpr {
+#ifdef DIM
+						for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
+							_mm_prefetch(((char*)&vec_list[member_list[i]]) + mult * 64,
+													 _MM_HINT_T0);
+#endif
+					};
+					for (size_t next_i_pre = 0;
+							 next_i_pre < std::min(in_advance, member_list.size());
+							 ++next_i_pre) {
+						do_loop_prefetch(next_i_pre);
+					}
+					auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
+							size_t next_i) constexpr {
+						if constexpr (inAdvanceIterExtra) {
+							_mm_prefetch(&member_list[next_i + in_advance + in_advance_extra],
+													 _MM_HINT_T0);
+						}
+						if constexpr (inAdvanceIter) {
+							do_loop_prefetch(next_i + in_advance);
+						}
+						const auto& next = member_list[next_i];
+						inner_loop_fn(next);
+					};
+					size_t next_i = 0;
+					for (; next_i + in_advance + in_advance_extra < member_list.size();
+							 ++next_i) {
+						loop_iter.template operator()<true, true>(next_i);
+					}
+					for (; next_i + in_advance < member_list.size(); ++next_i) {
+						loop_iter.template operator()<true, false>(next_i);
+					}
+					for (; next_i < member_list.size(); ++next_i) {
+						loop_iter.template operator()<false, false>(next_i);
+					}
+				};
+		loop_with_prefetches(
+				clusters[cur.second], all_entries, [&](const size_t& next) {
+#ifdef RECORD_STATS
+					++num_distcomps;
+#endif
+					T d_next = dist2(q, all_entries[next]);
+					if (nearest.size() < k || d_next < nearest.top().first) {
+						nearest.emplace(d_next, next);
+						if (nearest.size() > k)
+							nearest.pop();
+						for (size_t cluster_index : hadj_bottom_projected[next]) {
+							if (!visited[cluster_index]) {
+								cluster_neighbour_list.emplace_back(cluster_index);
+								visited[cluster_index] = true;
+								visited_recent.emplace_back(cluster_index);
+							}
+						}
+					}
+				});
+		// early termination condition (full nearest + no new candidate clusters
+		// found, so current cluster exploration was bad)
+		// TODO consider removing this entirely for potentially better performance
+		// TODO if removing it, limit size of candidates list instead (to top k)
+		if (cluster_neighbour_list.empty() && nearest.size() == k)
+			break;
+		loop_with_prefetches(cluster_neighbour_list, centroids,
+												 [&](const size_t& next) {
+#ifdef RECORD_STATS
+													 ++num_distcomps;
+#endif
+													 T d_next = dist2(q, centroids[next]);
+													 candidates.emplace(d_next, next);
+												 });
+	}
+	for (auto& v : visited_recent)
+		visited[v] = false;
+	visited_recent.clear();
+	std::vector<measured_data> ret;
+	while (!nearest.empty()) {
+		ret.emplace_back(nearest.top());
+		nearest.pop();
+	}
+	reverse(ret.begin(), ret.end());
+	return ret;
+}
+
+template <typename T>
 std::vector<size_t>
 ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 	size_t entry_point = starting_vertex;
@@ -480,8 +636,10 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 		}
 	}
 
+	// auto ret_combined =
+	//		query_k_at_layer<true, true>(q, 0, {entry_point}, k * ef_search_mult);
 	auto ret_combined =
-			query_k_at_layer<true, true>(q, 0, {entry_point}, k * ef_search_mult);
+			query_k_at_bottom_via_clusters(q, 0, {entry_point}, k * ef_search_mult);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;
