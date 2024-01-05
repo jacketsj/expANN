@@ -504,23 +504,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
 		candidates.pop();
-		// if (cur.first > nearest.top().first && nearest.size() == k) {
-		//	break;
-		// }
-		// std::vector<size_t> neighbour_list;
-		// for (size_t cluster_neighbour : hadj_bottom_projected[cur.second]) {
-		//	for (size_t neighbour : clusters[cluster_neighbour]) {
-		//		if (!visited[neighbour]) {
-		//			neighbour_list.emplace_back(neighbour);
-		//			visited[neighbour] = true;
-		//			visited_recent.emplace_back(neighbour);
-		//		}
-		//		// visited[cluster_neighbour] = true;
-		//		// visited_recent.emplace_back(cluster_neighbour);
-		//	}
-		//}
 		std::vector<size_t> cluster_neighbour_list;
-		const auto& member_list = clusters[cur.second];
 		auto loop_with_prefetches =
 				[&](const std::vector<size_t>& member_list,
 						const std::vector<vec<T>>& vec_list,
