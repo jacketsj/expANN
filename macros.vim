@@ -1,4 +1,5 @@
 nmap <leader>f :term ++shell ./build.sh && build/expann<CR>
+nmap <leader>F :term ++shell bashcord "./build.sh && build/expann" --config bashcord_config.json<CR>
 nmap <leader>d :term ++shell ./build.sh && gdbgui build/expann<CR>
 nmap <leader>D :term ++shell ./build.sh && rr record build/expann; gdbgui --gdb-cmd "rr replay --"<CR>
 nmap <leader>p :term ++shell python3 src/pyplotter.py<CR>
