@@ -137,7 +137,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 60; k <= 60; k += 20) {
-		for (size_t num_for_1nn = 6; num_for_1nn <= 6; num_for_1nn += 3) {
+		for (size_t num_for_1nn = 3; num_for_1nn <= 5; num_for_1nn += 1) {
 			for (bool use_cuts : {false, true}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
