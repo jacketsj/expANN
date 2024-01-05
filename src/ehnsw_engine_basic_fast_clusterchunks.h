@@ -280,6 +280,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		for (auto& v : centroids)
 			sub_engine.store_vector(v);
 		sub_engine.build();
+		clusters.clear();
 		clusters.resize(centroids.size());
 		for (size_t i = 0; i < all_entries.size(); ++i) {
 			clusters[sub_engine.query_k(all_entries[i], 1)[0]].emplace_back(i);
