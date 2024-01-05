@@ -486,7 +486,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 		T d_entry_point = dist2(q, all_entries[entry_point]);
 		size_t cluster_index = reverse_clusters[entry_point];
 		entry_points_with_dist.emplace_back(d_entry_point, cluster_index);
-		checked_cluster_distance[cluster_index] = 0;
+		checked_cluster_distance[cluster_index] = d_entry_point;
 		checked_cluster_recent.emplace_back(cluster_index);
 		non_cluster_entry_points_with_dist.emplace_back(d_entry_point, entry_point);
 	}
