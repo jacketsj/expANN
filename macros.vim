@@ -1,5 +1,5 @@
 nmap <leader>f :term ++shell ./build.sh && build/expann<CR>
-nmap <leader>F :term ++shell python3 ~/proj/bashcord/bashcord.py "./build.sh && build/expann" --config bashcord_config.json --files plots/newyearnewdata_sift_k_10/*.png<CR>
+nmap <leader>F :term ++shell ./build.sh && python3 ~/proj/bashcord/bashcord.py "build/expann" --config bashcord_config.json --files plots/newyearnewdata_sift_k_10/*.png<CR>
 nmap <leader>d :term ++shell ./build.sh && gdbgui build/expann<CR>
 nmap <leader>D :term ++shell ./build.sh && rr record build/expann; gdbgui --gdb-cmd "rr replay --"<CR>
 nmap <leader>p :term ++shell python3 src/pyplotter.py<CR>
