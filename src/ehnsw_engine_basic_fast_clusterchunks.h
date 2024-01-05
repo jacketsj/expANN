@@ -492,8 +492,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 								 best_elem);
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(worst_elem)>
-			nearest(non_cluster_entry_points_with_dist.begin(),
-							non_cluster_entry_points_with_dist.end(), worst_elem);
+			nearest(worst_elem);
 	while (nearest.size() > k)
 		nearest.pop();
 
