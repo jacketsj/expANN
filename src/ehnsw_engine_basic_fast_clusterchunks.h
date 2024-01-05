@@ -372,11 +372,14 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_layer(
 		std::vector<size_t> neighbour_list;
 		if constexpr (use_clusters && use_bottomlayer) {
 			for (size_t cluster_neighbour : hadj_bottom_projected[cur.second]) {
-				if (!visited[cluster_neighbour]) {
-					for (size_t neighbour : clusters[cluster_neighbour])
+				for (size_t neighbour : clusters[cluster_neighbour]) {
+					if (!visited[neighbour]) {
 						neighbour_list.emplace_back(neighbour);
-					visited[cluster_neighbour] = true;
-					visited_recent.emplace_back(cluster_neighbour);
+						visited[neighbour] = true;
+						visited_recent.emplace_back(neighbour);
+					}
+					// visited[cluster_neighbour] = true;
+					// visited_recent.emplace_back(cluster_neighbour);
 				}
 			}
 		} else
