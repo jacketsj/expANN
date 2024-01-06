@@ -23,13 +23,16 @@ struct ehnsw_engine_basic_fast_clusterchunks_config {
 	bool use_cuts;
 	size_t min_cluster_size;
 	size_t max_cluster_size;
+	bool use_sub_engine_queries;
 	ehnsw_engine_basic_fast_clusterchunks_config(
 			size_t _M, size_t _M0, size_t _ef_search_mult, size_t _ef_construction,
-			bool _use_cuts, size_t _min_cluster_size, size_t _max_cluster_size)
+			bool _use_cuts, size_t _min_cluster_size, size_t _max_cluster_size,
+			bool _use_sub_engine_queries)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), use_cuts(_use_cuts),
 				min_cluster_size(_min_cluster_size),
-				max_cluster_size(_max_cluster_size) {}
+				max_cluster_size(_max_cluster_size),
+				use_sub_engine_queries(_use_sub_engine_queries) {}
 };
 
 template <typename T>
@@ -46,6 +49,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	bool use_cuts;
 	size_t min_cluster_size;
 	size_t max_cluster_size;
+	bool use_sub_engine_queries;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -59,7 +63,8 @@ struct ehnsw_engine_basic_fast_clusterchunks
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), use_cuts(conf.use_cuts),
 				min_cluster_size(conf.min_cluster_size),
-				max_cluster_size(conf.max_cluster_size), max_layer(0) {}
+				max_cluster_size(conf.max_cluster_size),
+				use_sub_engine_queries(conf.use_sub_engine_queries), max_layer(0) {}
 	using config = ehnsw_engine_basic_fast_clusterchunks_config;
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
@@ -70,6 +75,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	std::vector<vec<T>> centroids;
 	std::vector<std::vector<size_t>> clusters;
+	std::vector<std::unique_ptr<ehnsw_engine_basic_fast<T>>> cluster_sub_engines;
 	std::vector<size_t> reverse_clusters;
 	std::vector<std::vector<size_t>> hadj_bottom_projected;
 	void _store_vector(const vec<T>& v);
@@ -84,6 +90,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T>& q, size_t layer,
 									 const std::vector<size_t>& entry_points, size_t k);
+	template <bool enable_cluster_sub_engines>
 	std::vector<std::pair<T, size_t>>
 	query_k_at_bottom_via_clusters(const vec<T>& q, size_t layer,
 																 const std::vector<size_t>& entry_points,
@@ -102,6 +109,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 		add_param(pl, use_cuts);
 		add_param(pl, min_cluster_size);
 		add_param(pl, max_cluster_size);
+		add_param(pl, use_sub_engine_queries);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 		add_param(pl, total_projected_degree);
@@ -345,6 +353,17 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		for (size_t j : clusters[i])
 			reverse_clusters[j] = i;
 	}
+	if (use_sub_engine_queries)
+		for (size_t cluster_index = 0; cluster_index < clusters.size();
+				 ++cluster_index) {
+			cluster_sub_engines.emplace_back(
+					std::make_unique<ehnsw_engine_basic_fast<T>>(
+							ehnsw_engine_basic_fast_config(M, M0, ef_search_mult,
+																						 ef_construction, use_cuts)));
+			for (auto& v_index : clusters[cluster_index])
+				cluster_sub_engines[cluster_index]->store_vector(all_entries[v_index]);
+			cluster_sub_engines[cluster_index]->build();
+		}
 
 	hadj_bottom_projected.resize(all_entries.size());
 	for (size_t i = 0; i < all_entries.size(); ++i) {
@@ -502,6 +521,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_layer(
 }
 
 template <typename T>
+template <bool enable_cluster_sub_engines>
 std::vector<std::pair<T, size_t>>
 ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 		const vec<T>& q, size_t layer,
@@ -522,9 +542,17 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 		size_t cluster_index = reverse_clusters[entry_point];
 		visited[cluster_index] = true;
 		visited_recent.emplace_back(cluster_index);
-		for (size_t entry_index : clusters[cluster_index]) {
-			T d_entry_index = dist2(q, all_entries[entry_index]);
-			entry_points_with_dist.emplace_back(d_entry_index, entry_index);
+		if constexpr (!enable_cluster_sub_engines) {
+			for (size_t entry_index : clusters[cluster_index]) {
+				T d_entry_index = dist2(q, all_entries[entry_index]);
+				entry_points_with_dist.emplace_back(d_entry_index, entry_index);
+			}
+		} else {
+			for (const auto& [d_entry_index, entry_index] :
+					 cluster_sub_engines[cluster_index]->query_k_combined(q, k)) {
+				entry_points_with_dist.emplace_back(
+						d_entry_index, clusters[cluster_index][entry_index]);
+			}
 		}
 	}
 
@@ -596,25 +624,36 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 				++total_clusters_checked;
 				total_clusters_checked_sizes += clusters[cluster_index].size();
 #endif
-				loop_with_prefetches(
-						clusters[cluster_index], all_entries, [&](const size_t& next) {
+				if constexpr (enable_cluster_sub_engines) {
+					for (const auto& [d_next, sub_next] :
+							 cluster_sub_engines[cluster_index]->query_k_combined(q, k)) {
+						if (nearest.size() < k || d_next < nearest.top().first) {
+							auto next = clusters[cluster_index][sub_next];
+							nearest.emplace(d_next, next);
+							if (nearest.size() > k)
+								nearest.pop();
+							// found_continuation = true;
+							candidates.emplace(d_next, next);
+						}
+					}
+				} else {
+					loop_with_prefetches(
+							clusters[cluster_index], all_entries, [&](const size_t& next) {
 #ifdef RECORD_STATS
-							++num_distcomps;
+								++num_distcomps;
 #endif
-							T d_next = dist2(q, all_entries[next]);
-							if (nearest.size() < k || d_next < nearest.top().first) {
-								nearest.emplace(d_next, next);
-								if (nearest.size() > k)
-									nearest.pop();
-								// found_continuation = true;
-								candidates.emplace(d_next, next);
-							}
-						});
+								T d_next = dist2(q, all_entries[next]);
+								if (nearest.size() < k || d_next < nearest.top().first) {
+									nearest.emplace(d_next, next);
+									if (nearest.size() > k)
+										nearest.pop();
+									// found_continuation = true;
+									candidates.emplace(d_next, next);
+								}
+							});
+				}
 			}
 		}
-		// if (!found_continuation) {
-		// 	break;
-		// }
 	}
 	for (auto& v : visited_recent)
 		visited[v] = false;
@@ -657,8 +696,11 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 
 	// auto ret_combined =
 	// 		query_k_at_layer<true, true>(q, 0, {entry_point}, k * ef_search_mult);
-	auto ret_combined =
-			query_k_at_bottom_via_clusters(q, 0, {entry_point}, k * ef_search_mult);
+	auto ret_combined = use_sub_engine_queries
+													? query_k_at_bottom_via_clusters<true>(
+																q, 0, {entry_point}, k * ef_search_mult)
+													: query_k_at_bottom_via_clusters<false>(
+																q, 0, {entry_point}, k * ef_search_mult);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;
