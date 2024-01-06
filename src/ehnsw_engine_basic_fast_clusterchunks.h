@@ -573,13 +573,13 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 						if (nearest.size() > k)
 							nearest.pop();
 						for (size_t cluster_index : hadj_bottom_projected[next]) {
-							candidates.emplace(d_next, cluster_index);
-							checked_cluster_recent.emplace_back(cluster_index);
-							// if (checked_cluster_distance[cluster_index] > d_next) {
-							//	checked_cluster_recent.emplace_back(cluster_index);
-							//	checked_cluster_distance[cluster_index] = d_next;
-							//	candidates.emplace(d_next, cluster_index);
-							// }
+							// candidates.emplace(d_next, cluster_index);
+							// checked_cluster_recent.emplace_back(cluster_index);
+							if (checked_cluster_distance[cluster_index] > d_next) {
+								checked_cluster_recent.emplace_back(cluster_index);
+								checked_cluster_distance[cluster_index] = d_next;
+								candidates.emplace(d_next, cluster_index);
+							}
 						}
 					}
 				});
