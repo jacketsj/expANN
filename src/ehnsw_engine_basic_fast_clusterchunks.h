@@ -48,6 +48,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
+	size_t total_projected_degree;
 #endif
 	ehnsw_engine_basic_fast_clusterchunks(
 			ehnsw_engine_basic_fast_clusterchunks_config conf)
@@ -102,6 +103,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 		add_param(pl, max_cluster_size);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
+		add_param(pl, total_projected_degree);
 #endif
 		return pl;
 	}
@@ -269,6 +271,9 @@ void ehnsw_engine_basic_fast_clusterchunks<T>::_store_vector(const vec<T>& v) {
 
 template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 	assert(all_entries.size() > 0);
+#ifdef RECORD_STATS
+	total_projected_degree = 0;
+#endif
 
 	// start by setting centroids to the values of the second-to-last layer
 	for (size_t i = 0; i < all_entries.size(); ++i) {
@@ -316,6 +321,9 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 				added.insert(cluster_index);
 			}
 		}
+#ifdef RECORD_STATS
+		total_projected_degree += hadj_bottom_projected[i].size();
+#endif
 	}
 
 	checked_cluster_distance =
@@ -389,8 +397,6 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_layer(
 						visited[neighbour] = true;
 						visited_recent.emplace_back(neighbour);
 					}
-					// visited[cluster_neighbour] = true;
-					// visited_recent.emplace_back(cluster_neighbour);
 				}
 			}
 		} else
@@ -408,7 +414,6 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_layer(
 				_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
 										 _MM_HINT_T0);
 #endif
-			//_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
 		};
 		for (size_t next_i_pre = 0;
 				 next_i_pre < std::min(in_advance, neighbour_list.size());
@@ -555,6 +560,8 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 						loop_iter.template operator()<false, false>(next_i);
 					}
 				};
+		size_t num_unadded_clusters = checked_cluster_recent.size();
+		bool already_saturated = nearest.size() == k;
 		loop_with_prefetches(
 				clusters[cur.second], all_entries, [&](const size_t& next) {
 #ifdef RECORD_STATS
@@ -566,12 +573,13 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 						if (nearest.size() > k)
 							nearest.pop();
 						for (size_t cluster_index : hadj_bottom_projected[next]) {
-							if (checked_cluster_distance[cluster_index] > d_next) {
-								checked_cluster_distance[cluster_index] = d_next;
-								checked_cluster_recent.emplace_back(cluster_index);
-								cluster_neighbour_list.emplace_back(cluster_index);
-								candidates.emplace(d_next, cluster_index);
-							}
+							candidates.emplace(d_next, cluster_index);
+							checked_cluster_recent.emplace_back(cluster_index);
+							// if (checked_cluster_distance[cluster_index] > d_next) {
+							//	checked_cluster_recent.emplace_back(cluster_index);
+							//	checked_cluster_distance[cluster_index] = d_next;
+							//	candidates.emplace(d_next, cluster_index);
+							// }
 						}
 					}
 				});
@@ -579,11 +587,10 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 		// found, so current cluster exploration was bad)
 		// TODO consider removing this entirely for potentially better performance
 		// TODO if removing it, limit size of candidates list instead (to top k)
-		if (cluster_neighbour_list.empty() && nearest.size() == k)
+		if (num_unadded_clusters == checked_cluster_recent.size() &&
+				already_saturated)
 			break;
 	}
-	std::vector<T> checked_cluster_distance;
-	std::vector<size_t> checked_cluster_recent;
 	for (auto& c : checked_cluster_recent)
 		checked_cluster_distance[c] = std::numeric_limits<T>::max();
 	checked_cluster_recent.clear();
