@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "ann_engine.h"
+#include "randomgeometry.h"
 #include "robin_hood.h"
 #include "topk_t.h"
 
@@ -282,7 +283,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 			centroids.emplace_back(all_entries[i]);
 		}
 	}
-	for (size_t iter = 0; iter < 30; ++iter) {
+	auto assign_to_clusters = [&]() {
 		ehnsw_engine_basic_fast<T> sub_engine(ehnsw_engine_basic_fast_config(
 				M, M0, ef_search_mult, ef_construction, use_cuts));
 		for (auto& v : centroids)
@@ -293,6 +294,35 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		for (size_t i = 0; i < all_entries.size(); ++i) {
 			clusters[sub_engine.query_k(all_entries[i], 1)[0]].emplace_back(i);
 		}
+	};
+	const size_t max_iters = 30;
+	for (size_t iter = 0; iter < max_iters; ++iter) {
+		assign_to_clusters();
+		// loosely enforce min/max cluster sizes
+		std::vector<std::vector<size_t>> clusters_new;
+		vec_generator<T> rvgen(all_entries[0].size());
+		for (size_t cluster_index = 0; cluster_index < clusters.size();
+				 ++cluster_index) {
+			// enforce min cluster size by deleting small clusters
+			if (clusters[cluster_index].size() >= min_cluster_size) {
+				// enforce max cluster size by splitting big clusters
+				if (clusters[cluster_index].size() <= max_cluster_size) {
+					clusters_new.emplace_back(clusters[cluster_index]);
+				} else {
+					// partition with a random hyperplane
+					auto project_vec = rvgen.random_vec(); // normal vector of hyperplane
+					clusters_new.emplace_back();
+					clusters_new.emplace_back();
+					for (size_t entry_index : clusters[cluster_index]) {
+						clusters_new[clusters_new.size() - 1 -
+												 ((all_entries[entry_index] - centroids[cluster_index])
+															.dot(project_vec) > 0)]
+								.emplace_back(entry_index);
+					}
+				}
+			}
+		}
+		clusters = clusters_new;
 		for (size_t centroid_index = 0; centroid_index < centroids.size();
 				 ++centroid_index) {
 			auto& centroid = centroids[centroid_index];
@@ -304,8 +334,8 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 				centroid /= clusters[centroid_index].size();
 			}
 		}
-		// TODO make use of min/max sizes
 	}
+	assign_to_clusters();
 	reverse_clusters.resize(all_entries.size());
 	for (size_t i = 0; i < clusters.size(); ++i) {
 		for (size_t j : clusters[i])
