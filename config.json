@@ -1,6 +1,6 @@
 {
   "dataset": "Sift1M",
   "ds_name": "newyearnewdata_sift_k_10",
-  "num_threads": 6,
+  "num_threads": 8,
   "k": 10
 }
