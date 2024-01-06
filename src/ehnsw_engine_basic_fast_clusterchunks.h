@@ -51,6 +51,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	size_t num_distcomps;
 	size_t total_projected_degree;
 	size_t total_clusters_checked;
+	size_t total_clusters_checked_sizes;
 #endif
 	ehnsw_engine_basic_fast_clusterchunks(
 			ehnsw_engine_basic_fast_clusterchunks_config conf)
@@ -105,6 +106,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 		add_param(pl, num_distcomps);
 		add_param(pl, total_projected_degree);
 		add_param(pl, total_clusters_checked);
+		add_param(pl, total_clusters_checked_sizes);
 #endif
 		return pl;
 	}
@@ -275,6 +277,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 #ifdef RECORD_STATS
 	total_projected_degree = 0;
 	total_clusters_checked = 0;
+	total_clusters_checked_sizes = 0;
 #endif
 
 	// start by setting centroids to the values of the second-to-last layer
@@ -539,6 +542,9 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
 		candidates.pop();
+		if (cur.first > nearest.top().first && nearest.size() == k) {
+			break;
+		}
 		auto loop_with_prefetches =
 				[&](const std::vector<size_t>& member_list,
 						const std::vector<vec<T>>& vec_list,
@@ -581,13 +587,14 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 						loop_iter.template operator()<false, false>(next_i);
 					}
 				};
-		bool found_continuation = nearest.size() < k;
+		// bool found_continuation = nearest.size() < k;
 		for (size_t cluster_index : hadj_bottom_projected[cur.second]) {
 			if (!visited[cluster_index]) {
 				visited[cluster_index] = true;
 				visited_recent.emplace_back(cluster_index);
 #ifdef RECORD_STATS
 				++total_clusters_checked;
+				total_clusters_checked_sizes += clusters[cluster_index].size();
 #endif
 				loop_with_prefetches(
 						clusters[cluster_index], all_entries, [&](const size_t& next) {
@@ -599,15 +606,15 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 								nearest.emplace(d_next, next);
 								if (nearest.size() > k)
 									nearest.pop();
-								found_continuation = true;
+								// found_continuation = true;
 								candidates.emplace(d_next, next);
 							}
 						});
 			}
 		}
-		if (!found_continuation) {
-			break;
-		}
+		// if (!found_continuation) {
+		// 	break;
+		// }
 	}
 	for (auto& v : visited_recent)
 		visited[v] = false;
@@ -649,7 +656,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 	}
 
 	// auto ret_combined =
-	//		query_k_at_layer<true, true>(q, 0, {entry_point}, k * ef_search_mult);
+	// 		query_k_at_layer<true, true>(q, 0, {entry_point}, k * ef_search_mult);
 	auto ret_combined =
 			query_k_at_bottom_via_clusters(q, 0, {entry_point}, k * ef_search_mult);
 	if (ret_combined.size() > k)
