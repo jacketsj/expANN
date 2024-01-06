@@ -46,6 +46,7 @@ template <typename Engine, typename EngineConfig> struct job {
 
 			std::printf("Running job %zu/%zu (tid=%zu): %s\n", job_index + 1,
 									total_jobs, thread_id, meta.c_str());
+			fflush(stdout);
 			result = basic_benchmarker.get_benchmark_data(eng);
 
 			std::string res_str = std::holds_alternative<bench_data>(result)
@@ -55,6 +56,7 @@ template <typename Engine, typename EngineConfig> struct job {
 			std::printf("Completed job %zu/%zu (tid=%zu): %s\nResult:%s\n",
 									job_index + 1, total_jobs, thread_id, meta.c_str(),
 									res_str.c_str());
+			fflush(stdout);
 		}
 	}
 };
@@ -136,7 +138,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 hnsw_engine_reference<float>, ensg_engine<float>>
 			job_lists;
 
-	for (size_t k = 60; k <= 60; k += 20) {
+	for (size_t k = 60; k <= 80; k += 20) {
 		for (size_t num_for_1nn = 3; num_for_1nn <= 5; num_for_1nn += 1) {
 			for (bool use_cuts : {false, true}) {
 				if (false) {
@@ -144,7 +146,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 				}
 			}
 			for (size_t edge_count_search_factor : {3}) {
-				for (bool use_cuts : {false}) {
+				for (bool use_cuts : {true, false}) {
 					if (true) {
 						ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 										k * edge_count_search_factor, use_cuts);
