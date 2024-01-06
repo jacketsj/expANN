@@ -323,6 +323,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 			}
 		}
 		clusters = clusters_new;
+		centroids.resize(clusters.size());
 		for (size_t centroid_index = 0; centroid_index < centroids.size();
 				 ++centroid_index) {
 			auto& centroid = centroids[centroid_index];
