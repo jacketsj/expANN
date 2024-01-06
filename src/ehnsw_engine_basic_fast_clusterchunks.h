@@ -49,6 +49,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 #ifdef RECORD_STATS
 	size_t num_distcomps;
 	size_t total_projected_degree;
+	size_t total_clusters_checked;
 #endif
 	ehnsw_engine_basic_fast_clusterchunks(
 			ehnsw_engine_basic_fast_clusterchunks_config conf)
@@ -102,6 +103,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 		add_param(pl, total_projected_degree);
+		add_param(pl, total_clusters_checked);
 #endif
 		return pl;
 	}
@@ -271,6 +273,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 	assert(all_entries.size() > 0);
 #ifdef RECORD_STATS
 	total_projected_degree = 0;
+	total_clusters_checked = 0;
 #endif
 
 	// start by setting centroids to the values of the second-to-last layer
@@ -552,6 +555,9 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 			if (!visited[cluster_index]) {
 				visited[cluster_index] = true;
 				visited_recent.emplace_back(cluster_index);
+#ifdef RECORD_STATS
+				++total_clusters_checked;
+#endif
 				loop_with_prefetches(
 						clusters[cluster_index], all_entries, [&](const size_t& next) {
 #ifdef RECORD_STATS
