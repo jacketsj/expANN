@@ -108,6 +108,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 		add_param(pl, use_cuts);
 		add_param(pl, min_cluster_size);
 		add_param(pl, max_cluster_size);
+		add_param(pl, very_early_termination);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 		add_param(pl, total_projected_degree);
