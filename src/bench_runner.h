@@ -154,12 +154,15 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					for (size_t min_cluster_size : {8}) { // 32
 						for (size_t max_cluster_size : {min_cluster_size * 4}) {
 							for (bool very_early_termination : {false}) {
-								for (bool use_clusters_data : {false, true}) {
-									if (true) {
-										ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>, k,
-														2 * k, num_for_1nn, k * edge_count_search_factor,
-														use_cuts, min_cluster_size, max_cluster_size,
-														very_early_termination, use_clusters_data);
+								for (bool use_clusters_data : {true}) {
+									for (bool minimize_noncluster_edges : {false, true}) {
+										if (true) {
+											ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>, k,
+															2 * k, num_for_1nn, k * edge_count_search_factor,
+															use_cuts, min_cluster_size, max_cluster_size,
+															very_early_termination, use_clusters_data,
+															minimize_noncluster_edges);
+										}
 									}
 								}
 							}

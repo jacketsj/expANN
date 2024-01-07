@@ -26,16 +26,19 @@ struct ehnsw_engine_basic_fast_clusterchunks_config {
 	size_t max_cluster_size;
 	bool very_early_termination;
 	bool use_clusters_data;
+	bool minimize_noncluster_edges;
 	ehnsw_engine_basic_fast_clusterchunks_config(
 			size_t _M, size_t _M0, size_t _ef_search_mult, size_t _ef_construction,
 			bool _use_cuts, size_t _min_cluster_size, size_t _max_cluster_size,
-			bool _very_early_termination, bool _use_clusters_data)
+			bool _very_early_termination, bool _use_clusters_data,
+			bool _minimize_noncluster_edges)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), use_cuts(_use_cuts),
 				min_cluster_size(_min_cluster_size),
 				max_cluster_size(_max_cluster_size),
 				very_early_termination(_very_early_termination),
-				use_clusters_data(_use_clusters_data) {}
+				use_clusters_data(_use_clusters_data),
+				minimize_noncluster_edges(_minimize_noncluster_edges) {}
 };
 
 template <typename T>
@@ -54,6 +57,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	size_t max_cluster_size;
 	bool very_early_termination;
 	bool use_clusters_data;
+	bool minimize_noncluster_edges;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -69,7 +73,9 @@ struct ehnsw_engine_basic_fast_clusterchunks
 				min_cluster_size(conf.min_cluster_size),
 				max_cluster_size(conf.max_cluster_size),
 				very_early_termination(conf.very_early_termination),
-				use_clusters_data(conf.use_clusters_data), max_layer(0) {}
+				use_clusters_data(conf.use_clusters_data),
+				minimize_noncluster_edges(conf.minimize_noncluster_edges),
+				max_layer(0) {}
 	using config = ehnsw_engine_basic_fast_clusterchunks_config;
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
@@ -115,6 +121,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 		add_param(pl, max_cluster_size);
 		add_param(pl, very_early_termination);
 		add_param(pl, use_clusters_data);
+		add_param(pl, minimize_noncluster_edges);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 		add_param(pl, total_projected_degree);
@@ -357,6 +364,43 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 	for (size_t i = 0; i < clusters.size(); ++i) {
 		for (size_t j : clusters[i])
 			reverse_clusters[j] = i;
+	}
+	if (minimize_noncluster_edges) {
+		for (size_t i = 0; i < 30; ++i) {
+			std::vector<size_t> next_reverse_clusters(all_entries.size());
+			// sort clusters by decreasing size
+			std::vector<std::pair<size_t, size_t>> cluster_order;
+			for (size_t i = 0; i < clusters.size(); ++i) {
+				cluster_order.emplace_back(clusters[i].size(), i);
+			}
+			std::sort(cluster_order.rbegin(), cluster_order.rend());
+			for (auto [_, cluster_index] : cluster_order) {
+				for (size_t data_index : clusters[cluster_index]) {
+					// decide if data_index should be moved to a different cluster
+					robin_hood::unordered_flat_map<size_t, size_t> cluster_move_votes;
+					cluster_move_votes[cluster_index] = 1;
+					for (size_t adjacent_data_index : hadj_bottom[data_index]) {
+						size_t adjacent_cluster_index =
+								reverse_clusters[adjacent_data_index];
+						if (clusters[adjacent_cluster_index].size() < max_cluster_size)
+							++cluster_move_votes[adjacent_cluster_index];
+					}
+					next_reverse_clusters[cluster_index] =
+							std::max_element(cluster_move_votes.begin(),
+															 cluster_move_votes.end(),
+															 [](const auto& a, const auto& b) {
+																 return a.second < b.second;
+															 })
+									->first;
+				}
+			}
+			reverse_clusters = next_reverse_clusters;
+		}
+		clusters.clear();
+		clusters.resize(centroids.size());
+		for (size_t data_index = 0; data_index < all_entries.size(); ++data_index) {
+			clusters[reverse_clusters[data_index]].emplace_back(data_index);
+		}
 	}
 	if (use_clusters_data) {
 		for (size_t cluster_index = 0; cluster_index < clusters.size();
