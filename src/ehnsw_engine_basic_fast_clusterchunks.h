@@ -386,7 +386,8 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 					for (size_t adjacent_data_index : hadj_bottom[data_index]) {
 						size_t adjacent_cluster_index =
 								reverse_clusters[adjacent_data_index];
-						if (clusters[adjacent_cluster_index].size() < max_cluster_size)
+						if (clusters[adjacent_cluster_index].size() <
+								clusters[cluster_index].size())
 							++cluster_move_votes[adjacent_cluster_index];
 					}
 					next_reverse_clusters[data_index] =
