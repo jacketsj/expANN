@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <queue>
 #include <random>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -528,10 +529,10 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 		}
 	}
 
-	std::priority_queue<measured_data, std::vector<measured_data>,
-											decltype(best_elem)>
-			candidates(entry_points_with_dist.begin(), entry_points_with_dist.end(),
-								 best_elem);
+	//, std::vector<measured_data>, decltype(best_elem)>
+	//, best_elem);
+	std::set<measured_data> candidates(entry_points_with_dist.begin(),
+																		 entry_points_with_dist.end());
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(worst_elem)>
 			nearest(entry_points_with_dist.begin(), entry_points_with_dist.end(),
@@ -540,8 +541,8 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 		nearest.pop();
 
 	while (!candidates.empty()) {
-		auto cur = candidates.top();
-		candidates.pop();
+		auto cur = candidates.extract(candidates.begin()).value();
+		// candidates.pop_front();
 		if (cur.first > nearest.top().first && nearest.size() == k) {
 			break;
 		}
@@ -611,6 +612,8 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 							}
 						});
 			}
+			while (candidates.size() > k)
+				candidates.erase(std::prev(candidates.end()));
 		}
 		// if (!found_continuation) {
 		// 	break;
