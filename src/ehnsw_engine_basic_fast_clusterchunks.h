@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <iostream>
 #include <queue>
 #include <random>
 #include <set>
@@ -319,11 +320,11 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		}
 	};
 	const size_t max_iters = 30;
+	vec_generator<T> rvgen(all_entries[0].size());
 	for (size_t iter = 0; iter < max_iters; ++iter) {
 		assign_to_clusters();
 		// loosely enforce min/max cluster sizes
 		std::vector<std::vector<size_t>> clusters_new;
-		vec_generator<T> rvgen(all_entries[0].size());
 		for (size_t cluster_index = 0; cluster_index < clusters.size();
 				 ++cluster_index) {
 			// enforce min cluster size by deleting small clusters
@@ -366,8 +367,11 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 			reverse_clusters[j] = i;
 	}
 	if (minimize_noncluster_edges) {
+		std::cout << "About to start minimizing noncluster edges" << std::endl;
+		std::vector<size_t> next_reverse_clusters(all_entries.size());
 		for (size_t i = 0; i < 30; ++i) {
-			std::vector<size_t> next_reverse_clusters(all_entries.size());
+			std::cout << "Iteration no. " << i << " of minimizing noncluster edges"
+								<< std::endl;
 			// sort clusters by decreasing size
 			std::vector<std::pair<size_t, size_t>> cluster_order;
 			for (size_t i = 0; i < clusters.size(); ++i) {
@@ -385,7 +389,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 						if (clusters[adjacent_cluster_index].size() < max_cluster_size)
 							++cluster_move_votes[adjacent_cluster_index];
 					}
-					next_reverse_clusters[cluster_index] =
+					next_reverse_clusters[data_index] =
 							std::max_element(cluster_move_votes.begin(),
 															 cluster_move_votes.end(),
 															 [](const auto& a, const auto& b) {
@@ -395,11 +399,12 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 				}
 			}
 			reverse_clusters = next_reverse_clusters;
-		}
-		clusters.clear();
-		clusters.resize(centroids.size());
-		for (size_t data_index = 0; data_index < all_entries.size(); ++data_index) {
-			clusters[reverse_clusters[data_index]].emplace_back(data_index);
+			clusters.clear();
+			clusters.resize(centroids.size());
+			for (size_t data_index = 0; data_index < all_entries.size();
+					 ++data_index) {
+				clusters[reverse_clusters[data_index]].emplace_back(data_index);
+			}
 		}
 	}
 	if (use_clusters_data) {
@@ -431,6 +436,8 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 	// reset before queries
 	num_distcomps = 0;
 #endif
+
+	std::cout << "Finished build" << std::endl;
 }
 
 template <typename T>
