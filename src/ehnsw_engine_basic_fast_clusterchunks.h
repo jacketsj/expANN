@@ -24,13 +24,16 @@ struct ehnsw_engine_basic_fast_clusterchunks_config {
 	bool use_cuts;
 	size_t min_cluster_size;
 	size_t max_cluster_size;
+	bool very_early_termination;
 	ehnsw_engine_basic_fast_clusterchunks_config(
 			size_t _M, size_t _M0, size_t _ef_search_mult, size_t _ef_construction,
-			bool _use_cuts, size_t _min_cluster_size, size_t _max_cluster_size)
+			bool _use_cuts, size_t _min_cluster_size, size_t _max_cluster_size,
+			bool _very_early_termination)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), use_cuts(_use_cuts),
 				min_cluster_size(_min_cluster_size),
-				max_cluster_size(_max_cluster_size) {}
+				max_cluster_size(_max_cluster_size),
+				very_early_termination(_very_early_termination) {}
 };
 
 template <typename T>
@@ -47,6 +50,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	bool use_cuts;
 	size_t min_cluster_size;
 	size_t max_cluster_size;
+	bool very_early_termination;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -60,7 +64,8 @@ struct ehnsw_engine_basic_fast_clusterchunks
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), use_cuts(conf.use_cuts),
 				min_cluster_size(conf.min_cluster_size),
-				max_cluster_size(conf.max_cluster_size), max_layer(0) {}
+				max_cluster_size(conf.max_cluster_size),
+				very_early_termination(conf.very_early_termination), max_layer(0) {}
 	using config = ehnsw_engine_basic_fast_clusterchunks_config;
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
@@ -588,7 +593,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 						loop_iter.template operator()<false, false>(next_i);
 					}
 				};
-		// bool found_continuation = nearest.size() < k;
+		bool found_continuation = nearest.size() < k;
 		for (size_t cluster_index : hadj_bottom_projected[cur.second]) {
 			if (!visited[cluster_index]) {
 				visited[cluster_index] = true;
@@ -607,7 +612,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 								nearest.emplace(d_next, next);
 								if (nearest.size() > k)
 									nearest.pop();
-								// found_continuation = true;
+								found_continuation = true;
 								candidates.emplace(d_next, next);
 							}
 						});
@@ -615,9 +620,9 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 			while (candidates.size() > k)
 				candidates.erase(std::prev(candidates.end()));
 		}
-		// if (!found_continuation) {
-		// 	break;
-		// }
+		if (very_early_termination && !found_continuation) {
+			break;
+		}
 	}
 	for (auto& v : visited_recent)
 		visited[v] = false;
