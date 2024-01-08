@@ -319,7 +319,21 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 			clusters[sub_engine.query_k(all_entries[i], 1)[0]].emplace_back(i);
 		}
 	};
-	const size_t max_iters = 30;
+	auto compute_centroids = [&]() {
+		centroids.resize(clusters.size());
+		for (size_t centroid_index = 0; centroid_index < centroids.size();
+				 ++centroid_index) {
+			auto& centroid = centroids[centroid_index];
+			centroid.clear();
+			for (size_t elem_index : clusters[centroid_index]) {
+				centroid += all_entries[elem_index];
+			}
+			if (!clusters[centroid_index].empty()) {
+				centroid /= clusters[centroid_index].size();
+			}
+		}
+	};
+	const size_t max_iters = M / 2;
 	vec_generator<T> rvgen(all_entries[0].size());
 	for (size_t iter = 0; iter < max_iters; ++iter) {
 		assign_to_clusters();
@@ -347,18 +361,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 			}
 		}
 		clusters = clusters_new;
-		centroids.resize(clusters.size());
-		for (size_t centroid_index = 0; centroid_index < centroids.size();
-				 ++centroid_index) {
-			auto& centroid = centroids[centroid_index];
-			centroid.clear();
-			for (size_t elem_index : clusters[centroid_index]) {
-				centroid += all_entries[elem_index];
-			}
-			if (!clusters[centroid_index].empty()) {
-				centroid /= clusters[centroid_index].size();
-			}
-		}
+		compute_centroids();
 	}
 	assign_to_clusters();
 	reverse_clusters.resize(all_entries.size());
@@ -369,7 +372,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 	if (minimize_noncluster_edges) {
 		std::cout << "About to start minimizing noncluster edges" << std::endl;
 		// std::vector<size_t> next_reverse_clusters(all_entries.size());
-		for (size_t i = 0; i < 30; ++i) {
+		for (size_t i = 0; i < max_iters; ++i) {
 			std::cout << "Iteration no. " << i << " of minimizing noncluster edges"
 								<< std::endl;
 			// sort clusters by increasing size
@@ -429,6 +432,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 					 ++data_index) {
 				clusters[reverse_clusters[data_index]].emplace_back(data_index);
 			}
+			compute_centroids();
 		}
 	}
 	if (use_clusters_data) {

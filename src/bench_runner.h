@@ -151,8 +151,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 										k * edge_count_search_factor, use_cuts);
 					}
-					for (size_t min_cluster_size : {8, 32}) {									 // 32
-						for (size_t max_cluster_size : {min_cluster_size * 8}) { // * 4
+					for (size_t min_cluster_size : {4}) {											 // 32
+						for (size_t max_cluster_size : {min_cluster_size * 2}) { // * 4
 							for (bool very_early_termination : {false}) {
 								for (bool use_clusters_data : {true}) {
 									for (bool minimize_noncluster_edges : {false, true}) {
