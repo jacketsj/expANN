@@ -368,17 +368,18 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 	}
 	if (minimize_noncluster_edges) {
 		std::cout << "About to start minimizing noncluster edges" << std::endl;
-		std::vector<size_t> next_reverse_clusters(all_entries.size());
+		// std::vector<size_t> next_reverse_clusters(all_entries.size());
 		for (size_t i = 0; i < 30; ++i) {
 			std::cout << "Iteration no. " << i << " of minimizing noncluster edges"
 								<< std::endl;
-			// sort clusters by decreasing size
+			// sort clusters by increasing size
 			std::vector<std::pair<size_t, size_t>> cluster_order;
 			for (size_t i = 0; i < clusters.size(); ++i) {
 				cluster_order.emplace_back(clusters[i].size(), i);
 			}
-			std::sort(cluster_order.rbegin(), cluster_order.rend());
+			std::sort(cluster_order.begin(), cluster_order.end());
 			for (auto [_, cluster_index] : cluster_order) {
+				size_t num_removed = 0;
 				for (size_t data_index : clusters[cluster_index]) {
 					// decide if data_index should be moved to a different cluster
 					robin_hood::unordered_flat_map<size_t, size_t> cluster_move_votes;
@@ -387,19 +388,27 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 						size_t adjacent_cluster_index =
 								reverse_clusters[adjacent_data_index];
 						if (clusters[adjacent_cluster_index].size() <
-								clusters[cluster_index].size())
+								clusters[cluster_index].size() - num_removed)
 							++cluster_move_votes[adjacent_cluster_index];
 					}
-					next_reverse_clusters[data_index] =
+					reverse_clusters[data_index] =
 							std::max_element(cluster_move_votes.begin(),
 															 cluster_move_votes.end(),
 															 [](const auto& a, const auto& b) {
 																 return a.second < b.second;
 															 })
 									->first;
+					if (cluster_index != reverse_clusters[data_index]) {
+						clusters[reverse_clusters[data_index]].emplace_back(data_index);
+						++num_removed;
+					}
 				}
+				std::vector<size_t> new_cluster_data;
+				for (size_t data_index : clusters[cluster_index])
+					if (reverse_clusters[data_index] == cluster_index)
+						new_cluster_data.emplace_back(data_index);
+				clusters[cluster_index] = new_cluster_data;
 			}
-			reverse_clusters = next_reverse_clusters;
 			clusters.clear();
 			clusters.resize(centroids.size());
 			for (size_t data_index = 0; data_index < all_entries.size();
