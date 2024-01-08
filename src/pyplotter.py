@@ -71,6 +71,7 @@ def prepare_data(file_name, x_axis, y_axis, use_param_x, use_param_y):
 
 
 app = dash.Dash(__name__)
+app.title = "ExpANN Plots"
 
 data_options_map = {
     'recall': 'Recall',
