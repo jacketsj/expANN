@@ -108,22 +108,18 @@ def update_graph(selected_file, recall_threshold):
                 hoverlabel=dict(
                     namelength=-1)  # Allow long text in hover labels
             ))
-    fig.update_layout(title=f"Recall-QPS for {dataset} (k={k_value})",
+    fig.update_layout(title=f"Recall-QPS of {k_value}-NN for {dataset}",
                       xaxis_title="Recall",
                       yaxis_title="QPS",
                       yaxis_type="log")
     return fig
 
 
-# Function to open a web browser tab
 def open_browser():
     webbrowser.open_new_tab("http://127.0.0.1:8050/")
 
 
-# Run the app
 if __name__ == '__main__':
-    # Run the app in a separate thread
     Thread(
         target=lambda: app.run_server(debug=True, use_reloader=False)).start()
-    # Open the browser
     open_browser()
