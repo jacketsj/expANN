@@ -28,18 +28,20 @@ struct ehnsw_engine_basic_fast_clusterchunks_config {
 	bool very_early_termination;
 	bool use_clusters_data;
 	bool minimize_noncluster_edges;
+	bool coarse_search;
 	ehnsw_engine_basic_fast_clusterchunks_config(
 			size_t _M, size_t _M0, size_t _ef_search_mult, size_t _ef_construction,
 			bool _use_cuts, size_t _min_cluster_size, size_t _max_cluster_size,
 			bool _very_early_termination, bool _use_clusters_data,
-			bool _minimize_noncluster_edges)
+			bool _minimize_noncluster_edges, bool _coarse_search)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), use_cuts(_use_cuts),
 				min_cluster_size(_min_cluster_size),
 				max_cluster_size(_max_cluster_size),
 				very_early_termination(_very_early_termination),
 				use_clusters_data(_use_clusters_data),
-				minimize_noncluster_edges(_minimize_noncluster_edges) {}
+				minimize_noncluster_edges(_minimize_noncluster_edges),
+				coarse_search(_coarse_search) {}
 };
 
 template <typename T>
@@ -59,6 +61,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	bool very_early_termination;
 	bool use_clusters_data;
 	bool minimize_noncluster_edges;
+	bool coarse_search;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -76,7 +79,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 				very_early_termination(conf.very_early_termination),
 				use_clusters_data(conf.use_clusters_data),
 				minimize_noncluster_edges(conf.minimize_noncluster_edges),
-				max_layer(0) {}
+				coarse_search(conf.coarse_search), max_layer(0) {}
 	using config = ehnsw_engine_basic_fast_clusterchunks_config;
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
@@ -90,6 +93,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	std::vector<std::vector<vec<T>>> clusters_data;
 	std::vector<size_t> reverse_clusters;
 	std::vector<std::vector<size_t>> hadj_bottom_projected;
+	std::unique_ptr<ehnsw_engine_basic_fast<T>> coarse_searcher;
 	void _store_vector(const vec<T>& v);
 	void _build();
 	std::vector<char> visited; // booleans
@@ -123,6 +127,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 		add_param(pl, very_early_termination);
 		add_param(pl, use_clusters_data);
 		add_param(pl, minimize_noncluster_edges);
+		add_param(pl, coarse_search);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 		add_param(pl, total_projected_degree);
@@ -386,8 +391,6 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 				for (size_t data_index : clusters[cluster_index]) {
 					// decide if data_index should be moved to a different cluster
 					robin_hood::unordered_flat_map<size_t, double> cluster_connectivity;
-					T d2_cluster =
-							dist2(all_entries[data_index], centroids[cluster_index]);
 					for (const auto& [adjacent_d2, adjacent_data_index] :
 							 hadj_flat_with_lengths[data_index][0]) {
 						size_t adjacent_cluster_index =
@@ -445,19 +448,28 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		}
 	}
 
-	hadj_bottom_projected.resize(all_entries.size());
-	for (size_t i = 0; i < all_entries.size(); ++i) {
-		robin_hood::unordered_flat_set<size_t> added = {reverse_clusters[i]};
-		for (size_t j : hadj_bottom[i]) {
-			size_t cluster_index = reverse_clusters[j];
-			if (!added.contains(cluster_index)) {
-				hadj_bottom_projected[i].emplace_back(cluster_index);
-				added.insert(cluster_index);
+	if (coarse_search) {
+		coarse_searcher = std::make_unique<ehnsw_engine_basic_fast<T>>(
+				ehnsw_engine_basic_fast_config(M, M0, ef_search_mult, ef_construction,
+																			 use_cuts));
+		for (auto& v : centroids)
+			coarse_searcher->store_vector(v);
+		coarse_searcher->build();
+	} else {
+		hadj_bottom_projected.resize(all_entries.size());
+		for (size_t i = 0; i < all_entries.size(); ++i) {
+			robin_hood::unordered_flat_set<size_t> added = {reverse_clusters[i]};
+			for (size_t j : hadj_bottom[i]) {
+				size_t cluster_index = reverse_clusters[j];
+				if (!added.contains(cluster_index)) {
+					hadj_bottom_projected[i].emplace_back(cluster_index);
+					added.insert(cluster_index);
+				}
 			}
-		}
 #ifdef RECORD_STATS
-		total_projected_degree += hadj_bottom_projected[i].size();
+			total_projected_degree += hadj_bottom_projected[i].size();
 #endif
+		}
 	}
 
 #ifdef RECORD_STATS
@@ -753,6 +765,48 @@ ehnsw_engine_basic_fast_clusterchunks<T>::query_k_at_bottom_via_clusters(
 template <typename T>
 std::vector<size_t>
 ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
+	if (coarse_search) {
+		std::vector<size_t> clusters_to_check =
+				coarse_searcher->query_k(q, k * ef_search_mult);
+		using measured_data = std::pair<T, size_t>;
+		std::vector<measured_data> results;
+		if (use_clusters_data) {
+			for (size_t cluster_index : clusters_to_check)
+				for (size_t inside_cluster_index = 0;
+						 inside_cluster_index < clusters[cluster_index].size();
+						 ++inside_cluster_index) {
+					size_t next = clusters[cluster_index][inside_cluster_index];
+#ifdef RECORD_STATS
+					++num_distcomps;
+#endif
+					T d_next =
+							dist2(q, clusters_data[cluster_index][inside_cluster_index]);
+					results.emplace_back(d_next, next);
+				}
+		} else {
+			for (size_t cluster_index : clusters_to_check)
+				for (size_t inside_cluster_index = 0;
+						 inside_cluster_index < clusters[cluster_index].size();
+						 ++inside_cluster_index) {
+					size_t next = clusters[cluster_index][inside_cluster_index];
+#ifdef RECORD_STATS
+					++num_distcomps;
+#endif
+					T d_next = dist2(q, all_entries[next]);
+					results.emplace_back(d_next, next);
+				}
+		}
+		size_t ret_size = std::min(k, results.size());
+		std::partial_sort(results.begin(), results.begin() + ret_size,
+											results.end());
+		results.resize(ret_size);
+		std::vector<size_t> ret;
+		for (size_t i = 0; i < results.size() && i < k; ++i) {
+			ret.emplace_back(results[i].second);
+		}
+		return ret;
+	}
+
 	size_t entry_point = starting_vertex;
 #ifdef RECORD_STATS
 	++num_distcomps;

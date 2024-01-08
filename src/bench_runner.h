@@ -141,31 +141,34 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 60; k <= 60; k += 20) {
-		for (size_t num_for_1nn = 1; num_for_1nn <= 1; num_for_1nn += 1) { // 5
+		for (size_t num_for_1nn = 1; num_for_1nn <= 5; num_for_1nn += 2) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
 				}
 			}
-			for (size_t edge_count_search_factor : {1}) { // 3
+			for (size_t edge_count_search_factor : {2}) { // 3
 				for (bool use_cuts : {false}) {
 					if (true) {
 						ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 										k * edge_count_search_factor, use_cuts);
 					}
-					for (size_t min_cluster_size : {4}) {											 // 32
-						for (size_t max_cluster_size : {min_cluster_size * 2}) { // * 4
+					for (size_t min_cluster_size : {32}) {										 // 32
+						for (size_t max_cluster_size : {min_cluster_size * 4}) { // * 4
 							for (bool very_early_termination : {false}) {
 								for (bool use_clusters_data : {true}) {
 									for (bool minimize_noncluster_edges : {false}) {
-										if (true) {
-											ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>, k,
-															2 * k, num_for_1nn, k * edge_count_search_factor,
-															use_cuts, min_cluster_size, max_cluster_size,
-															very_early_termination, use_clusters_data,
-															minimize_noncluster_edges);
+										for (bool coarse_search : {false, true}) {
+											if (true) {
+												ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>, k,
+																2 * k, num_for_1nn,
+																k * edge_count_search_factor, use_cuts,
+																min_cluster_size, max_cluster_size,
+																very_early_termination, use_clusters_data,
+																minimize_noncluster_edges, coarse_search);
+											}
 										}
-										if (true) {
+										if (false) {
 											ADD_JOB(
 													ehnsw_engine_basic_fast_clusterchunks_pqprune<float>,
 													k, 2 * k, num_for_1nn, k * edge_count_search_factor,
