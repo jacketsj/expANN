@@ -1,188 +1,129 @@
+import dash
+from dash import dcc, html
+import plotly.graph_objs as go
 import json
-import matplotlib.pyplot as plt
-import math
-import pprint
+import pandas as pd
+from dash.dependencies import Input, Output
+import webbrowser
+from threading import Thread
+
+with open('config.json', 'r') as config_file:
+    config = json.load(config_file)
+ds_name = config['ds_name']
+dataset = config['dataset']
+k_value = config['k']
+
+data_folder = f'./data/{ds_name}/data/'
 
 
-class AnnoteFinder(object):
-    """callback for matplotlib to display an annotation when points are
-    clicked on.  The point which is closest to the click and within
-    xtol and ytol is identified.
-
-    Register this function like this:
-
-    scatter(xdata, ydata)
-    af = AnnoteFinder(xdata, ydata, annotes)
-    connect('button_press_event', af)
-    
-    This doesn't really work well on log scale plots
-    """
-    def __init__(self, xdata, ydata, annotes, ax=None, xtol=None, ytol=None):
-        self.data = list(zip(xdata, ydata, annotes))
-        if xtol is None:
-            xtol = ((max(xdata) - min(xdata)) / float(len(xdata))) * 4
-        if ytol is None:
-            ytol = ((max(ydata) - min(ydata)) / float(len(ydata))) * 4
-        self.xtol = xtol
-        self.ytol = ytol
-        if ax is None:
-            self.ax = plt.gca()
-        else:
-            self.ax = ax
-        self.drawnAnnotations = {}
-        self.links = []
-
-    def distance(self, x1, x2, y1, y2):
-        """
-        return the distance between two points
-        """
-        return (math.sqrt((x1 - x2)**2 + (y1 - y2)**2))
-
-    def __call__(self, event):
-
-        if event.inaxes:
-
-            clickX = event.xdata
-            clickY = event.ydata
-            if (self.ax is None) or (self.ax is event.inaxes):
-                annotes = []
-                # print(event.xdata, event.ydata)
-                for x, y, a in self.data:
-                    # print(x, y, a)
-                    if ((clickX - self.xtol < x < clickX + self.xtol)
-                            and (clickY - self.ytol < y < clickY + self.ytol)):
-                        annotes.append((self.distance(x, clickX, y,
-                                                      clickY), x, y, a))
-                if annotes:
-                    annotes.sort()
-                    distance, x, y, annote = annotes[0]
-                    self.drawAnnote(event.inaxes, x, y, annote)
-                    for l in self.links:
-                        l.drawSpecificAnnote(annote)
-
-    def drawAnnote(self, ax, x, y, annote):
-        """
-        Draw the annotation on the plot
-        """
-        if (x, y) in self.drawnAnnotations:
-            markers = self.drawnAnnotations[(x, y)]
-            for m in markers:
-                m.set_visible(not m.get_visible())
-            self.ax.figure.canvas.draw_idle()
-        else:
-            # Hide all other annotations
-            for (x0, y0) in self.drawnAnnotations:
-                markers = self.drawnAnnotations[(x0, y0)]
-                for m in markers:
-                    m.set_visible(False)
-                self.ax.figure.canvas.draw_idle()
-            t = ax.text(x,
-                        y,
-                        " - %s" % (annote),
-                        bbox=dict(facecolor='gray', alpha=0.5))
-            m = ax.scatter([x], [y], marker='d', c='r', zorder=10000)
-            self.drawnAnnotations[(x, y)] = (t, m)
-            self.ax.figure.canvas.draw_idle()
-
-    def drawSpecificAnnote(self, annote):
-        annotesToDraw = [(x, y, a) for x, y, a in self.data if a == annote]
-        for x, y, a in annotesToDraw:
-            self.drawAnnote(self.ax, x, y, a)
-
-
-#f = open('./data/synthetic_uniform_sphere_n50000_dim16_m400_k1/data/all.json')
-#f = open('./data/synthetic_uniform_sphere_n30000_dim16_m300_k10/data/all.json')
-#f = open('./data/sift1m_full/data/all.json')
-#f = open('./data/sift1m_full_k10/data/all.json')
-#f = open('./data/newyearnewdata_synthetic_n_56000_m_400_d_128_k_10/data/all.json')
-f = open('./data/newyearnewdata_sift_k_10/data/latest.json')
-#f = open('./data/newyearnewsift/data/all.json')
-#f = open('./data/sift1m_full_k10/data/latest.json')
-#f = open('./data/synthetic_uniform_sphere_n90000_dim16_m600_k10/data/all.json')
-#f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/all.json')
-#f = open('./data/synthetic_uniform_sphere_n56000_dim64_m400_k10/data/latest.json')
-#f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/some-combined-stuff.json')
-#f = open('./data/synthetic_uniform_sphere_n56000_dim128_m400_k10/data/hnsw2_vs_ehnsw2_vs_filterehnsw.json')
-#f = open('./data/synthetic_uniform_sphere_n66000_dim64_m400_k10/data/latest.json')
-
-datavec = json.load(f)
-
-# TODO come up with a better name for this
-enable_sprinkles = False
-sprinkle_param = 'use_ecuts'
-
-engines = set()
-for benchdata in datavec:
-    #engines.add(benchdata['engine_name'] + "=" + benchdata['param_list']['max_depth'])
-    #if benchdata['engine_name'] != "EHNSW Engine 4" and benchdata['engine_name'] != "EHNSW Engine 5":
-    #if benchdata['engine_name'] != "EHNSW Engine 5(no e)" and benchdata['engine_name'] != "EHNSW Engine 5" and benchdata['engine_name'] != "EHNSW Engine 4" and benchdata['engine_name'] != "EHNSW Engine 2":
-    #   continue
-    if enable_sprinkles:
-        sprinkle = ""
-        if sprinkle_param in benchdata['param_list']:
-            sprinkle = benchdata['param_list'][sprinkle_param]
-        engines.add(benchdata['engine_name'] + "=" + sprinkle)
-    else:
-        engines.add(benchdata['engine_name'])
-
-from colour import Color
-cols = list(Color('blue').range_to(Color('red'), len(engines)))
-
-#annotations = {}
-
-fig, ax = plt.subplots()
-xall = []
-yall = []
-annotationsall = []
-#for eng in sorted(engines):
-for eng, col in zip(sorted(engines), cols):
-    x = []
-    y = []
-    s = []
-    #annotations[eng] = []
+def prepare_data(file_name, recall_threshold=0.0):
+    with open(data_folder + file_name, 'r') as dataset_file:
+        datavec = json.load(dataset_file)
+    data_dict = {'recall': [], 'qps': [], 'annotations': [], 'engine': []}
     for benchdata in datavec:
-        #if ('run_improves' not in benchdata['param_list']) or (benchdata['param_list']['run_improves'] != '0'):
-        #    continue
-        #bd_name = benchdata['engine_name'] + "=" + benchdata['param_list']['max_depth']
-        #if eng == benchdata['engine_name']:
-        bd_name = benchdata['engine_name']
-        if enable_sprinkles:
-            sprinkle = ""
-            if sprinkle_param in benchdata['param_list']:
-                sprinkle = benchdata['param_list'][sprinkle_param]
-            bd_name = benchdata['engine_name'] + "=" + sprinkle
-        if eng == bd_name:
-            xi = benchdata['recall']
-            yi = benchdata['time_per_query_ns']
-            #if xi < 0.9:
-            #    continue
-            #yi = float(benchdata['param_list']['num_distcomps'])
-            x.append(xi)
-            xall.append(xi)
-            #y.append(yi)
-            #yall.append(yi)
-            y.append(1e9 / yi)
-            yall.append(1e9 / yi)
-            s.append(4)
-            #annotations[(xi, yi)] = str(benchdata)
-            annotationsall.append(pprint.pformat(benchdata))
-            # annotations[eng].append(str(benchdata))
-    if enable_sprinkles:
-        plt.scatter(x, y, s, label=eng, picker=True, color='{}'.format(col))
-    else:
-        plt.scatter(x, y, s, label=eng, picker=True)
+        if benchdata['recall'] >= recall_threshold:
+            data_dict['recall'].append(benchdata['recall'])
+            data_dict['qps'].append(1e9 / benchdata['time_per_query_ns'])
 
-plt.xlabel("Recall")
-#plt.ylabel("Query time (ns)")
-plt.ylabel("QPS")
+            # Separate properties and param_list
+            properties = {
+                k: v
+                for k, v in benchdata.items() if k != 'param_list'
+            }
+            param_list = benchdata.get('param_list', {})
 
-#plt.title("Recall-Querytime for k-NN.")
-plt.title("Recall-QPS for k-NN.")
+            # Move 'engine_name' to the front if it exists
+            if 'engine_name' in properties:
+                properties = {
+                    'engine_name': properties['engine_name'],
+                    **properties
+                }
 
-plt.yscale("log")
-plt.legend()
+            # Custom pretty-printing
+            properties_str = "<br>".join([
+                f"{k}: {json.dumps(v, indent=4)}"
+                for k, v in properties.items()
+            ])
+            param_list_str = "<br>".join([
+                f"{k}: {json.dumps(v, indent=4)}"
+                for k, v in param_list.items()
+            ])
 
-af = AnnoteFinder(xall, yall, annotationsall, ax=ax)
+            annotation = (f"<b>Statistics:</b><br>{properties_str}"
+                          f"<br><br><b>Param List:</b><br>{param_list_str}")
+            annotation = annotation.replace('"', '').replace('{', '').replace(
+                '}', '').replace(',', '')
+            annotation = annotation.replace("engine_name: ", "")
+            data_dict['annotations'].append(annotation)
+            data_dict['engine'].append(benchdata['engine_name'])
+    return pd.DataFrame(data_dict)
 
-fig.canvas.mpl_connect('button_press_event', af)
-plt.show()
+
+app = dash.Dash(__name__)
+
+app.layout = html.Div([
+    dcc.Dropdown(id='file-selector',
+                 options=[{
+                     'label': 'All Data',
+                     'value': 'all.json'
+                 }, {
+                     'label': 'Latest Data',
+                     'value': 'latest.json'
+                 }],
+                 value='all.json'),
+    dcc.Graph(id='data-plot', style={'height': 'calc(95vh - 60px)'}),
+    dcc.Slider(id='recall-slider',
+               min=0.0,
+               max=1.0,
+               step=0.1,
+               value=0.0,
+               marks={i / 10: str(i / 10)
+                      for i in range(0, 11)})
+],
+                      style={
+                          'display': 'flex',
+                          'flexDirection': 'column',
+                          'height': '95vh'
+                      })
+
+
+# Update the graph
+@app.callback(
+    Output('data-plot', 'figure'),
+    [Input('file-selector', 'value'),
+     Input('recall-slider', 'value')])
+def update_graph(selected_file, recall_threshold):
+    df = prepare_data(selected_file, recall_threshold)
+    fig = go.Figure()
+    for engine in df['engine'].unique():
+        engine_df = df[df['engine'] == engine]
+        fig.add_trace(
+            go.Scatter(
+                x=engine_df['recall'],
+                y=engine_df['qps'],
+                mode='markers',
+                name=engine,
+                hovertext=engine_df['annotations'],
+                hoverinfo='text',
+                hoverlabel=dict(
+                    namelength=-1)  # Allow long text in hover labels
+            ))
+    fig.update_layout(title=f"Recall-QPS for {dataset} (k={k_value})",
+                      xaxis_title="Recall",
+                      yaxis_title="QPS",
+                      yaxis_type="log")
+    return fig
+
+
+# Function to open a web browser tab
+def open_browser():
+    webbrowser.open_new_tab("http://127.0.0.1:8050/")
+
+
+# Run the app
+if __name__ == '__main__':
+    # Run the app in a separate thread
+    Thread(
+        target=lambda: app.run_server(debug=True, use_reloader=False)).start()
+    # Open the browser
+    open_browser()
