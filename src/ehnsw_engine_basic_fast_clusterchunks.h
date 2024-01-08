@@ -382,22 +382,36 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 				size_t num_removed = 0;
 				for (size_t data_index : clusters[cluster_index]) {
 					// decide if data_index should be moved to a different cluster
-					robin_hood::unordered_flat_map<size_t, size_t> cluster_move_votes;
-					cluster_move_votes[cluster_index] = 1;
-					for (size_t adjacent_data_index : hadj_bottom[data_index]) {
+					robin_hood::unordered_flat_map<size_t, double> cluster_connectivity;
+					T d2_cluster =
+							dist2(all_entries[data_index], centroids[cluster_index]);
+					for (const auto& [adjacent_d2, adjacent_data_index] :
+							 hadj_flat_with_lengths[data_index][0]) {
 						size_t adjacent_cluster_index =
 								reverse_clusters[adjacent_data_index];
+						// TODO consider removing this restriction or replacing it with a
+						// looser one
 						if (clusters[adjacent_cluster_index].size() <
 								clusters[cluster_index].size() - num_removed)
-							++cluster_move_votes[adjacent_cluster_index];
+							cluster_connectivity[adjacent_cluster_index] += 1.0 / adjacent_d2;
 					}
-					reverse_clusters[data_index] =
-							std::max_element(cluster_move_votes.begin(),
-															 cluster_move_votes.end(),
-															 [](const auto& a, const auto& b) {
-																 return a.second < b.second;
-															 })
-									->first;
+					double best_modularity_gain = 0.0;
+					size_t best_cluster = cluster_index;
+					for (const auto& [adjacent_cluster, connectivity] :
+							 cluster_connectivity) {
+						if (adjacent_cluster != cluster_index) {
+							double expected_connectivity =
+									clusters[adjacent_cluster].size() /
+									dist2(all_entries[data_index], centroids[adjacent_cluster]);
+
+							double modularity_gain = connectivity - expected_connectivity;
+							if (modularity_gain > best_modularity_gain) {
+								best_modularity_gain = modularity_gain;
+								best_cluster = adjacent_cluster;
+							}
+						}
+					}
+					reverse_clusters[data_index] = best_cluster;
 					if (cluster_index != reverse_clusters[data_index]) {
 						clusters[reverse_clusters[data_index]].emplace_back(data_index);
 						++num_removed;
