@@ -12,6 +12,7 @@
 #include "dataset_loader.h"
 #include "ehnsw_engine_basic_fast.h"
 #include "ehnsw_engine_basic_fast_clusterchunks.h"
+#include "ehnsw_engine_basic_fast_clusterchunks_pqprune.h"
 #include "ehnsw_engine_basic_fast_multilist.h"
 #include "ensg_engine.h"
 #include "hnsw_engine_reference.h"
@@ -134,6 +135,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 
 	JobTuple<ehnsw_engine_basic_fast<float>,
 					 ehnsw_engine_basic_fast_clusterchunks<float>,
+					 ehnsw_engine_basic_fast_clusterchunks_pqprune<float>,
 					 ehnsw_engine_basic_fast_multilist<float>,
 					 hnsw_engine_reference<float>, ensg_engine<float>>
 			job_lists;
@@ -155,13 +157,21 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						for (size_t max_cluster_size : {min_cluster_size * 2}) { // * 4
 							for (bool very_early_termination : {false}) {
 								for (bool use_clusters_data : {true}) {
-									for (bool minimize_noncluster_edges : {false, true}) {
+									for (bool minimize_noncluster_edges : {false}) {
 										if (true) {
 											ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>, k,
 															2 * k, num_for_1nn, k * edge_count_search_factor,
 															use_cuts, min_cluster_size, max_cluster_size,
 															very_early_termination, use_clusters_data,
 															minimize_noncluster_edges);
+										}
+										if (true) {
+											ADD_JOB(
+													ehnsw_engine_basic_fast_clusterchunks_pqprune<float>,
+													k, 2 * k, num_for_1nn, k * edge_count_search_factor,
+													use_cuts, min_cluster_size, max_cluster_size,
+													very_early_termination, use_clusters_data,
+													minimize_noncluster_edges);
 										}
 									}
 								}
