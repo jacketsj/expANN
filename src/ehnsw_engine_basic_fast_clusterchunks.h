@@ -344,7 +344,8 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		for (size_t i = 0; i < all_entries.size(); ++i) {
 			auto sub_engine_results =
 					sub_engine.query_k(all_entries[i], cluster_overlap);
-			for (size_t j = 0; j < cluster_overlap; ++j) {
+			for (size_t j = 0;
+					 j < std::min(cluster_overlap, sub_engine_results.size()); ++j) {
 				clusters[sub_engine_results[j]].emplace_back(i);
 			}
 		}
@@ -485,6 +486,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		coarse_searcher->build();
 
 		if (use_pq) {
+			std::cout << "About to start pq indexing" << std::endl;
 			for (size_t cluster_index = 0; cluster_index < clusters.size();
 					 ++cluster_index) {
 				std::vector<typename vec<T>::Underlying> residuals;
@@ -495,6 +497,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 				clusters_searchers.emplace_back(residuals, pq_clusters,
 																				all_entries[0].size() / pq_subspaces);
 			}
+			std::cout << "Just finished pq indexing" << std::endl;
 		}
 	} else {
 		hadj_bottom_projected.resize(all_entries.size());
