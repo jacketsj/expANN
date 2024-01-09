@@ -141,32 +141,31 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 60; k <= 60; k += 20) {
-		for (size_t num_for_1nn : {4, 6}) { // 5
+		for (size_t num_for_1nn : {4}) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
 				}
 			}
-			for (size_t edge_count_search_factor : {3}) { // 3
+			for (size_t edge_count_search_factor : {3, 5}) { // 3
 				for (bool use_cuts : {false}) {
-					if (true) {
+					if (false) {
 						ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 										k * edge_count_search_factor, use_cuts);
 					}
-					for (size_t min_cluster_size : {32}) { // 32
-						for (size_t max_cluster_size :
-								 {min_cluster_size * 2, min_cluster_size * 4}) { // * 4
+					for (size_t min_cluster_size : {32, 128}) {								 // 32
+						for (size_t max_cluster_size : {min_cluster_size * 4}) { // * 4
 							for (bool very_early_termination : {false}) {
 								for (bool use_clusters_data : {true}) {
 									for (bool minimize_noncluster_edges : {false}) {
 										for (bool coarse_search : {true}) { // false, true
 											std::vector<size_t> cluster_overlap_vals = {1};
 											if (coarse_search)
-												cluster_overlap_vals = {1, 2, 4}; // 1,2
+												cluster_overlap_vals = {1, 4}; // 1,2,4
 											for (size_t cluster_overlap : cluster_overlap_vals) {
-												for (bool use_pq : {false, true}) {
-													for (size_t pq_clusters : {8}) {
-														for (size_t pq_subspaces : {8}) {
+												for (bool use_pq : {true}) {
+													for (size_t pq_clusters : {8, 16}) {
+														for (size_t pq_subspaces : {8, 32}) {
 															if (true) {
 																ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<
 																						float>,
