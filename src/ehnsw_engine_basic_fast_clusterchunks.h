@@ -821,7 +821,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 						clusters_searchers[cluster_index].compute_distances(
 								q - centroids[cluster_index]);
 				for (size_t i = 0; i < clusters[cluster_index].size(); ++i) {
-					results.emplace_back(clusters[cluster_index][i], distances[i]);
+					results.emplace_back(distances[i], clusters[cluster_index][i]);
 				}
 			}
 		} else if (use_clusters_data) {
