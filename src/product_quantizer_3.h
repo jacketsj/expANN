@@ -120,7 +120,7 @@ struct product_quantizer_3 {
 		// Compute distances for each vector in codes_list
 		for (size_t i = 0; i < codes_list.size(); ++i) {
 			for (size_t j = 0; j < codes_list[i].size(); ++j) {
-				ret[i] += distance_tables[j](0, codes_list[i][j]);
+				ret[i] += distance_tables[j](codes_list[i][j]);
 			}
 		}
 	}
