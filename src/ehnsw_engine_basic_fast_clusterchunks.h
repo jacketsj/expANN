@@ -391,7 +391,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 				}
 			}
 		}
-		if (!clusters_new.empty())
+		if (!clusters_new.empty()) // don't let all clusters be deleted
 			clusters = clusters_new;
 		compute_centroids();
 	}
