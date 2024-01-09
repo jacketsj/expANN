@@ -115,7 +115,7 @@ struct product_quantizer_3 {
 
 	void compute_distances_given_table(
 			const std::vector<Eigen::VectorXf>& distance_tables,
-			std::vector<float> ret) const {
+			std::vector<float>& ret) const {
 		// Compute distances for each vector in codes_list
 		for (size_t i = 0; i < codes_list.size(); ++i) {
 			for (size_t j = 0; j < codes_list[i].size(); ++j) {
