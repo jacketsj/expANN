@@ -162,7 +162,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										for (bool coarse_search : {true}) { // false, true
 											std::vector<size_t> cluster_overlap_vals = {1};
 											if (coarse_search)
-												cluster_overlap_vals = {2}; // 1,2
+												cluster_overlap_vals = {1, 2, 4}; // 1,2
 											for (size_t cluster_overlap : cluster_overlap_vals) {
 												if (true) {
 													ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>,
