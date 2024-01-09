@@ -146,6 +146,9 @@ struct ehnsw_engine_basic_fast_clusterchunks
 		add_param(pl, minimize_noncluster_edges);
 		add_param(pl, coarse_search);
 		add_param(pl, cluster_overlap);
+		add_param(pl, use_pq);
+		add_param(pl, pq_clusters);
+		add_param(pl, pq_subspaces);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 		add_param(pl, total_projected_degree);
