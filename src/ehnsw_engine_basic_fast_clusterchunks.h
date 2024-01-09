@@ -391,7 +391,8 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 				}
 			}
 		}
-		clusters = clusters_new;
+		if (!clusters_new.empty())
+			clusters = clusters_new;
 		compute_centroids();
 	}
 	assign_to_clusters();
