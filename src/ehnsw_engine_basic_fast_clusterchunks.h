@@ -820,8 +820,11 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 				std::vector<T> distances =
 						clusters_searchers[cluster_index].compute_distances(
 								q - centroids[cluster_index]);
-				for (size_t i = 0; i < clusters[cluster_index].size(); ++i) {
-					results.emplace_back(distances[i], clusters[cluster_index][i]);
+				for (size_t inside_cluster_index = 0;
+						 inside_cluster_index < clusters[cluster_index].size();
+						 ++inside_cluster_index) {
+					results.emplace_back(distances[inside_cluster_index],
+															 clusters[cluster_index][inside_cluster_index]);
 				}
 			}
 		} else if (use_clusters_data) {
