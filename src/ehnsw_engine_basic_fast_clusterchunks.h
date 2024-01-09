@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "ann_engine.h"
+#include "product_quantizer_3.h"
 #include "randomgeometry.h"
 #include "robin_hood.h"
 #include "topk_t.h"
@@ -30,12 +31,16 @@ struct ehnsw_engine_basic_fast_clusterchunks_config {
 	bool minimize_noncluster_edges;
 	bool coarse_search;
 	size_t cluster_overlap;
+	bool use_pq;
+	size_t pq_clusters;
+	size_t pq_subspaces;
 	ehnsw_engine_basic_fast_clusterchunks_config(
 			size_t _M, size_t _M0, size_t _ef_search_mult, size_t _ef_construction,
 			bool _use_cuts, size_t _min_cluster_size, size_t _max_cluster_size,
 			bool _very_early_termination, bool _use_clusters_data,
 			bool _minimize_noncluster_edges, bool _coarse_search,
-			size_t _cluster_overlap)
+			size_t _cluster_overlap, bool _use_pq, size_t _pq_clusters,
+			size_t _pq_subspaces)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), use_cuts(_use_cuts),
 				min_cluster_size(_min_cluster_size),
@@ -43,7 +48,9 @@ struct ehnsw_engine_basic_fast_clusterchunks_config {
 				very_early_termination(_very_early_termination),
 				use_clusters_data(_use_clusters_data),
 				minimize_noncluster_edges(_minimize_noncluster_edges),
-				coarse_search(_coarse_search), cluster_overlap(_cluster_overlap) {}
+				coarse_search(_coarse_search), cluster_overlap(_cluster_overlap),
+				use_pq(_use_pq), pq_clusters(_pq_clusters),
+				pq_subspaces(_pq_subspaces) {}
 };
 
 template <typename T>
@@ -65,6 +72,9 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	bool minimize_noncluster_edges;
 	bool coarse_search;
 	size_t cluster_overlap;
+	bool use_pq;
+	size_t pq_clusters;
+	size_t pq_subspaces;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -83,7 +93,9 @@ struct ehnsw_engine_basic_fast_clusterchunks
 				use_clusters_data(conf.use_clusters_data),
 				minimize_noncluster_edges(conf.minimize_noncluster_edges),
 				coarse_search(conf.coarse_search),
-				cluster_overlap(conf.cluster_overlap), max_layer(0) {}
+				cluster_overlap(conf.cluster_overlap), use_pq(conf.use_pq),
+				pq_clusters(conf.pq_clusters), pq_subspaces(conf.pq_subspaces),
+				max_layer(0) {}
 	using config = ehnsw_engine_basic_fast_clusterchunks_config;
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
@@ -95,6 +107,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	std::vector<vec<T>> centroids;
 	std::vector<std::vector<size_t>> clusters;
 	std::vector<std::vector<vec<T>>> clusters_data;
+	std::vector<product_quantizer_3> clusters_searchers;
 	std::vector<size_t> reverse_clusters;
 	std::vector<std::vector<size_t>> hadj_bottom_projected;
 	std::unique_ptr<ehnsw_engine_basic_fast<T>> coarse_searcher;
@@ -467,6 +480,19 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		for (auto& v : centroids)
 			coarse_searcher->store_vector(v);
 		coarse_searcher->build();
+
+		if (use_pq) {
+			for (size_t cluster_index = 0; cluster_index < clusters.size();
+					 ++cluster_index) {
+				std::vector<typename vec<T>::Underlying> residuals;
+				for (size_t i : clusters[cluster_index]) {
+					residuals.emplace_back(
+							(all_entries[i] - centroids[cluster_index]).get_underlying());
+				}
+				clusters_searchers.emplace_back(residuals, pq_clusters,
+																				all_entries[0].size() / pq_subspaces);
+			}
+		}
 	} else {
 		hadj_bottom_projected.resize(all_entries.size());
 		for (size_t i = 0; i < all_entries.size(); ++i) {
@@ -782,7 +808,16 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 				coarse_searcher->query_k(q, k * ef_search_mult);
 		using measured_data = std::pair<T, size_t>;
 		std::vector<measured_data> results;
-		if (use_clusters_data) {
+		if (use_pq) {
+			for (size_t cluster_index : clusters_to_check) {
+				std::vector<T> distances =
+						clusters_searchers[cluster_index].compute_distances(
+								q - centroids[cluster_index]);
+				for (size_t i = 0; i < clusters[cluster_index].size(); ++i) {
+					results.emplace_back(clusters[cluster_index][i], distances[i]);
+				}
+			}
+		} else if (use_clusters_data) {
 			for (size_t cluster_index : clusters_to_check)
 				for (size_t inside_cluster_index = 0;
 						 inside_cluster_index < clusters[cluster_index].size();
@@ -808,12 +843,18 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 					results.emplace_back(d_next, next);
 				}
 		}
-		std::sort(results.begin(), results.end());
+		std::sort(results.begin(), results.end(),
+							[](const measured_data& a, const measured_data& b) {
+								return a.second < b.second;
+							});
 		auto last = std::unique(results.begin(), results.end(),
 														[](const measured_data& a, const measured_data& b) {
 															return a.second == b.second;
 														});
 		results.erase(last, results.end());
+		std::partial_sort(results.begin(),
+											results.begin() + std::min(results.size(), k),
+											results.end());
 
 		size_t ret_size = std::min(k, results.size());
 		results.resize(ret_size);

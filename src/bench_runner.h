@@ -164,14 +164,23 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 											if (coarse_search)
 												cluster_overlap_vals = {1, 2, 4}; // 1,2
 											for (size_t cluster_overlap : cluster_overlap_vals) {
-												if (true) {
-													ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>,
-																	k, 2 * k, num_for_1nn,
-																	k * edge_count_search_factor, use_cuts,
-																	min_cluster_size, max_cluster_size,
-																	very_early_termination, use_clusters_data,
-																	minimize_noncluster_edges, coarse_search,
-																	cluster_overlap);
+												for (bool use_pq : {false, true}) {
+													for (size_t pq_clusters : {8}) {
+														for (size_t pq_subspaces : {8}) {
+															if (true) {
+																ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<
+																						float>,
+																				k, 2 * k, num_for_1nn,
+																				k * edge_count_search_factor, use_cuts,
+																				min_cluster_size, max_cluster_size,
+																				very_early_termination,
+																				use_clusters_data,
+																				minimize_noncluster_edges,
+																				coarse_search, cluster_overlap, use_pq,
+																				pq_clusters, pq_subspaces);
+															}
+														}
+													}
 												}
 											}
 										}
