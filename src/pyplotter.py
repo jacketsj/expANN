@@ -58,7 +58,7 @@ def prepare_data(file_name, x_axis, y_axis, use_param_x, use_param_y):
         annotation = "<b>Statistics:</b><br>"
         annotation += "<br>".join([
             f"{k}: {v}" for k, v in benchdata.items()
-            if k not in ['param_list', x_axis, y_axis]
+            if k not in ['param_list']
         ])
         annotation += "<br><br><b>Param List:</b><br>"
         annotation += "<br>".join(
