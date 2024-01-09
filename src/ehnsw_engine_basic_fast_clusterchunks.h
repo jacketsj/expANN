@@ -29,11 +29,13 @@ struct ehnsw_engine_basic_fast_clusterchunks_config {
 	bool use_clusters_data;
 	bool minimize_noncluster_edges;
 	bool coarse_search;
+	size_t cluster_overlap;
 	ehnsw_engine_basic_fast_clusterchunks_config(
 			size_t _M, size_t _M0, size_t _ef_search_mult, size_t _ef_construction,
 			bool _use_cuts, size_t _min_cluster_size, size_t _max_cluster_size,
 			bool _very_early_termination, bool _use_clusters_data,
-			bool _minimize_noncluster_edges, bool _coarse_search)
+			bool _minimize_noncluster_edges, bool _coarse_search,
+			size_t _cluster_overlap)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), use_cuts(_use_cuts),
 				min_cluster_size(_min_cluster_size),
@@ -41,7 +43,7 @@ struct ehnsw_engine_basic_fast_clusterchunks_config {
 				very_early_termination(_very_early_termination),
 				use_clusters_data(_use_clusters_data),
 				minimize_noncluster_edges(_minimize_noncluster_edges),
-				coarse_search(_coarse_search) {}
+				coarse_search(_coarse_search), cluster_overlap(_cluster_overlap) {}
 };
 
 template <typename T>
@@ -62,6 +64,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	bool use_clusters_data;
 	bool minimize_noncluster_edges;
 	bool coarse_search;
+	size_t cluster_overlap;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -79,7 +82,8 @@ struct ehnsw_engine_basic_fast_clusterchunks
 				very_early_termination(conf.very_early_termination),
 				use_clusters_data(conf.use_clusters_data),
 				minimize_noncluster_edges(conf.minimize_noncluster_edges),
-				coarse_search(conf.coarse_search), max_layer(0) {}
+				coarse_search(conf.coarse_search),
+				cluster_overlap(conf.cluster_overlap), max_layer(0) {}
 	using config = ehnsw_engine_basic_fast_clusterchunks_config;
 	std::vector<vec<T>> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
@@ -321,7 +325,11 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		clusters.clear();
 		clusters.resize(centroids.size());
 		for (size_t i = 0; i < all_entries.size(); ++i) {
-			clusters[sub_engine.query_k(all_entries[i], 1)[0]].emplace_back(i);
+			auto sub_engine_results =
+					sub_engine.query_k(all_entries[i], cluster_overlap);
+			for (size_t j = 0; j < cluster_overlap; ++j) {
+				clusters[sub_engine_results[j]].emplace_back(i);
+			}
 		}
 	};
 	auto compute_centroids = [&]() {
@@ -369,73 +377,76 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 		compute_centroids();
 	}
 	assign_to_clusters();
-	reverse_clusters.resize(all_entries.size());
-	for (size_t i = 0; i < clusters.size(); ++i) {
-		for (size_t j : clusters[i])
-			reverse_clusters[j] = i;
-	}
-	if (minimize_noncluster_edges) {
-		std::cout << "About to start minimizing noncluster edges" << std::endl;
-		// std::vector<size_t> next_reverse_clusters(all_entries.size());
-		for (size_t i = 0; i < max_iters; ++i) {
-			std::cout << "Iteration no. " << i << " of minimizing noncluster edges"
-								<< std::endl;
-			// sort clusters by increasing size
-			std::vector<std::pair<size_t, size_t>> cluster_order;
-			for (size_t i = 0; i < clusters.size(); ++i) {
-				cluster_order.emplace_back(clusters[i].size(), i);
-			}
-			std::sort(cluster_order.begin(), cluster_order.end());
-			for (auto [_, cluster_index] : cluster_order) {
-				size_t num_removed = 0;
-				for (size_t data_index : clusters[cluster_index]) {
-					// decide if data_index should be moved to a different cluster
-					robin_hood::unordered_flat_map<size_t, double> cluster_connectivity;
-					for (const auto& [adjacent_d2, adjacent_data_index] :
-							 hadj_flat_with_lengths[data_index][0]) {
-						size_t adjacent_cluster_index =
-								reverse_clusters[adjacent_data_index];
-						// TODO consider removing this restriction or replacing it with a
-						// looser one
-						if (clusters[adjacent_cluster_index].size() <
-								clusters[cluster_index].size() - num_removed)
-							cluster_connectivity[adjacent_cluster_index] += 1.0 / adjacent_d2;
-					}
-					double best_modularity_gain = 0.0;
-					size_t best_cluster = cluster_index;
-					for (const auto& [adjacent_cluster, connectivity] :
-							 cluster_connectivity) {
-						if (adjacent_cluster != cluster_index) {
-							double expected_connectivity =
-									clusters[adjacent_cluster].size() /
-									dist2(all_entries[data_index], centroids[adjacent_cluster]);
+	if (cluster_overlap == 1) {
+		reverse_clusters.resize(all_entries.size());
+		for (size_t i = 0; i < clusters.size(); ++i) {
+			for (size_t j : clusters[i])
+				reverse_clusters[j] = i;
+		}
+		if (minimize_noncluster_edges) {
+			std::cout << "About to start minimizing noncluster edges" << std::endl;
+			// std::vector<size_t> next_reverse_clusters(all_entries.size());
+			for (size_t i = 0; i < max_iters; ++i) {
+				std::cout << "Iteration no. " << i << " of minimizing noncluster edges"
+									<< std::endl;
+				// sort clusters by increasing size
+				std::vector<std::pair<size_t, size_t>> cluster_order;
+				for (size_t i = 0; i < clusters.size(); ++i) {
+					cluster_order.emplace_back(clusters[i].size(), i);
+				}
+				std::sort(cluster_order.begin(), cluster_order.end());
+				for (auto [_, cluster_index] : cluster_order) {
+					size_t num_removed = 0;
+					for (size_t data_index : clusters[cluster_index]) {
+						// decide if data_index should be moved to a different cluster
+						robin_hood::unordered_flat_map<size_t, double> cluster_connectivity;
+						for (const auto& [adjacent_d2, adjacent_data_index] :
+								 hadj_flat_with_lengths[data_index][0]) {
+							size_t adjacent_cluster_index =
+									reverse_clusters[adjacent_data_index];
+							// TODO consider removing this restriction or replacing it with a
+							// looser one
+							if (clusters[adjacent_cluster_index].size() <
+									clusters[cluster_index].size() - num_removed)
+								cluster_connectivity[adjacent_cluster_index] +=
+										1.0 / adjacent_d2;
+						}
+						double best_modularity_gain = 0.0;
+						size_t best_cluster = cluster_index;
+						for (const auto& [adjacent_cluster, connectivity] :
+								 cluster_connectivity) {
+							if (adjacent_cluster != cluster_index) {
+								double expected_connectivity =
+										clusters[adjacent_cluster].size() /
+										dist2(all_entries[data_index], centroids[adjacent_cluster]);
 
-							double modularity_gain = connectivity - expected_connectivity;
-							if (modularity_gain > best_modularity_gain) {
-								best_modularity_gain = modularity_gain;
-								best_cluster = adjacent_cluster;
+								double modularity_gain = connectivity - expected_connectivity;
+								if (modularity_gain > best_modularity_gain) {
+									best_modularity_gain = modularity_gain;
+									best_cluster = adjacent_cluster;
+								}
 							}
 						}
+						reverse_clusters[data_index] = best_cluster;
+						if (cluster_index != reverse_clusters[data_index]) {
+							clusters[reverse_clusters[data_index]].emplace_back(data_index);
+							++num_removed;
+						}
 					}
-					reverse_clusters[data_index] = best_cluster;
-					if (cluster_index != reverse_clusters[data_index]) {
-						clusters[reverse_clusters[data_index]].emplace_back(data_index);
-						++num_removed;
-					}
+					std::vector<size_t> new_cluster_data;
+					for (size_t data_index : clusters[cluster_index])
+						if (reverse_clusters[data_index] == cluster_index)
+							new_cluster_data.emplace_back(data_index);
+					clusters[cluster_index] = new_cluster_data;
 				}
-				std::vector<size_t> new_cluster_data;
-				for (size_t data_index : clusters[cluster_index])
-					if (reverse_clusters[data_index] == cluster_index)
-						new_cluster_data.emplace_back(data_index);
-				clusters[cluster_index] = new_cluster_data;
+				clusters.clear();
+				clusters.resize(centroids.size());
+				for (size_t data_index = 0; data_index < all_entries.size();
+						 ++data_index) {
+					clusters[reverse_clusters[data_index]].emplace_back(data_index);
+				}
+				compute_centroids();
 			}
-			clusters.clear();
-			clusters.resize(centroids.size());
-			for (size_t data_index = 0; data_index < all_entries.size();
-					 ++data_index) {
-				clusters[reverse_clusters[data_index]].emplace_back(data_index);
-			}
-			compute_centroids();
 		}
 	}
 	if (use_clusters_data) {

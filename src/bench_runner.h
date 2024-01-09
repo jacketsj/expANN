@@ -159,13 +159,19 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								for (bool use_clusters_data : {true}) {
 									for (bool minimize_noncluster_edges : {false}) {
 										for (bool coarse_search : {false, true}) {
-											if (true) {
-												ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>, k,
-																2 * k, num_for_1nn,
-																k * edge_count_search_factor, use_cuts,
-																min_cluster_size, max_cluster_size,
-																very_early_termination, use_clusters_data,
-																minimize_noncluster_edges, coarse_search);
+											std::vector<size_t> cluster_overlap_vals = {1};
+											if (coarse_search)
+												cluster_overlap_vals = {1, 2, 4};
+											for (size_t cluster_overlap : cluster_overlap_vals) {
+												if (true) {
+													ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>,
+																	k, 2 * k, num_for_1nn,
+																	k * edge_count_search_factor, use_cuts,
+																	min_cluster_size, max_cluster_size,
+																	very_early_termination, use_clusters_data,
+																	minimize_noncluster_edges, coarse_search,
+																	cluster_overlap);
+												}
 											}
 										}
 										if (false) {
