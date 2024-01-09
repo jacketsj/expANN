@@ -808,9 +808,14 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 					results.emplace_back(d_next, next);
 				}
 		}
+		std::sort(results.begin(), results.end());
+		auto last = std::unique(results.begin(), results.end(),
+														[](const measured_data& a, const measured_data& b) {
+															return a.second == b.second;
+														});
+		results.erase(last, results.end());
+
 		size_t ret_size = std::min(k, results.size());
-		std::partial_sort(results.begin(), results.begin() + ret_size,
-											results.end());
 		results.resize(ret_size);
 		std::vector<size_t> ret;
 		for (size_t i = 0; i < results.size() && i < k; ++i) {
