@@ -23,6 +23,7 @@ struct product_quantizer_3 {
 	product_quantizer_3(const std::vector<Vector_t>& data_vecs,
 											size_t num_centroids, size_t subvector_size)
 			: subvector_size(subvector_size) {
+		num_centroids = std::min(num_centroids, data_vecs.size());
 		auto centroids = k_means_cluster(data_vecs, num_centroids);
 		size_t num_subvectors = centroids[0].size() / subvector_size;
 		sub_centroids.resize(num_subvectors);
