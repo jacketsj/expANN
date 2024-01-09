@@ -141,7 +141,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 60; k <= 60; k += 20) {
-		for (size_t num_for_1nn = 3; num_for_1nn <= 6; num_for_1nn += 3) { // 5
+		for (size_t num_for_1nn : {4, 6}) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
@@ -162,7 +162,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										for (bool coarse_search : {true}) { // false, true
 											std::vector<size_t> cluster_overlap_vals = {1};
 											if (coarse_search)
-												cluster_overlap_vals = {1, 2};
+												cluster_overlap_vals = {2}; // 1,2
 											for (size_t cluster_overlap : cluster_overlap_vals) {
 												if (true) {
 													ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<float>,
