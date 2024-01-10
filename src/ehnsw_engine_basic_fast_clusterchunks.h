@@ -82,8 +82,6 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	size_t total_projected_degree;
 	size_t total_clusters_checked;
 	size_t total_clusters_checked_sizes;
-	float average_distance_error;
-	size_t average_distance_error_den;
 #endif
 	ehnsw_engine_basic_fast_clusterchunks(
 			ehnsw_engine_basic_fast_clusterchunks_config conf)
@@ -157,8 +155,6 @@ struct ehnsw_engine_basic_fast_clusterchunks
 		add_param(pl, total_projected_degree);
 		add_param(pl, total_clusters_checked);
 		add_param(pl, total_clusters_checked_sizes);
-		add_param(pl, average_distance_error);
-		add_param(pl, average_distance_error_den);
 #endif
 		return pl;
 	}
@@ -526,8 +522,6 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 #ifdef RECORD_STATS
 	// reset before queries
 	num_distcomps = 0;
-	average_distance_error = 0;
-	average_distance_error_den = 0;
 #endif
 
 	std::cout << "Finished build" << std::endl;
@@ -834,13 +828,6 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 						 ++inside_cluster_index) {
 					results.emplace_back(distances[inside_cluster_index],
 															 clusters[cluster_index][inside_cluster_index]);
-#ifdef RECORD_STATS
-					average_distance_error_den++;
-					T d_next =
-							dist2(q, clusters_data[cluster_index][inside_cluster_index]);
-					average_distance_error +=
-							abs(distances[inside_cluster_index] - d_next) / d_next;
-#endif
 				}
 			}
 		} else if (use_clusters_data) {
