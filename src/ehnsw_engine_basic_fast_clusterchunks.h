@@ -11,7 +11,8 @@
 #include <vector>
 
 #include "ann_engine.h"
-#include "product_quantizer_3.h"
+// #include "product_quantizer_3.h"
+#include "product_quantizer_4.h"
 #include "randomgeometry.h"
 #include "robin_hood.h"
 #include "topk_t.h"
@@ -81,6 +82,8 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	size_t total_projected_degree;
 	size_t total_clusters_checked;
 	size_t total_clusters_checked_sizes;
+	float average_distance_error;
+	size_t average_distance_error_den;
 #endif
 	ehnsw_engine_basic_fast_clusterchunks(
 			ehnsw_engine_basic_fast_clusterchunks_config conf)
@@ -107,7 +110,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	std::vector<vec<T>> centroids;
 	std::vector<std::vector<size_t>> clusters;
 	std::vector<std::vector<vec<T>>> clusters_data;
-	std::vector<product_quantizer_3> clusters_searchers;
+	std::vector<product_quantizer_4> clusters_searchers;
 	std::vector<size_t> reverse_clusters;
 	std::vector<std::vector<size_t>> hadj_bottom_projected;
 	std::unique_ptr<ehnsw_engine_basic_fast<T>> coarse_searcher;
@@ -154,6 +157,8 @@ struct ehnsw_engine_basic_fast_clusterchunks
 		add_param(pl, total_projected_degree);
 		add_param(pl, total_clusters_checked);
 		add_param(pl, total_clusters_checked_sizes);
+		add_param(pl, average_distance_error);
+		add_param(pl, average_distance_error_den);
 #endif
 		return pl;
 	}
@@ -494,6 +499,7 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 				for (size_t i : clusters[cluster_index]) {
 					residuals.emplace_back(
 							(all_entries[i] - centroids[cluster_index]).get_underlying());
+					//(all_entries[i].get_underlying());
 				}
 				clusters_searchers.emplace_back(residuals, pq_clusters,
 																				all_entries[0].size() / pq_subspaces);
@@ -520,6 +526,8 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 #ifdef RECORD_STATS
 	// reset before queries
 	num_distcomps = 0;
+	average_distance_error = 0;
+	average_distance_error_den = 0;
 #endif
 
 	std::cout << "Finished build" << std::endl;
@@ -820,11 +828,19 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 				std::vector<T> distances =
 						clusters_searchers[cluster_index].compute_distances(
 								q - centroids[cluster_index]);
+				// q);
 				for (size_t inside_cluster_index = 0;
 						 inside_cluster_index < clusters[cluster_index].size();
 						 ++inside_cluster_index) {
 					results.emplace_back(distances[inside_cluster_index],
 															 clusters[cluster_index][inside_cluster_index]);
+#ifdef RECORD_STATS
+					average_distance_error_den++;
+					T d_next =
+							dist2(q, clusters_data[cluster_index][inside_cluster_index]);
+					average_distance_error +=
+							abs(distances[inside_cluster_index] - d_next) / d_next;
+#endif
 				}
 			}
 		} else if (use_clusters_data) {
@@ -862,6 +878,13 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 															return a.second == b.second;
 														});
 		results.erase(last, results.end());
+		std::partial_sort(results.begin(),
+											results.begin() +
+													std::min(results.size(), k * ef_search_mult),
+											results.end());
+		for (size_t i = 0; i < results.size(); ++i) {
+			results[i].first = dist2(q, all_entries[results[i].second]);
+		}
 		std::partial_sort(results.begin(),
 											results.begin() + std::min(results.size(), k),
 											results.end());
