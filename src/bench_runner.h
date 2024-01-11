@@ -149,7 +149,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			}
 			for (size_t edge_count_search_factor : {3, 5}) { // 3
 				for (bool use_cuts : {false}) {
-					if (false) {
+					if (true) {
 						ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 										k * edge_count_search_factor, use_cuts);
 					}

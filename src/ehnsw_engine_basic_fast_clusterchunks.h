@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "ann_engine.h"
-// #include "product_quantizer_3.h"
-#include "product_quantizer_4.h"
+#include "product_quantizer_3.h"
+// #include "product_quantizer_4.h"
 #include "randomgeometry.h"
 #include "robin_hood.h"
 #include "topk_t.h"
@@ -108,7 +108,7 @@ struct ehnsw_engine_basic_fast_clusterchunks
 	std::vector<vec<T>> centroids;
 	std::vector<std::vector<size_t>> clusters;
 	std::vector<std::vector<vec<T>>> clusters_data;
-	std::vector<product_quantizer_4> clusters_searchers;
+	std::vector<product_quantizer_3> clusters_searchers;
 	std::vector<size_t> reverse_clusters;
 	std::vector<std::vector<size_t>> hadj_bottom_projected;
 	std::unique_ptr<ehnsw_engine_basic_fast<T>> coarse_searcher;
@@ -217,6 +217,9 @@ template <typename T>
 void ehnsw_engine_basic_fast_clusterchunks<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	all_entries.push_back(v);
+
+	if (v_index % 10000 == 0)
+		std::cout << "Adding vector no. " << v_index << std::endl;
 
 	e_labels.emplace_back();
 	for (size_t cut = 0; cut < M0 - 2 * 10; ++cut)
@@ -368,6 +371,10 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 	const size_t max_iters = M / 2;
 	vec_generator<T> rvgen(all_entries[0].size());
 	for (size_t iter = 0; iter < max_iters; ++iter) {
+		if (iter % 5 == 0) {
+			std::cout << "Running accel-k-means clustering iteration no. " << iter
+								<< std::endl;
+		}
 		assign_to_clusters();
 		// loosely enforce min/max cluster sizes
 		std::vector<std::vector<size_t>> clusters_new;
