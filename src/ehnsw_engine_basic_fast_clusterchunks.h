@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "ann_engine.h"
+// #include "product_quantizer_5.h"
 #include "product_quantizer_3.h"
-// #include "product_quantizer_4.h"
 #include "randomgeometry.h"
 #include "robin_hood.h"
 #include "topk_t.h"
