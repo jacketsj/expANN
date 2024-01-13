@@ -500,12 +500,12 @@ template <typename T> void ehnsw_engine_basic_fast_clusterchunks<T>::_build() {
 					 ++cluster_index) {
 				std::vector<typename vec<T>::Underlying> residuals;
 				for (size_t i : clusters[cluster_index]) {
-					residuals.emplace_back(
-							(all_entries[i] - centroids[cluster_index]).get_underlying());
+					residuals.emplace_back((all_entries[i] - centroids[cluster_index]));
 					//(all_entries[i].get_underlying());
 				}
-				clusters_searchers.emplace_back(residuals, pq_clusters,
-																				all_entries[0].size() / pq_subspaces);
+				clusters_searchers.emplace_back(
+						residuals); //, pq_clusters,
+												// all_entries[0].size() / pq_subspaces);
 			}
 			std::cout << "Just finished pq indexing" << std::endl;
 		}
@@ -828,7 +828,7 @@ ehnsw_engine_basic_fast_clusterchunks<T>::_query_k(const vec<T>& q, size_t k) {
 			for (size_t cluster_index : clusters_to_check) {
 				std::vector<T> distances =
 						clusters_searchers[cluster_index].compute_distances(
-								q - centroids[cluster_index]);
+								(q - centroids[cluster_index]).get_underlying());
 				// q);
 				for (size_t inside_cluster_index = 0;
 						 inside_cluster_index < clusters[cluster_index].size();
