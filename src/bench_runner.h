@@ -140,14 +140,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 hnsw_engine_reference<float>, ensg_engine<float>>
 			job_lists;
 
-	for (size_t k = 60; k <= 60; k += 20) {
-		for (size_t num_for_1nn : {4}) { // 5
+	for (size_t k = 60; k <= 80; k += 20) {
+		for (size_t num_for_1nn : {2}) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
 				}
 			}
-			for (size_t edge_count_search_factor : {3, 5}) { // 3
+			for (size_t edge_count_search_factor : {3}) { // 3
 				for (bool use_cuts : {false}) {
 					if (true) {
 						ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
@@ -166,7 +166,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 												for (bool use_pq : {true}) {
 													for (size_t pq_clusters : {8, 16}) {
 														for (size_t pq_subspaces : {8, 32}) {
-															if (true) {
+															if (false) {
 																ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<
 																						float>,
 																				k, 2 * k, num_for_1nn,
@@ -201,7 +201,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										num_for_1nn, k * edge_count_search_factor, use_cuts);
 					}
 				}
-				if (false) {
+				if (true) {
 					for (bool use_ecuts : {false}) {
 						ADD_JOB(hnsw_engine_reference<float>, k,
 										edge_count_search_factor * k, num_for_1nn, use_ecuts);
