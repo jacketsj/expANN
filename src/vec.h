@@ -14,16 +14,12 @@
 
 template <typename> struct ChooseUnderlying;
 
-template <> struct ChooseUnderlying<float> {
+template <typename T> struct ChooseUnderlying {
 #ifdef DIM
-	using Underlying = Eigen::Matrix<float, DIM, 1>;
+	using Underlying = Eigen::Matrix<T, DIM, 1>;
 #else
-	using Underlying = Eigen::VectorXf;
+	using Underlying = Eigen::VectorX<T>;
 #endif
-};
-
-template <> struct ChooseUnderlying<double> {
-	using Underlying = Eigen::VectorXd;
 };
 
 // template <typename T> struct ChooseUnderlying {
@@ -50,6 +46,10 @@ public:
 	}
 	vec(const Underlying& _internal) : internal(_internal) {}
 	vec(Underlying&& _internal) : internal(_internal) {}
+	template <typename T2> vec(vec<T2> other) : internal(other.internal.size()) {
+		for (int i = 0; i < other.size(); ++i)
+			internal(i) = static_cast<T>(other.internal(i));
+	}
 	T* data() { return internal.data(); }
 	void set_dim(size_t dim) { internal.resize(dim); }
 	size_t size() const { return size_t(internal.size()); }
