@@ -8,6 +8,7 @@
 #include "basic_bench.h"
 #include "bench_data_manager.h"
 
+#include "antitopo_engine.h"
 #include "dataset.h"
 #include "dataset_loader.h"
 #include "ehnsw_engine_basic_fast.h"
