@@ -105,12 +105,13 @@ antitopo_engine<T>::prune_edges(size_t layer, size_t from,
 			auto v2 = (all_entries[md_chosen.second] - origin).normalized();
 			if (md.first == md_chosen.first || dist2(v1, v2) <= 1.0) {
 				choose = false;
-			}
-			if (choose)
-				ret.emplace_back(md);
-			if (ret.size() >= edge_count_mult)
 				break;
+			}
 		}
+		if (choose)
+			ret.emplace_back(md);
+		if (ret.size() >= edge_count_mult)
+			break;
 	}
 	return ret;
 }
