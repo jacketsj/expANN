@@ -140,7 +140,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 ehnsw_engine_basic_fast_clusterchunks_pqprune<float>,
 					 ehnsw_engine_basic_fast_multilist<float>,
 					 multi_engine_partition<float>, hnsw_engine_reference<float>,
-					 ensg_engine<float>>
+					 ensg_engine<float>, antitopo_engine<float>>
 			job_lists;
 
 	for (size_t k = 70; k <= 80; k += 20) {
@@ -153,9 +153,13 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			for (size_t edge_count_search_factor : {3}) { // 3
 				for (bool use_cuts : {false}) {
 					for (bool use_compression : {false, true}) {
-						if (true) {
+						if (false) {
 							ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 											k * edge_count_search_factor, use_cuts, use_compression);
+						}
+						if (true) {
+							ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
+											k * edge_count_search_factor, use_compression);
 						}
 					}
 					for (size_t num_splits : {4, 12, 32}) {
