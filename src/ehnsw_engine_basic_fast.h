@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <iostream>
 #include <queue>
 #include <random>
 #include <string>
@@ -18,10 +19,13 @@ struct ehnsw_engine_basic_fast_config {
 	size_t ef_search_mult;
 	size_t ef_construction;
 	bool use_cuts;
+	bool use_compression;
 	ehnsw_engine_basic_fast_config(size_t _M, size_t _M0, size_t _ef_search_mult,
-																 size_t _ef_construction, bool _use_cuts)
+																 size_t _ef_construction, bool _use_cuts,
+																 bool _use_compression = false)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
-				ef_construction(_ef_construction), use_cuts(_use_cuts) {}
+				ef_construction(_ef_construction), use_cuts(_use_cuts),
+				use_compression(_use_compression) {}
 };
 
 template <typename T>
@@ -36,6 +40,7 @@ struct ehnsw_engine_basic_fast
 	size_t ef_search_mult;
 	size_t ef_construction;
 	bool use_cuts;
+	bool use_compression;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -44,9 +49,10 @@ struct ehnsw_engine_basic_fast
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), use_cuts(conf.use_cuts),
-				max_layer(0) {}
+				use_compression(conf.use_compression), max_layer(0) {}
 	using config = ehnsw_engine_basic_fast_config;
 	std::vector<vec<T>> all_entries;
+	std::vector<vec<Eigen::half>> all_entries_compressed;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
 	std::vector<std::vector<size_t>>
@@ -61,9 +67,9 @@ struct ehnsw_engine_basic_fast
 	size_t num_cuts() { return use_cuts ? e_labels[0].size() : 0; }
 	std::vector<std::pair<T, size_t>>
 	prune_edges(size_t layer, size_t from, std::vector<std::pair<T, size_t>> to);
-	template <bool use_bottomlayer>
+	template <bool use_bottomlayer, bool use_compressed, typename T2 = T>
 	std::vector<std::pair<T, size_t>>
-	query_k_at_layer(const vec<T>& q, size_t layer,
+	query_k_at_layer(const vec<T2>& q, size_t layer,
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
@@ -76,6 +82,8 @@ struct ehnsw_engine_basic_fast
 		add_param(pl, M0);
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
+		add_param(pl, use_cuts);
+		add_param(pl, use_compression);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 #endif
@@ -108,6 +116,7 @@ ehnsw_engine_basic_fast<T>::prune_edges(size_t layer, size_t from,
 		if (ret.size() >= edge_count_mult)
 			break;
 		bool choose = true;
+		auto origin = all_entries[from];
 		for (const auto& md_chosen : ret) {
 			if (md.first == md_chosen.first ||
 					dist2(all_entries[md.second], all_entries[md_chosen.second]) <=
@@ -145,6 +154,11 @@ template <typename T>
 void ehnsw_engine_basic_fast<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
 	all_entries.push_back(v);
+	all_entries_compressed.emplace_back(v);
+
+	if (v_index % 1000 == 0) {
+		std::cout << "Storing v_index=" << v_index << std::endl;
+	}
 
 	e_labels.emplace_back();
 	for (size_t cut = 0; cut < M0 - 2 * 10; ++cut)
@@ -194,7 +208,7 @@ void ehnsw_engine_basic_fast<T>::_store_vector(const vec<T>& v) {
 		for (int layer = std::min(new_max_layer, max_layer - 1); layer >= 0;
 				 --layer) {
 			kNN_per_layer.emplace_back(
-					query_k_at_layer<false>(v, layer, cur, ef_construction));
+					query_k_at_layer<false, false>(v, layer, cur, ef_construction));
 			cur.clear();
 			for (auto& md : kNN_per_layer.back()) {
 				cur.emplace_back(md.second);
@@ -258,9 +272,9 @@ template <typename T> void ehnsw_engine_basic_fast<T>::_build() {
 }
 
 template <typename T>
-template <bool use_bottomlayer>
+template <bool use_bottomlayer, bool use_compressed, typename T2>
 std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
-		const vec<T>& q, size_t layer, const std::vector<size_t>& entry_points,
+		const vec<T2>& q, size_t layer, const std::vector<size_t>& entry_points,
 		size_t k) {
 	using measured_data = std::pair<T, size_t>;
 
@@ -271,6 +285,12 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 			return hadj_flat[index][layer];
 		}
 	};
+	auto get_data = [&](const size_t& data_index) -> auto& {
+		if constexpr (use_compressed)
+			return all_entries_compressed[data_index];
+		else
+			return all_entries[data_index];
+	};
 
 	auto worst_elem = [](const measured_data& a, const measured_data& b) {
 		return a.first < b.first;
@@ -279,11 +299,14 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 		return a.first > b.first;
 	};
 	std::vector<measured_data> entry_points_with_dist;
+	auto distfn = [&](const auto& a, const auto& b) {
+		return (a.internal - b.internal).squaredNorm();
+	};
 	for (auto& entry_point : entry_points) {
 #ifdef RECORD_STATS
 		++num_distcomps;
 #endif
-		entry_points_with_dist.emplace_back(dist2(q, all_entries[entry_point]),
+		entry_points_with_dist.emplace_back(distfn(q, get_data(entry_point)),
 																				entry_point);
 	}
 
@@ -321,7 +344,7 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 		auto do_loop_prefetch = [&](size_t i) constexpr {
 #ifdef DIM
 			for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
-				_mm_prefetch(((char*)&all_entries[neighbour_list[i]]) + mult * 64,
+				_mm_prefetch(((char*)&get_data(neighbour_list[i])) + mult * 64,
 										 _MM_HINT_T0);
 #endif
 			//_mm_prefetch(&visited[neighbour_list[i]], _MM_HINT_T0);
@@ -347,7 +370,7 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 #ifdef RECORD_STATS
 			++num_distcomps;
 #endif
-			T d_next = dist2(q, all_entries[next]);
+			T d_next = distfn(q, get_data(next));
 			if (nearest.size() < k || d_next < nearest.top().first) {
 				candidates.emplace(d_next, next);
 				nearest.emplace(d_next, next);
@@ -372,9 +395,15 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 		visited[v] = false;
 	visited_recent.clear();
 	std::vector<measured_data> ret;
+	std::sort(ret.begin(), ret.end());
 	while (!nearest.empty()) {
 		ret.emplace_back(nearest.top());
 		nearest.pop();
+	}
+	if constexpr (use_compressed) {
+		for (auto& [d, data_index] : ret) {
+			d = distfn(get_data(data_index), q);
+		}
 	}
 	reverse(ret.begin(), ret.end());
 	return ret;
@@ -407,8 +436,15 @@ std::vector<size_t> ehnsw_engine_basic_fast<T>::_query_k(const vec<T>& q,
 		}
 	}
 
-	auto ret_combined =
-			query_k_at_layer<true>(q, 0, {entry_point}, k * ef_search_mult);
+	std::vector<std::pair<T, size_t>> ret_combined;
+	if (use_compression) {
+		auto qc = vec<Eigen::half>(q);
+		ret_combined =
+				query_k_at_layer<true, true>(qc, 0, {entry_point}, k * ef_search_mult);
+	} else {
+		ret_combined =
+				query_k_at_layer<true, false>(q, 0, {entry_point}, k * ef_search_mult);
+	}
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;
@@ -446,7 +482,7 @@ ehnsw_engine_basic_fast<T>::query_k_combined(const vec<T>& q, size_t k) {
 	}
 
 	auto ret_combined =
-			query_k_at_layer<true>(q, 0, {entry_point}, k * ef_search_mult);
+			query_k_at_layer<true, false>(q, 0, {entry_point}, k * ef_search_mult);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	return ret_combined;
