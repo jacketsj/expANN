@@ -103,6 +103,8 @@ antitopo_engine<T>::prune_edges(size_t layer, size_t from,
 		return to;
 	}
 
+	constexpr size_t in_advance = 2;
+
 	sort(to.begin(), to.end());
 	std::vector<std::pair<T, size_t>> ret;
 	robin_hood::unordered_flat_set<size_t> added;
@@ -114,19 +116,40 @@ antitopo_engine<T>::prune_edges(size_t layer, size_t from,
 		bool choose = true;
 		auto v1 = (all_entries[md.second] - origin).normalized();
 		// auto _mm_prefetch(&all_entries[md_chosen.second], _MM_HINT_T0);
-		for (const auto& v2 : normalized_ret) {
+		auto do_loop_prefetch = [&](const size_t& index) constexpr {
+#ifdef DIM
+			for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
+				_mm_prefetch(((char*)&normalized_ret[index]) + mult * 64, _MM_HINT_T0);
+#endif
+		};
+		auto iter = [&]<bool inAdvanceIter>(const auto& index) constexpr {
+			if constexpr (inAdvanceIter) {
+				do_loop_prefetch(index + in_advance);
+			}
+			const auto& v2 = normalized_ret[index];
 			if (dist2(v1, v2) <= 1.0) {
 				choose = false;
-				break;
 			}
+		};
+		for (size_t next_i_pre = 0;
+				 next_i_pre < std::min(in_advance, normalized_ret.size());
+				 ++next_i_pre) {
+			do_loop_prefetch(next_i_pre);
+		}
+		size_t next_i = 0;
+		for (; next_i + in_advance < normalized_ret.size() && choose; ++next_i) {
+			iter.template operator()<true>(next_i);
+		}
+		for (; next_i < normalized_ret.size() && choose; ++next_i) {
+			iter.template operator()<false>(next_i);
 		}
 		if (choose) {
 			ret.emplace_back(md);
 			normalized_ret.emplace_back(v1);
 			added.insert(md.first);
+			if (ret.size() >= edge_count_mult)
+				break;
 		}
-		if (ret.size() >= edge_count_mult)
-			break;
 	}
 	return ret;
 }
