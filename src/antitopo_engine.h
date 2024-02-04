@@ -13,6 +13,13 @@
 #include "robin_hood.h"
 #include "topk_t.h"
 
+namespace {
+
+template <typename A, typename B> auto dist2(const A& a, const B& b) {
+	return (a - b).squaredNorm();
+}
+} // namespace
+
 struct antitopo_engine_config {
 	size_t M;
 	size_t M0;
@@ -27,6 +34,7 @@ struct antitopo_engine_config {
 
 template <typename T>
 struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
+	using fvec = typename vec<T>::Underlying;
 	std::random_device rd;
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
@@ -46,9 +54,9 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				ef_construction(conf.ef_construction),
 				use_compression(conf.use_compression), max_layer(0) {}
 	using config = antitopo_engine_config;
-	std::vector<vec<T>> all_entries;
+	std::vector<fvec> all_entries;
 	using compressed_t = Eigen::half;
-	std::vector<vec<compressed_t>> all_entries_compressed;
+	std::vector<vec<compressed_t>::Underlying> all_entries_compressed;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
 	std::vector<std::vector<size_t>>
@@ -97,29 +105,37 @@ antitopo_engine<T>::prune_edges(size_t layer, size_t from,
 
 	sort(to.begin(), to.end());
 	std::vector<std::pair<T, size_t>> ret;
+	robin_hood::unordered_flat_set<size_t> added;
+	std::vector<fvec> normalized_ret;
 	auto origin = all_entries[from];
 	for (const auto& md : to) {
+		if (added.contains(md.first))
+			continue;
 		bool choose = true;
-		for (const auto& md_chosen : ret) {
-			auto v1 = (all_entries[md.second] - origin).normalized();
-			auto v2 = (all_entries[md_chosen.second] - origin).normalized();
-			if (md.first == md_chosen.first || dist2(v1, v2) <= 1.0) {
+		auto v1 = (all_entries[md.second] - origin).normalized();
+		// auto _mm_prefetch(&all_entries[md_chosen.second], _MM_HINT_T0);
+		for (const auto& v2 : normalized_ret) {
+			if (dist2(v1, v2) <= 1.0) {
 				choose = false;
 				break;
 			}
 		}
-		if (choose)
+		if (choose) {
 			ret.emplace_back(md);
+			normalized_ret.emplace_back(v1);
+			added.insert(md.first);
+		}
 		if (ret.size() >= edge_count_mult)
 			break;
 	}
 	return ret;
 }
 
-template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v) {
+template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v0) {
+	auto v = v0.internal;
 	size_t v_index = all_entries.size();
-	all_entries.push_back(v);
-	all_entries_compressed.emplace_back(v);
+	all_entries.emplace_back(v);
+	all_entries_compressed.emplace_back(vec<compressed_t>(v0).internal);
 
 	if (v_index % 1000 == 0) {
 		std::cout << "Storing v_index=" << v_index << std::endl;
@@ -169,7 +185,7 @@ template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v) {
 		for (int layer = std::min(new_max_layer, max_layer - 1); layer >= 0;
 				 --layer) {
 			kNN_per_layer.emplace_back(
-					query_k_at_layer<false, false>(v, layer, cur, ef_construction));
+					query_k_at_layer<false, false>(v0, layer, cur, ef_construction));
 			cur.clear();
 			for (auto& md : kNN_per_layer.back()) {
 				cur.emplace_back(md.second);
@@ -235,10 +251,11 @@ template <typename T> void antitopo_engine<T>::_build() {
 template <typename T>
 template <bool use_bottomlayer, bool use_compressed, typename T2>
 std::vector<std::pair<T, size_t>>
-antitopo_engine<T>::query_k_at_layer(const vec<T2>& q, size_t layer,
+antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
 																		 const std::vector<size_t>& entry_points,
 																		 size_t k) {
 	using measured_data = std::pair<T, size_t>;
+	const auto& q = q0.internal;
 
 	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
 		if constexpr (use_bottomlayer) {
@@ -261,14 +278,11 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q, size_t layer,
 		return a.first > b.first;
 	};
 	std::vector<measured_data> entry_points_with_dist;
-	auto distfn = [&](const auto& a, const auto& b) {
-		return (a.internal - b.internal).squaredNorm();
-	};
 	for (auto& entry_point : entry_points) {
 #ifdef RECORD_STATS
 		++num_distcomps;
 #endif
-		entry_points_with_dist.emplace_back(distfn(q, get_data(entry_point)),
+		entry_points_with_dist.emplace_back(dist2(q, get_data(entry_point)),
 																				entry_point);
 	}
 
@@ -332,7 +346,7 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q, size_t layer,
 #ifdef RECORD_STATS
 			++num_distcomps;
 #endif
-			T d_next = distfn(q, get_data(next));
+			T d_next = dist2(q, get_data(next));
 			if (nearest.size() < k || d_next < nearest.top().first) {
 				candidates.emplace(d_next, next);
 				nearest.emplace(d_next, next);
@@ -364,7 +378,7 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q, size_t layer,
 	}
 	if constexpr (use_compressed) {
 		for (auto& [d, data_index] : ret) {
-			d = distfn(get_data(data_index), q);
+			d = dist2(get_data(data_index), q);
 		}
 	}
 	reverse(ret.begin(), ret.end());
@@ -372,7 +386,8 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q, size_t layer,
 }
 
 template <typename T>
-std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q, size_t k) {
+std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
+	const auto& q = q0.internal;
 	size_t entry_point = starting_vertex;
 #ifdef RECORD_STATS
 	++num_distcomps;
@@ -399,12 +414,13 @@ std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q, size_t k) {
 
 	std::vector<std::pair<T, size_t>> ret_combined;
 	if (use_compression) {
-		auto qc = vec<compressed_t>(q);
+		// TODO fix
+		auto qc = vec<compressed_t>(q0);
 		ret_combined =
 				query_k_at_layer<true, true>(qc, 0, {entry_point}, k * ef_search_mult);
 	} else {
 		ret_combined =
-				query_k_at_layer<true, false>(q, 0, {entry_point}, k * ef_search_mult);
+				query_k_at_layer<true, false>(q0, 0, {entry_point}, k * ef_search_mult);
 	}
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
