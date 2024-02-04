@@ -4,6 +4,7 @@
 #include <iostream>
 #include <queue>
 #include <random>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -55,6 +56,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				use_compression(conf.use_compression), max_layer(0) {}
 	using config = antitopo_engine_config;
 	std::vector<fvec> all_entries;
+	std::set<std::pair<size_t, size_t>> needs_pruning;
 	using compressed_t = Eigen::half;
 	std::vector<vec<compressed_t>::Underlying> all_entries_compressed;
 	std::vector<std::vector<std::vector<size_t>>>
@@ -67,8 +69,22 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	void _build();
 	std::vector<char> visited; // booleans
 	std::vector<size_t> visited_recent;
-	std::vector<std::pair<T, size_t>>
-	prune_edges(size_t layer, size_t from, std::vector<std::pair<T, size_t>> to);
+	void update_edges(size_t layer, size_t from) {
+		hadj_flat[from][layer].clear();
+		hadj_flat[from][layer].reserve(hadj_flat_with_lengths[from][layer].size());
+		for (auto& [_, val] : hadj_flat_with_lengths[from][layer]) {
+			hadj_flat[from][layer].emplace_back(val);
+		}
+		if (layer == 0)
+			hadj_bottom[from] = hadj_flat[from][layer];
+	}
+	void prune_edges(size_t layer, size_t from, bool lazy = true);
+	void prune_all_edges() {
+		for (const auto& [nlayer, nfrom] : needs_pruning) {
+			prune_edges(nlayer, nfrom, false);
+		}
+		needs_pruning.clear();
+	}
 	template <bool use_bottomlayer, bool use_compressed, typename T2 = T>
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T2>& q, size_t layer,
@@ -91,16 +107,34 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 };
 
 template <typename T>
-std::vector<std::pair<T, size_t>>
-antitopo_engine<T>::prune_edges(size_t layer, size_t from,
-																std::vector<std::pair<T, size_t>> to) {
+void antitopo_engine<T>::prune_edges(size_t layer, size_t from, bool lazy) {
+	auto& to = hadj_flat_with_lengths[from][layer];
+
 	auto edge_count_mult = M;
 	if (layer == 0)
 		edge_count_mult = M0;
 
 	// reference impl vs paper difference
 	if (to.size() <= edge_count_mult) {
-		return to;
+		update_edges(layer, from);
+		return;
+	}
+	constexpr auto max_unpruned = 256;
+	if (lazy && to.size() <= 2 * edge_count_mult &&
+			needs_pruning.size() < max_unpruned) {
+		auto current = std::make_pair(layer, from);
+		if (!needs_pruning.contains(current)) {
+			needs_pruning.insert(current);
+		}
+		update_edges(layer, from);
+		return;
+	} else if (lazy && needs_pruning.size() >= max_unpruned) {
+		auto current = std::make_pair(layer, from);
+		if (!needs_pruning.contains(current)) {
+			needs_pruning.insert(current);
+		}
+		prune_all_edges();
+		return;
 	}
 
 	constexpr size_t in_advance = 2;
@@ -151,7 +185,8 @@ antitopo_engine<T>::prune_edges(size_t layer, size_t from,
 				break;
 		}
 	}
-	return ret;
+	to = ret;
+	update_edges(layer, from);
 }
 
 template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v0) {
@@ -171,15 +206,6 @@ template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v0) {
 	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
 		hadj_flat_with_lengths[v_index].emplace_back();
 	}
-
-	auto convert_el = [](std::vector<std::pair<T, size_t>> el) constexpr {
-		std::vector<size_t> ret;
-		ret.reserve(el.size());
-		for (auto& [_, val] : el) {
-			ret.emplace_back(val);
-		}
-		return ret;
-	};
 
 	// get kNN for each layer
 	std::vector<std::vector<std::pair<T, size_t>>> kNN_per_layer;
@@ -219,11 +245,17 @@ template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v0) {
 		std::reverse(kNN_per_layer.begin(), kNN_per_layer.end());
 	}
 
+	hadj_flat.emplace_back();
+	hadj_bottom.emplace_back();
+	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
+		hadj_flat[v_index].emplace_back();
+	}
+
 	// add the found edges to the graph
 	for (size_t layer = 0; layer < std::min(max_layer, new_max_layer + 1);
 			 ++layer) {
-		hadj_flat_with_lengths[v_index][layer] =
-				prune_edges(layer, v_index, kNN_per_layer[layer]);
+		hadj_flat_with_lengths[v_index][layer] = kNN_per_layer[layer];
+		prune_edges(layer, v_index);
 		//  add bidirectional connections, prune if necessary
 		for (auto& md : kNN_per_layer[layer]) {
 			bool edge_exists = false;
@@ -235,12 +267,7 @@ template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v0) {
 			if (!edge_exists) {
 				hadj_flat_with_lengths[md.second][layer].emplace_back(md.first,
 																															v_index);
-				hadj_flat_with_lengths[md.second][layer] = prune_edges(
-						layer, md.second, hadj_flat_with_lengths[md.second][layer]);
-				hadj_flat[md.second][layer] =
-						convert_el(hadj_flat_with_lengths[md.second][layer]);
-				if (layer == 0)
-					hadj_bottom[md.second] = hadj_flat[md.second][layer];
+				prune_edges(layer, md.second);
 			}
 		}
 	}
@@ -252,18 +279,11 @@ template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v0) {
 	}
 
 	visited.emplace_back();
-	hadj_flat.emplace_back();
-	hadj_bottom.emplace_back();
-	hadj_bottom[v_index] = convert_el(hadj_flat_with_lengths[v_index][0]);
-	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
-		hadj_flat[v_index].emplace_back();
-		hadj_flat[v_index][layer] =
-				convert_el(hadj_flat_with_lengths[v_index][layer]);
-	}
 }
 
 template <typename T> void antitopo_engine<T>::_build() {
 	assert(all_entries.size() > 0);
+	prune_all_edges();
 
 #ifdef RECORD_STATS
 	// reset before queries
