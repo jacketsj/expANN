@@ -116,7 +116,6 @@ ehnsw_engine_basic_fast<T>::prune_edges(size_t layer, size_t from,
 		if (ret.size() >= edge_count_mult)
 			break;
 		bool choose = true;
-		auto origin = all_entries[from];
 		for (const auto& md_chosen : ret) {
 			if (md.first == md_chosen.first ||
 					dist2(all_entries[md.second], all_entries[md_chosen.second]) <=
