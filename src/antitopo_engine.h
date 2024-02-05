@@ -272,7 +272,7 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
 			return hadj_flat[index][layer];
 		}
 	};
-	auto get_data = [&](const size_t& data_index) -> auto& {
+	auto get_data = [&](const size_t& data_index) constexpr->auto& {
 		if constexpr (use_compressed)
 			return all_entries_compressed[data_index];
 		else
