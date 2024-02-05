@@ -56,7 +56,6 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				use_compression(conf.use_compression), max_layer(0) {}
 	using config = antitopo_engine_config;
 	std::vector<fvec> all_entries;
-	std::set<std::pair<size_t, size_t>> needs_pruning;
 	using compressed_t = Eigen::half;
 	std::vector<vec<compressed_t>::Underlying> all_entries_compressed;
 	std::vector<std::vector<std::vector<size_t>>>
