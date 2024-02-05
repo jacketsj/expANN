@@ -222,7 +222,7 @@ template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v0) {
 		hadj_flat_with_lengths[v_index][layer] = kNN_per_layer[layer];
 		prune_edges(layer, v_index, false);
 		//  add bidirectional connections, prune if necessary
-		for (auto& md : kNN_per_layer[layer]) {
+		for (auto& md : hadj_flat_with_lengths[v_index][layer]) {
 			bool edge_exists = false;
 			for (auto& md_other : hadj_flat_with_lengths[md.second][layer]) {
 				if (md_other.second == v_index) {
