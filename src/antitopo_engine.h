@@ -27,10 +27,13 @@ struct antitopo_engine_config {
 	size_t ef_search_mult;
 	size_t ef_construction;
 	bool use_compression;
+	bool use_largest_direction_filtering;
 	antitopo_engine_config(size_t _M, size_t _M0, size_t _ef_search_mult,
-												 size_t _ef_construction, bool _use_compression = false)
+												 size_t _ef_construction, bool _use_compression = false,
+												 bool _use_largest_direction_filtering = false)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
-				ef_construction(_ef_construction), use_compression(_use_compression) {}
+				ef_construction(_ef_construction), use_compression(_use_compression),
+				use_largest_direction_filtering(_use_largest_direction_filtering) {}
 };
 
 template <typename T>
@@ -45,6 +48,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	size_t ef_search_mult;
 	size_t ef_construction;
 	bool use_compression;
+	bool use_largest_direction_filtering;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -53,7 +57,9 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction),
-				use_compression(conf.use_compression), max_layer(0) {}
+				use_compression(conf.use_compression),
+				use_largest_direction_filtering(conf.use_largest_direction_filtering),
+				max_layer(0) {}
 	using config = antitopo_engine_config;
 	std::vector<fvec> all_entries;
 	using compressed_t = Eigen::half;
@@ -102,6 +108,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
 		add_param(pl, use_compression);
+		add_param(pl, use_largest_direction_filtering);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 #endif
@@ -127,17 +134,39 @@ void antitopo_engine<T>::prune_edges(size_t layer, size_t from, bool lazy) {
 	std::vector<std::pair<T, size_t>> ret;
 	std::vector<fvec> normalized_ret;
 	auto origin = all_entries[from];
+	std::unordered_set<size_t> taken;
 	for (const auto& md : to) {
 		bool choose = true;
 		auto v1 = (all_entries[md.second] - origin).normalized();
-		for (size_t next_i = 0; next_i < normalized_ret.size(); ++next_i) {
-			const auto& v2 = normalized_ret[next_i];
-			if (dist2(v1, v2) <= 1.0) {
+		size_t max_i = 0;
+		float max_val = 0;
+		if (use_largest_direction_filtering) {
+			for (size_t i = 0; i < v1.size(); ++i) {
+				float cur_val = v1[i];
+				if (cur_val > max_val) {
+					max_i = i;
+					max_val = cur_val;
+				} else if (-cur_val > max_val) {
+					max_i = i + v1.size();
+					max_val = -cur_val;
+				}
+			}
+			if (taken.contains(max_i)) {
 				choose = false;
-				break;
+			}
+		} else {
+			for (size_t next_i = 0; next_i < normalized_ret.size(); ++next_i) {
+				const auto& v2 = normalized_ret[next_i];
+				// if (dist2(all_entries[md.second], all_entries[ret[next_i].second]) <
+				//		dist2(all_entries[md.second], origin)) {
+				if (dist2(v1, v2) <= 1.0) {
+					choose = false;
+					break;
+				}
 			}
 		}
 		if (choose) {
+			taken.insert(max_i);
 			ret.emplace_back(md);
 			normalized_ret.emplace_back(v1);
 			if (ret.size() >= edge_count_mult)

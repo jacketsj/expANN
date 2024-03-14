@@ -157,9 +157,12 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 											k * edge_count_search_factor, use_cuts, use_compression);
 						}
-						if (true) {
-							ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
-											k * edge_count_search_factor, use_compression);
+						for (bool use_largest_direction_filtering : {false, true}) {
+							if (true) {
+								ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
+												k * edge_count_search_factor, use_compression,
+												use_largest_direction_filtering);
+							}
 						}
 					}
 					for (size_t num_splits : {4, 12, 32}) {
@@ -218,7 +221,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										num_for_1nn, k * edge_count_search_factor, use_cuts);
 					}
 				}
-				if (true) {
+				if (false) {
 					for (bool use_ecuts : {false}) {
 						ADD_JOB(hnsw_engine_reference<float>, k,
 										edge_count_search_factor * k, num_for_1nn, use_ecuts);
