@@ -17,6 +17,7 @@
 #include "ehnsw_engine_basic_fast_multilist.h"
 #include "ensg_engine.h"
 #include "hnsw_engine_reference.h"
+#include "line_pruning_exact_engine.h"
 #include "multi_engine_partition.h"
 
 template <typename Engine, typename EngineConfig> struct job {
@@ -140,7 +141,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 ehnsw_engine_basic_fast_clusterchunks_pqprune<float>,
 					 ehnsw_engine_basic_fast_multilist<float>,
 					 multi_engine_partition<float>, hnsw_engine_reference<float>,
-					 ensg_engine<float>, antitopo_engine<float>>
+					 ensg_engine<float>, antitopo_engine<float>,
+					 line_pruning_exact_engine<float>>
 			job_lists;
 
 	for (size_t k = 70; k <= 80; k += 20) {
@@ -162,6 +164,17 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
 												k * edge_count_search_factor, use_compression,
 												use_largest_direction_filtering);
+							}
+							if (true) {
+								for (size_t brute_force_size : {64, 128})
+									for (size_t line_count : {128}) {
+										ADD_JOB(line_pruning_exact_engine<float>, brute_force_size,
+														line_count,
+														antitopo_engine_config(
+																k, 2 * k, num_for_1nn,
+																k * edge_count_search_factor, use_compression,
+																use_largest_direction_filtering));
+									}
 							}
 						}
 					}
