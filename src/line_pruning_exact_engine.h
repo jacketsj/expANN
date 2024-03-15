@@ -116,7 +116,6 @@ void line_pruning_exact_engine<T>::_store_vector(const vec<T>& v0) {
 template <typename T> void line_pruning_exact_engine<T>::_build() {
 	// TODO step 1a make a hierarchical clustering of the data
 	// TODO step 1b sample lines within each cluster
-	// TODO step 2 build a sub-engine
 	for (const auto& v : all_entries) {
 		sub_engine.store_vector(vec<T>(v));
 	}
@@ -129,8 +128,10 @@ std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 	const auto& q = q0.internal;
 	std::unordered_set<size_t> nearest_data; // TODO replace with a visited list,
 																					 // similar to antitopo engine/hnsw
-	// TODO step 1 query the sub-engine to get an approximate nearest neighbour
-	// with high likelyhood of being the best. Populate nearest_data
+																					 // (share it with sub_engine even)
+	for (const auto& data_index : sub_engine.query_k(q0, k)) {
+		nearest_data.emplace(data_index);
+	}
 	using measured_data = std::pair<T, size_t>;
 	auto worst_elem = [](const measured_data& a, const measured_data& b) {
 		return a.first < b.first;
