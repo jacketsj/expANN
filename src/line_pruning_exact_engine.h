@@ -179,6 +179,7 @@ template <typename T> void line_pruning_exact_engine<T>::_build() {
 		}
 		// TODO consider adding the lines corresponding to edges in a mesh graph
 	}
+	std::cout << "Done adding lines, now building sub-engine" << std::endl;
 	for (const auto& v : all_entries) {
 		sub_engine.store_vector(vec<T>(v));
 	}
