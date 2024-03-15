@@ -75,6 +75,7 @@ public:
 	};
 	struct cluster_tree_node {
 		std::vector<size_t> elems;
+		std::vector<fvec> entries;
 		std::vector<line_with_points> lines;
 		std::vector<size_t> children;
 		bool leaf;
@@ -87,6 +88,10 @@ public:
 				best = std::max(best, lp.get_lb(v));
 			}
 			return best * best; // return as squared dist
+		}
+		void add_line(const fvec& a, const fvec& b) {
+			line l(a, b);
+			lines.emplace_back(l, elems, entries);
 		}
 	};
 	size_t brute_force_size;
@@ -119,7 +124,18 @@ void line_pruning_exact_engine<T>::_store_vector(const vec<T>& v0) {
 
 template <typename T> void line_pruning_exact_engine<T>::_build() {
 	// TODO-critical step 1a make a hierarchical clustering of the data
-	// TODO-critical step 1b sample lines within each cluster
+	for (auto& node : cluster_tree) {
+		if (node.leaf)
+			continue; // always scan through everything in a leaf
+		std::uniform_int_distribution<> int_distribution(0, node.elems.size() - 1);
+		for (size_t i = 0; i < line_count; ++i) {
+			auto v1 = all_entries[node.elems[int_distribution(gen)]];
+			auto v2 = all_entries[node.elems[int_distribution(gen)]];
+			node.add_line(v1, v2);
+			// TODO consider adding the centroid too
+		}
+		// TODO consider adding the lines corresponding to edges in a mesh graph
+	}
 	for (const auto& v : all_entries) {
 		sub_engine.store_vector(vec<T>(v));
 	}
