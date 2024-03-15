@@ -31,7 +31,7 @@ accel_k_means(const std::vector<vec<float>::Underlying>& vecs, size_t k,
 	auto assign_to_clusters = [&]() {
 		antitopo_engine<float> sub_engine(conf);
 		for (auto& v : centroids)
-			sub_engine.store_vector(v);
+			sub_engine._store_vector(v, true);
 		sub_engine.build();
 		clusters.clear();
 		clusters.resize(centroids.size());

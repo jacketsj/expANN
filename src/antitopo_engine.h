@@ -70,7 +70,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 			hadj_bottom; // vector -> edges in bottom layer
 	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
-	void _store_vector(const vec<T>& v);
+	void _store_vector(const vec<T>& v0, bool silent = false);
 	void _build();
 	std::vector<char> visited; // booleans
 	std::vector<size_t> visited_recent;
@@ -177,13 +177,14 @@ void antitopo_engine<T>::prune_edges(size_t layer, size_t from, bool lazy) {
 	update_edges(layer, from);
 }
 
-template <typename T> void antitopo_engine<T>::_store_vector(const vec<T>& v0) {
+template <typename T>
+void antitopo_engine<T>::_store_vector(const vec<T>& v0, bool silent) {
 	auto v = v0.internal;
 	size_t v_index = all_entries.size();
 	all_entries.emplace_back(v);
 	all_entries_compressed.emplace_back(vec<compressed_t>(v0).internal);
 
-	if (v_index % 1000 == 0) {
+	if (v_index % 1000 == 0 && !silent) {
 		std::cout << "Storing v_index=" << v_index << std::endl;
 	}
 
