@@ -106,7 +106,8 @@ void line_pruning_exact_engine<T>::_store_vector(const vec<T>& v0) {
 }
 
 template <typename T> void line_pruning_exact_engine<T>::_build() {
-	// TODO step 1 make a hierarchical clustering of the data
+	// TODO step 1a make a hierarchical clustering of the data
+	// TODO step 1b sample lines within each cluster
 	// TODO step 2 build a sub-engine
 }
 
