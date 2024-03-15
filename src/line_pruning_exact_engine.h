@@ -87,10 +87,13 @@ public:
 	};
 	size_t brute_force_size;
 	size_t line_count;
+	antitopo_engine<T> sub_engine;
 	std::vector<cluster_tree_node> cluster_tree;
-	line_pruning_exact_engine(line_pruning_exact_engine_config conf)
+	line_pruning_exact_engine(line_pruning_exact_engine_config conf,
+														antitopo_engine_config sub_conf)
 			: rd(), gen(0), distribution(0, 1),
-				brute_force_size(conf.brute_force_size), line_count(conf.line_count) {}
+				brute_force_size(conf.brute_force_size), line_count(conf.line_count),
+				sub_engine(sub_conf) {}
 	using config = line_pruning_exact_engine_config;
 	std::vector<fvec> all_entries;
 	void _store_vector(const vec<T>& v);
@@ -114,6 +117,10 @@ template <typename T> void line_pruning_exact_engine<T>::_build() {
 	// TODO step 1a make a hierarchical clustering of the data
 	// TODO step 1b sample lines within each cluster
 	// TODO step 2 build a sub-engine
+	for (const auto& v : all_entries) {
+		sub_engine.store_vector(vec<T>(v));
+	}
+	sub_engine.build();
 }
 
 template <typename T>
