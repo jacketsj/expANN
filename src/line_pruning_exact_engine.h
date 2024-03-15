@@ -76,12 +76,12 @@ public:
 	struct cluster_tree_node {
 		std::vector<size_t> elems;
 		std::vector<fvec> entries;
+		bool leaf;
 		std::vector<line_with_points> lines;
 		std::vector<size_t> children;
-		bool leaf;
 		cluster_tree_node(const std::vector<size_t>& elems,
 											const std::vector<fvec>& entries)
-				: elems(elems), entries(entries) {}
+				: elems(elems), entries(entries), leaf(false) {}
 		float get_lb(const fvec& v) const {
 			// TODO when getting a lb, also return the corresponding index, so that it
 			// can be tested to see if it's a new best approximate nearest neighbour
@@ -160,8 +160,9 @@ template <typename T> void line_pruning_exact_engine<T>::_build() {
 			for (const auto& local_elem : sub_cluster)
 				sub_cluster_contents_global.emplace_back(
 						cluster_tree[cindex].elems[local_elem]);
-			cluster_tree[cindex].children.emplace_back(
-					make_cluster_tree_node(sub_cluster_contents_global));
+			auto new_cluster_index =
+					make_cluster_tree_node(sub_cluster_contents_global);
+			cluster_tree[cindex].children.emplace_back(new_cluster_index);
 		}
 	}
 
