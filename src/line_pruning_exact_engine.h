@@ -68,6 +68,7 @@ struct line_pruning_exact_engine
 		std::vector<size_t> elems;
 		std::vector<line_with_points> lines;
 		std::vector<size_t> children;
+		bool leaf;
 		float get_lb(const fvec& v) {
 			// TODO when getting a lb, also return the corresponding index, so that it
 			// can be tested to see if it's a new best approximate nearest neighbour
@@ -101,12 +102,62 @@ struct line_pruning_exact_engine
 template <typename T>
 void line_pruning_exact_engine<T>::_store_vector(const vec<T>& v0) {
 	auto v = v0.internal;
-	size_t v_index = all_entries.size();
 	all_entries.emplace_back(v);
 }
 
-template <typename T> void line_pruning_exact_engine<T>::_build() {}
+template <typename T> void line_pruning_exact_engine<T>::_build() {
+	// TODO step 1 make a hierarchical clustering of the data
+	// TODO step 2 build a sub-engine
+}
 
 template <typename T>
 std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
-																													 size_t k) {}
+																													 size_t k) {
+	const auto& q = q0.internal;
+	// TODO step 1 query the sub-engine to get an approximate nearest neighbour
+	// with high likelyhood of being the best
+	using measured_data = std::pair<T, size_t>;
+	auto worst_elem = [](const measured_data& a, const measured_data& b) {
+		return a.first < b.first;
+	};
+	std::priority_queue<measured_data, std::vector<measured_data>,
+											decltype(worst_elem)>
+			nearest(worst_elem);
+	// TODO step 2 traverse the hierarchical clustering stored in cluster_tree
+	// (starting from index 0):
+	// - Check if the lower bound of a cluster precludes it from being a possible
+	// choice
+	// - If it doesn't, recurse into it
+	std::queue<size_t> clusters_to_traverse;
+	clusters_to_traverse.emplace(0);
+	// TODO figure out best candidate clusters (by lower bound?), and traverse
+	// those first. Save new NN value in the to_traverse priority_queue in order
+	// to prune better.
+	while (!clusters_to_traverse.empty()) {
+		size_t current_cluster = clusters_to_traverse.front();
+		clusters_to_traverse.pop();
+		const auto& cluster_node = cluster_tree[current_cluster];
+		if (cluster_node.get_lb(q) < nearest.top().first) {
+			if (cluster_node.leaf) {
+				for (const size_t& elem_index : cluster_node.elems) {
+					T cur_dist = dist2(all_entries[elem_index], q);
+					if (cur_dist < nearest.top().first()) {
+						nearest.emplace(cur_dist, elem_index);
+						if (nearest.size() > k)
+							nearest.pop();
+					}
+				}
+			} else {
+				for (const auto& child : cluster_node.children)
+					clusters_to_traverse.emplace(child);
+			}
+		}
+	}
+	std::vector<measured_data> ret;
+	while (!nearest.empty()) {
+		ret.emplace_back(nearest.top());
+		nearest.pop();
+	}
+	reverse(ret.begin(), ret.end());
+	return ret;
+}
