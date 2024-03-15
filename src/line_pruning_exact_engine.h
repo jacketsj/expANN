@@ -53,6 +53,8 @@ public:
 			}
 		}
 		float get_lb(const fvec& v) const {
+			// TODO allow filtering here, so that the clusters containing the best
+			// known elements don't inherently need to be recursed in
 			auto projected_v = l.proj(v);
 			auto it = sorted_elems.lower_bound(std::make_pair(projected_v, 0));
 			auto it_dist = [&]() { return std::abs(it->first - projected_v); };
