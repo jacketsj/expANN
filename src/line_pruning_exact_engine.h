@@ -55,6 +55,8 @@ public:
 		float get_lb(const fvec& v) const {
 			// TODO allow filtering here, so that the clusters containing the best
 			// known elements don't inherently need to be recursed in
+			// Could even filter an entire visited list from preceeding ANN search
+			// (possibly too slow)
 			auto projected_v = l.proj(v);
 			auto it = sorted_elems.lower_bound(std::make_pair(projected_v, 0));
 			auto it_dist = [&]() { return std::abs(it->first - projected_v); };
@@ -118,7 +120,8 @@ template <typename T>
 std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 																													 size_t k) {
 	const auto& q = q0.internal;
-	std::unordered_set<size_t> nearest_data;
+	std::unordered_set<size_t> nearest_data; // TODO replace with a visited list,
+																					 // similar to antitopo engine/hnsw
 	// TODO step 1 query the sub-engine to get an approximate nearest neighbour
 	// with high likelyhood of being the best. Populate nearest_data
 	using measured_data = std::pair<T, size_t>;
