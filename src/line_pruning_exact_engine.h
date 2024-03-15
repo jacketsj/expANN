@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "ann_engine.h"
+#include "clustering.h"
 #include "robin_hood.h"
 #include "topk_t.h"
 
