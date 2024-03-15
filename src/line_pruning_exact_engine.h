@@ -14,12 +14,7 @@
 #include "robin_hood.h"
 #include "topk_t.h"
 
-namespace {
-
-template <typename A, typename B> auto dist2(const A& a, const B& b) {
-	return (a - b).squaredNorm();
-}
-} // namespace
+#include "antitopo_engine.h"
 
 struct line_pruning_exact_engine_config {
 	size_t brute_force_size;
@@ -31,6 +26,12 @@ struct line_pruning_exact_engine_config {
 template <typename T>
 struct line_pruning_exact_engine
 		: public ann_engine<T, line_pruning_exact_engine<T>> {
+private:
+	template <typename A, typename B> auto dist2(const A& a, const B& b) {
+		return (a - b).squaredNorm();
+	}
+
+public:
 	using fvec = typename vec<T>::Underlying;
 	std::random_device rd;
 	std::mt19937 gen;
@@ -77,7 +78,7 @@ struct line_pruning_exact_engine
 			for (const auto& lp : lines) {
 				best = std::max(best, lp.get_lb(v));
 			}
-			return best;
+			return best * best; // return as squared dist
 		}
 	};
 	size_t brute_force_size;
@@ -116,7 +117,7 @@ std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 																													 size_t k) {
 	const auto& q = q0.internal;
 	// TODO step 1 query the sub-engine to get an approximate nearest neighbour
-	// with high likelyhood of being the best
+	// with high likelyhood of being the best. Populate nearest
 	using measured_data = std::pair<T, size_t>;
 	auto worst_elem = [](const measured_data& a, const measured_data& b) {
 		return a.first < b.first;
@@ -124,11 +125,6 @@ std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(worst_elem)>
 			nearest(worst_elem);
-	// TODO step 2 traverse the hierarchical clustering stored in cluster_tree
-	// (starting from index 0):
-	// - Check if the lower bound of a cluster precludes it from being a possible
-	// choice
-	// - If it doesn't, recurse into it
 	std::queue<size_t> clusters_to_traverse;
 	clusters_to_traverse.emplace(0);
 	// TODO figure out best candidate clusters (by lower bound?), and traverse
