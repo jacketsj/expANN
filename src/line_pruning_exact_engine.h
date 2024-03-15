@@ -105,7 +105,7 @@ public:
 	line_pruning_exact_engine(line_pruning_exact_engine_config conf)
 			: rd(), gen(0), distribution(0, 1),
 				brute_force_size(conf.brute_force_size), line_count(conf.line_count),
-				sub_conf(sub_conf), sub_engine(conf.sub_conf) {}
+				sub_conf(conf.sub_conf), sub_engine(conf.sub_conf) {}
 	using config = line_pruning_exact_engine_config;
 	std::vector<fvec> all_entries;
 	void _store_vector(const vec<T>& v);
