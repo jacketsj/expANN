@@ -5,19 +5,24 @@
 #include "randomgeometry.h"
 
 std::vector<std::vector<size_t>>
-accel_k_means(const std::vector<vec<float>>& vecs, size_t k,
+accel_k_means(const std::vector<vec<float>::Underlying>& vecs, size_t k,
 							antitopo_engine_config conf) {
-	size_t min_cluster_size = 32;
-	size_t max_cluster_size = min_cluster_size * 4;
+	// size_t min_cluster_size = 32;
+	// size_t max_cluster_size = min_cluster_size * 4;
 	std::vector<vec<float>> centroids;
 	std::vector<std::vector<size_t>> clusters;
 	std::mt19937 gen(0);
-	std::uniform_real_distribution<> distribution(0, 1);
+	std::uniform_int_distribution<> distribution(0, vecs.size() - 1);
+	// std::uniform_real_distribution<> distribution(0, 1);
+	for (size_t i = 0; i < k; ++i)
+		centroids.emplace_back(vecs[distribution(gen)]);
+	/*
 	for (size_t i = 0; i < vecs.size(); ++i) {
 		if (floor(-log(distribution(gen)) * 1 / log(double(60))) > 0) {
 			centroids.emplace_back(vecs[i]);
 		}
 	}
+	*/
 	auto assign_to_clusters = [&]() {
 		antitopo_engine<float> sub_engine(conf);
 		for (auto& v : centroids)
@@ -26,7 +31,7 @@ accel_k_means(const std::vector<vec<float>>& vecs, size_t k,
 		clusters.clear();
 		clusters.resize(centroids.size());
 		for (size_t i = 0; i < vecs.size(); ++i) {
-			auto sub_engine_results = sub_engine.query_k(vecs[i], 1);
+			auto sub_engine_results = sub_engine.query_k(vec<float>(vecs[i]), 1);
 			clusters[sub_engine_results[0]].emplace_back(i);
 		}
 	};
@@ -37,7 +42,7 @@ accel_k_means(const std::vector<vec<float>>& vecs, size_t k,
 			auto& centroid = centroids[centroid_index];
 			centroid.clear();
 			for (size_t elem_index : clusters[centroid_index]) {
-				centroid += vecs[elem_index];
+				centroid += vec<float>(vecs[elem_index]);
 			}
 			if (!clusters[centroid_index].empty()) {
 				centroid /= clusters[centroid_index].size();
@@ -45,9 +50,10 @@ accel_k_means(const std::vector<vec<float>>& vecs, size_t k,
 		}
 	};
 	const size_t max_iters = 30;
-	vec_generator<float> rvgen(vecs[0].size());
+	vec_generator<float> rvgen(vec<float>(vecs[0]).size());
 	for (size_t iter = 0; iter < max_iters; ++iter) {
 		assign_to_clusters();
+		/*
 		// loosely enforce min/max cluster sizes
 		std::vector<std::vector<size_t>> clusters_new;
 		for (size_t cluster_index = 0; cluster_index < clusters.size();
@@ -73,6 +79,7 @@ accel_k_means(const std::vector<vec<float>>& vecs, size_t k,
 		}
 		if (!clusters_new.empty()) // don't let all clusters be deleted
 			clusters = clusters_new;
+		*/
 		compute_centroids();
 	}
 	assign_to_clusters();

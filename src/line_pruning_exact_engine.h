@@ -79,6 +79,9 @@ public:
 		std::vector<line_with_points> lines;
 		std::vector<size_t> children;
 		bool leaf;
+		cluster_tree_node(const std::vector<size_t>& elems,
+											const std::vector<fvec>& entries)
+				: elems(elems), entries(entries) {}
 		float get_lb(const fvec& v) const {
 			// TODO when getting a lb, also return the corresponding index, so that it
 			// can be tested to see if it's a new best approximate nearest neighbour
@@ -96,12 +99,13 @@ public:
 	};
 	size_t brute_force_size;
 	size_t line_count;
+	antitopo_engine_config sub_conf;
 	antitopo_engine<T> sub_engine;
 	std::vector<cluster_tree_node> cluster_tree;
 	line_pruning_exact_engine(line_pruning_exact_engine_config conf)
 			: rd(), gen(0), distribution(0, 1),
 				brute_force_size(conf.brute_force_size), line_count(conf.line_count),
-				sub_engine(conf.sub_conf) {}
+				sub_conf(sub_conf), sub_engine(conf.sub_conf) {}
 	using config = line_pruning_exact_engine_config;
 	std::vector<fvec> all_entries;
 	void _store_vector(const vec<T>& v);
@@ -124,6 +128,34 @@ void line_pruning_exact_engine<T>::_store_vector(const vec<T>& v0) {
 
 template <typename T> void line_pruning_exact_engine<T>::_build() {
 	// TODO-critical step 1a make a hierarchical clustering of the data
+	auto make_cluster_tree_node = [&](const std::vector<size_t>& elems) {
+		std::vector<fvec> entries;
+		for (const auto& e : elems)
+			entries.emplace_back(all_entries[e]);
+		cluster_tree_node ret(elems, entries);
+		if (elems.size() <= brute_force_size)
+			ret.leaf = true;
+		return ret;
+	};
+	std::queue<size_t> to_build;
+	{
+		std::vector<size_t> all_elems;
+		for (size_t i = 0; i < all_entries.size(); ++i)
+			all_elems.emplace_back(i);
+		cluster_tree.emplace_back(make_cluster_tree_node(all_elems));
+		to_build.emplace(0);
+	}
+	while (!to_build.empty()) {
+		size_t cindex = to_build.front();
+		to_build.pop();
+		if (cluster_tree[cindex].leaf) {
+			continue;
+		}
+		auto clustering_local_indices =
+				accel_k_means(cluster_tree[cindex].entries, 16, sub_conf);
+		// TODO-critical assign clustering to children
+	}
+
 	for (auto& node : cluster_tree) {
 		if (node.leaf)
 			continue; // always scan through everything in a leaf
@@ -132,7 +164,7 @@ template <typename T> void line_pruning_exact_engine<T>::_build() {
 			auto v1 = all_entries[node.elems[int_distribution(gen)]];
 			auto v2 = all_entries[node.elems[int_distribution(gen)]];
 			node.add_line(v1, v2);
-			// TODO consider adding the centroid too
+			// TODO consider adding lines through the centroid too
 		}
 		// TODO consider adding the lines corresponding to edges in a mesh graph
 	}
