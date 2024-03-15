@@ -128,22 +128,24 @@ void line_pruning_exact_engine<T>::_store_vector(const vec<T>& v0) {
 
 template <typename T> void line_pruning_exact_engine<T>::_build() {
 	// TODO-critical step 1a make a hierarchical clustering of the data
+	std::queue<size_t> to_build;
 	auto make_cluster_tree_node = [&](const std::vector<size_t>& elems) {
 		std::vector<fvec> entries;
 		for (const auto& e : elems)
 			entries.emplace_back(all_entries[e]);
-		cluster_tree_node ret(elems, entries);
+		cluster_tree_node cluster(elems, entries);
 		if (elems.size() <= brute_force_size)
-			ret.leaf = true;
-		return ret;
+			cluster.leaf = true;
+		size_t new_index = cluster_tree.size();
+		cluster_tree.emplace_back(cluster);
+		to_build.emplace(new_index);
+		return new_index;
 	};
-	std::queue<size_t> to_build;
 	{
 		std::vector<size_t> all_elems;
 		for (size_t i = 0; i < all_entries.size(); ++i)
 			all_elems.emplace_back(i);
-		cluster_tree.emplace_back(make_cluster_tree_node(all_elems));
-		to_build.emplace(0);
+		make_cluster_tree_node(all_elems);
 	}
 	while (!to_build.empty()) {
 		size_t cindex = to_build.front();
@@ -153,7 +155,14 @@ template <typename T> void line_pruning_exact_engine<T>::_build() {
 		}
 		auto clustering_local_indices =
 				accel_k_means(cluster_tree[cindex].entries, 16, sub_conf);
-		// TODO-critical assign clustering to children
+		for (const auto& sub_cluster : clustering_local_indices) {
+			std::vector<size_t> sub_cluster_contents_global;
+			for (const auto& local_elem : sub_cluster)
+				sub_cluster_contents_global.emplace_back(
+						cluster_tree[cindex].elems[local_elem]);
+			cluster_tree[cindex].children.emplace_back(
+					make_cluster_tree_node(sub_cluster_contents_global));
+		}
 	}
 
 	for (auto& node : cluster_tree) {
