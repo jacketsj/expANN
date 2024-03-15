@@ -52,8 +52,8 @@ public:
 		line_with_points(const line& l, const std::vector<size_t>& elems,
 										 const std::vector<fvec>& entries)
 				: l(l) {
-			for (size_t i : elems) {
-				sorted_elems.emplace(l.proj(entries[i]), i);
+			for (size_t i = 0; i < entries.size(); ++i) {
+				sorted_elems.emplace(l.proj(entries[i]), elems[i]);
 			}
 		}
 		float get_lb(const fvec& v) const {
@@ -166,6 +166,7 @@ template <typename T> void line_pruning_exact_engine<T>::_build() {
 		}
 	}
 
+	std::cout << "Done creating clusters, now adding lines" << std::endl;
 	for (auto& node : cluster_tree) {
 		if (node.leaf)
 			continue; // always scan through everything in a leaf
