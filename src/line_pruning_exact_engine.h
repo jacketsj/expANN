@@ -19,8 +19,11 @@
 struct line_pruning_exact_engine_config {
 	size_t brute_force_size;
 	size_t line_count;
-	line_pruning_exact_engine_config(size_t _brute_force_size, size_t _line_count)
-			: brute_force_size(_brute_force_size), line_count(_line_count) {}
+	antitopo_engine_config sub_conf;
+	line_pruning_exact_engine_config(size_t _brute_force_size, size_t _line_count,
+																	 antitopo_engine_config _sub_conf)
+			: brute_force_size(_brute_force_size), line_count(_line_count),
+				sub_conf(_sub_conf) {}
 };
 
 template <typename T>
@@ -40,7 +43,7 @@ public:
 		// TODO a is completely unnecessary I think
 		fvec a, dir;
 		line(const fvec& a, const fvec& b) : a(a), dir((b - a).normalized()) {}
-		T proj(fvec v) const { return dot(v - a, dir); }
+		T proj(fvec v) const { return dir.dot(v - a); }
 	};
 	struct line_with_points {
 		line l;
@@ -74,7 +77,7 @@ public:
 		std::vector<line_with_points> lines;
 		std::vector<size_t> children;
 		bool leaf;
-		float get_lb(const fvec& v) {
+		float get_lb(const fvec& v) const {
 			// TODO when getting a lb, also return the corresponding index, so that it
 			// can be tested to see if it's a new best approximate nearest neighbour
 			// (and a new graph search can be initiated with it as a seed if so)
@@ -89,16 +92,16 @@ public:
 	size_t line_count;
 	antitopo_engine<T> sub_engine;
 	std::vector<cluster_tree_node> cluster_tree;
-	line_pruning_exact_engine(line_pruning_exact_engine_config conf,
-														antitopo_engine_config sub_conf)
+	line_pruning_exact_engine(line_pruning_exact_engine_config conf)
 			: rd(), gen(0), distribution(0, 1),
 				brute_force_size(conf.brute_force_size), line_count(conf.line_count),
-				sub_engine(sub_conf) {}
+				sub_engine(conf.sub_conf) {}
 	using config = line_pruning_exact_engine_config;
 	std::vector<fvec> all_entries;
 	void _store_vector(const vec<T>& v);
 	void _build();
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
+	const std::string _name() { return "Line-Pruning Exact Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, brute_force_size);
@@ -159,7 +162,7 @@ std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 			if (cluster_node.leaf) {
 				for (const size_t& elem_index : cluster_node.elems) {
 					T cur_dist = dist2(all_entries[elem_index], q);
-					if (cur_dist < nearest.top().first() &&
+					if (cur_dist < nearest.top().first &&
 							!nearest_data.contains(elem_index)) {
 						// TODO continue ANN search with elem_index as an additional seed
 						// point. Call query_k_at_layer with the previous visited list (add
@@ -179,9 +182,9 @@ std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 			}
 		}
 	}
-	std::vector<measured_data> ret;
+	std::vector<size_t> ret;
 	while (!nearest.empty()) {
-		ret.emplace_back(nearest.top());
+		ret.emplace_back(nearest.top().second);
 		nearest.pop();
 	}
 	reverse(ret.begin(), ret.end());
