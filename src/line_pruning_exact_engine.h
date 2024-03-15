@@ -160,7 +160,10 @@ std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 					T cur_dist = dist2(all_entries[elem_index], q);
 					if (cur_dist < nearest.top().first() &&
 							!nearest_data.contains(elem_index)) {
-						// TODO continue ANN search with elem_index as a seed point
+						// TODO continue ANN search with elem_index as an additional seed
+						// point. Call query_k_at_layer with the previous visited list (add
+						// a setting to not clear it, or to feed a special one), and
+						// everything in nearest as entry_points
 						nearest.emplace(cur_dist, elem_index);
 						nearest_data.emplace(elem_index);
 						if (nearest.size() > k) {
