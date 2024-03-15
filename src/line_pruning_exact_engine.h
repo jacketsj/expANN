@@ -116,8 +116,9 @@ template <typename T>
 std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 																													 size_t k) {
 	const auto& q = q0.internal;
+	std::unordered_set<size_t> nearest_data;
 	// TODO step 1 query the sub-engine to get an approximate nearest neighbour
-	// with high likelyhood of being the best. Populate nearest
+	// with high likelyhood of being the best. Populate nearest_data
 	using measured_data = std::pair<T, size_t>;
 	auto worst_elem = [](const measured_data& a, const measured_data& b) {
 		return a.first < b.first;
@@ -125,6 +126,13 @@ std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(worst_elem)>
 			nearest(worst_elem);
+	for (const auto& data_index : nearest_data) {
+		nearest.emplace(dist2(q, all_entries[data_index]), data_index);
+	}
+	while (nearest.size() > k) {
+		nearest_data.erase(nearest.top().second);
+		nearest.pop();
+	}
 	std::queue<size_t> clusters_to_traverse;
 	clusters_to_traverse.emplace(0);
 	// TODO figure out best candidate clusters (by lower bound?), and traverse
@@ -138,10 +146,14 @@ std::vector<size_t> line_pruning_exact_engine<T>::_query_k(const vec<T>& q0,
 			if (cluster_node.leaf) {
 				for (const size_t& elem_index : cluster_node.elems) {
 					T cur_dist = dist2(all_entries[elem_index], q);
-					if (cur_dist < nearest.top().first()) {
+					if (cur_dist < nearest.top().first() &&
+							!nearest_data.contains(elem_index)) {
 						nearest.emplace(cur_dist, elem_index);
-						if (nearest.size() > k)
+						nearest_data.emplace(elem_index);
+						if (nearest.size() > k) {
+							nearest_data.erase(nearest.top().second);
 							nearest.pop();
+						}
 					}
 				}
 			} else {
