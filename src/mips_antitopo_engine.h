@@ -327,9 +327,18 @@ void mips_antitopo_engine<T>::_store_vector(const vec<T>& v) {
 template <typename T> void mips_antitopo_engine<T>::_build() {
 	assert(all_entries.size() > 0);
 	// TODO init random graph
-	for (size_t iter = 0; iter < 2; ++iter)
-		for (size_t v_index = 0; v_index < all_entries.size(); ++v_index)
+	for (size_t iter = 0; iter < 2; ++iter) {
+		std::cerr << "Full improvement round iteration=" << iter << std::endl;
+		for (size_t v_index = 0; v_index < all_entries.size(); ++v_index) {
+			if (v_index % 20000 == 0) {
+				std::cerr << "Improving v_index=" << v_index << std::endl;
+			}
 			improve_entries({v_index});
+		}
+	}
+
+	// TODO now create quantized mips vecs, store in a substructure with flat
+	// graph
 #ifdef RECORD_STATS
 	// reset before queries
 	num_distcomps = 0;
