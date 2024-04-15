@@ -166,11 +166,13 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 												k * edge_count_search_factor, use_compression,
 												use_largest_direction_filtering);
 							}
-							for (std::string scalar_quant : {"int8"}) {
-								if (true) {
-									ADD_JOB(mips_antitopo_engine<float>, k, 2 * k, num_for_1nn,
-													k * edge_count_search_factor, scalar_quant,
-													use_largest_direction_filtering);
+							for (std::string scalar_quant : {"float"}) {
+								for (size_t num_iters : {1}) {
+									if (true) {
+										ADD_JOB(mips_antitopo_engine<float>, k, 2 * k, num_for_1nn,
+														k * edge_count_search_factor, scalar_quant,
+														use_largest_direction_filtering, num_iters);
+									}
 								}
 							}
 							if (false) {

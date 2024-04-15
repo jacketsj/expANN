@@ -27,18 +27,68 @@ struct mips_antitopo_engine_config {
 	size_t ef_construction;
 	std::string scalar_quant;
 	bool use_largest_direction_filtering;
+	size_t num_iters;
 	mips_antitopo_engine_config(size_t _M, size_t _M0, size_t _ef_search_mult,
 															size_t _ef_construction,
 															std::string _scalar_quant,
-															bool _use_largest_direction_filtering = false)
+															bool _use_largest_direction_filtering,
+															size_t num_iters)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), scalar_quant(_scalar_quant),
-				use_largest_direction_filtering(_use_largest_direction_filtering) {}
+				use_largest_direction_filtering(_use_largest_direction_filtering),
+				num_iters(num_iters) {}
 };
 
 template <typename T>
 struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 	using fvec = typename vec<T>::Underlying;
+	struct mips_subengine {
+		std::vector<std::vector<size_t>> adj;
+		virtual void encode_and_add(const fvec& v0,
+																const std::vector<size_t>& neighbours) {
+			throw std::runtime_error(
+					"This shouldn't be called, linker required it to exist");
+		}
+		virtual std::vector<std::pair<T, size_t>> query_k(const vec<T>& q0,
+																											size_t k) {
+			throw std::runtime_error(
+					"This shouldn't be called, linker required it to exist");
+		}
+		virtual ~mips_subengine() = default;
+	};
+	template <typename Q> struct mips_subengine_q : public mips_subengine {
+		std::vector<char> visited; // booleans
+		std::vector<size_t> visited_recent;
+		using qvec = Eigen::VectorX<Q>;
+		size_t dimension = 0;
+		std::vector<qvec> qentries;
+		using mips_subengine::adj;
+		qvec encode(const fvec& v0, const T& factor, const T& extra) {
+			qvec vq;
+			vq.resize(v0.size() + 1);
+			for (size_t i = 0; i < size_t(v0.size()); ++i)
+				vq[i] = Q(factor * v0[i]);
+			vq[v0.size()] = Q(extra);
+			if (dimension > 0 && dimension != size_t(vq.size())) {
+				throw std::runtime_error("Dimensions mismatch during encoding");
+			}
+			dimension = vq.size();
+			return vq;
+		}
+		virtual void encode_and_add(const fvec& v0,
+																const std::vector<size_t>& neighbours) {
+			qentries.emplace_back(encode(v0, 1, v0.squaredNorm()));
+			adj.emplace_back(neighbours);
+			visited.emplace_back(false);
+		}
+		std::vector<std::pair<T, size_t>> search_graph(const qvec& qq, size_t k,
+																									 size_t starting_vertex);
+		virtual std::vector<std::pair<T, size_t>> query_k(const fvec& q0, size_t k,
+																											size_t starting_vertex) {
+			auto qq = encode(q0, -2, 1);
+			return search_graph(qq, k, starting_vertex);
+		}
+	};
 	std::random_device rd;
 	std::mt19937 gen;
 	std::uniform_real_distribution<> distribution;
@@ -49,6 +99,7 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 	size_t ef_construction;
 	std::string scalar_quant;
 	bool use_largest_direction_filtering;
+	size_t num_iters;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -58,8 +109,9 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), scalar_quant(conf.scalar_quant),
 				use_largest_direction_filtering(conf.use_largest_direction_filtering),
-				max_layer(0) {}
+				num_iters(conf.num_iters), max_layer(0) {}
 	using config = mips_antitopo_engine_config;
+	std::unique_ptr<mips_subengine> subengine;
 	std::vector<fvec> all_entries;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
@@ -101,7 +153,6 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 	query_k_at_layer(const fvec& q, size_t layer,
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
-	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
 	const std::string _name() { return "MIPS Anti-Topo Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
@@ -111,6 +162,7 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 		add_param(pl, ef_construction);
 		add_param_str(pl, scalar_quant);
 		add_param(pl, use_largest_direction_filtering);
+		add_param(pl, num_iters);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
 #endif
@@ -325,9 +377,19 @@ void mips_antitopo_engine<T>::_store_vector(const vec<T>& v) {
 }
 
 template <typename T> void mips_antitopo_engine<T>::_build() {
+	if (scalar_quant == "int8")
+		subengine = std::make_unique<mips_subengine_q<int8_t>>();
+	else if (scalar_quant == "uint8")
+		subengine = std::make_unique<mips_subengine_q<uint8_t>>();
+	else if (scalar_quant == "float")
+		subengine = std::make_unique<mips_subengine_q<float>>();
+	else
+		throw std::runtime_error("Unsupported scalar quant type '" + scalar_quant +
+														 "'");
+
 	assert(all_entries.size() > 0);
 	// TODO init random graph
-	for (size_t iter = 0; iter < 2; ++iter) {
+	for (size_t iter = 0; iter < num_iters; ++iter) {
 		std::cerr << "Full improvement round iteration=" << iter << std::endl;
 		for (size_t v_index = 0; v_index < all_entries.size(); ++v_index) {
 			if (v_index % 20000 == 0) {
@@ -337,8 +399,15 @@ template <typename T> void mips_antitopo_engine<T>::_build() {
 		}
 	}
 
-	// TODO now create quantized mips vecs, store in a substructure with flat
-	// graph
+	for (size_t v_index = 0; v_index < all_entries.size(); ++v_index) {
+		std::vector<size_t> neighbours;
+		for (const auto& adj_l : hadj_flat[v_index]) {
+			for (const auto& neighbour : adj_l) {
+				neighbours.emplace_back(neighbour);
+			}
+		}
+		subengine->encode_and_add(all_entries[v_index], neighbours);
+	}
 #ifdef RECORD_STATS
 	// reset before queries
 	num_distcomps = 0;
@@ -394,13 +463,14 @@ std::vector<std::pair<T, size_t>> mips_antitopo_engine<T>::query_k_at_layer(
 		visited_recent.emplace_back(entry_point);
 	}
 
+	std::vector<size_t> neighbour_list; // = get_vertex(cur.second);
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
 		candidates.pop();
 		if (cur.first > nearest.top().first && nearest.size() == k) {
 			break;
 		}
-		std::vector<size_t> neighbour_list; // = get_vertex(cur.second);
+		neighbour_list.clear();
 		for (size_t neighbour : get_vertex(cur.second))
 			if (!visited[neighbour]) {
 				neighbour_list.emplace_back(neighbour);
@@ -468,14 +538,152 @@ std::vector<std::pair<T, size_t>> mips_antitopo_engine<T>::query_k_at_layer(
 		ret.emplace_back(nearest.top());
 		nearest.pop();
 	}
-	// TODO use reranking here
 	reverse(ret.begin(), ret.end());
 	return ret;
 }
 
 template <typename T>
+template <typename Q>
+std::vector<std::pair<T, size_t>>
+mips_antitopo_engine<T>::mips_subengine_q<Q>::search_graph(
+		const qvec& qq, size_t k, size_t starting_vertex) {
+	auto get_data = [&](const size_t& data_index) constexpr -> auto& {
+		return qentries[data_index];
+	};
+	auto score = [&](size_t index) constexpr -> Q {
+		return qq.dot(get_data(index));
+#ifdef RECORD_STATS
+		// TODO
+		// ++num_distcomps;
+#endif
+	};
+	auto get_vertex = [&](const size_t& index) constexpr -> std::vector<size_t>& {
+		return adj[index];
+	};
+
+	// TODO finish function, use adj and qentries
+	// TODO use reranking at end
+	using measured_data_q = std::pair<Q, size_t>;
+
+	auto worst_elem = [](const measured_data_q& a, const measured_data_q& b) {
+		return a.first > b.first;
+	};
+	auto best_elem = [](const measured_data_q& a, const measured_data_q& b) {
+		return a.first < b.first;
+	};
+	std::vector<measured_data_q> entry_points_with_dist;
+	entry_points_with_dist.emplace_back(score(starting_vertex), starting_vertex);
+
+	std::vector<measured_data_q> container_candidates, container_nearest;
+	container_candidates.reserve(2 * k);
+	std::priority_queue<measured_data_q, std::vector<measured_data_q>,
+											decltype(best_elem)>
+			candidates(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+								 best_elem, std::move(container_candidates));
+	container_nearest.reserve(k + 1);
+	std::priority_queue<measured_data_q, std::vector<measured_data_q>,
+											decltype(worst_elem)>
+			nearest(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+							worst_elem, std::move(container_nearest));
+	while (nearest.size() > k)
+		nearest.pop();
+
+	std::vector<measured_data_q> best_candidates;
+	best_candidates.reserve(k);
+	auto clean_candidates_size = [&]() constexpr {
+		if (candidates.size() >= 2 * k) {
+			best_candidates.clear();
+			for (size_t i = 0; i < k; ++i) {
+				best_candidates.emplace_back(candidates.top());
+				candidates.pop();
+			}
+			while (!candidates.empty())
+				candidates.pop();
+			for (const auto& can : best_candidates)
+				candidates.emplace(can);
+		}
+	};
+
+	visited[starting_vertex] = true;
+	visited_recent.emplace_back(starting_vertex);
+
+	std::vector<measured_data_q> neighbour_list;
+	while (!candidates.empty()) {
+		auto cur = candidates.top();
+		candidates.pop();
+		if (cur.first > nearest.top().first && nearest.size() == k) {
+			break;
+		}
+		neighbour_list.clear();
+		for (size_t neighbour : get_vertex(cur.second))
+			if (!visited[neighbour]) {
+				neighbour_list.emplace_back(0, neighbour);
+				visited[neighbour] = true;
+				visited_recent.emplace_back(neighbour);
+			}
+		constexpr size_t in_advance = 4;
+		constexpr size_t in_advance_extra = 2;
+		auto do_loop_prefetch = [&](size_t i) constexpr {
+			for (size_t mult = 0; mult < dimension * sizeof(T) / 64; ++mult)
+				_mm_prefetch(((char*)&get_data(neighbour_list[i].second)) + mult * 64,
+										 _MM_HINT_T0);
+		};
+		for (size_t next_i_pre = 0;
+				 next_i_pre < std::min(in_advance, neighbour_list.size());
+				 ++next_i_pre) {
+			do_loop_prefetch(next_i_pre);
+		}
+		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
+												 size_t next_i) constexpr {
+			if constexpr (inAdvanceIterExtra) {
+				_mm_prefetch(
+						&neighbour_list[next_i + in_advance + in_advance_extra].second,
+						_MM_HINT_T0);
+			}
+			if constexpr (inAdvanceIter) {
+				do_loop_prefetch(next_i + in_advance);
+			}
+			auto& next_combined = neighbour_list[next_i];
+			next_combined.first = score(next_combined.second);
+		};
+		size_t next_i = 0;
+		for (; next_i + in_advance + in_advance_extra < neighbour_list.size();
+				 ++next_i) {
+			loop_iter.template operator()<true, true>(next_i);
+		}
+		for (; next_i + in_advance < neighbour_list.size(); ++next_i) {
+			loop_iter.template operator()<true, false>(next_i);
+		}
+		for (; next_i < neighbour_list.size(); ++next_i) {
+			loop_iter.template operator()<false, false>(next_i);
+		}
+		for (const auto& [d_next, next] : neighbour_list)
+			if (nearest.size() < k || d_next < nearest.top().first) {
+				candidates.emplace(d_next, next);
+				nearest.emplace(d_next, next);
+				if (nearest.size() > k)
+					nearest.pop();
+			}
+		clean_candidates_size();
+	}
+	for (auto& v : visited_recent)
+		visited[v] = false;
+	visited_recent.clear();
+	using measured_data = std::pair<T, size_t>;
+	std::vector<measured_data> ret_q;
+	std::sort(ret_q.begin(), ret_q.end());
+	while (!nearest.empty()) {
+		ret_q.emplace_back(nearest.top());
+		nearest.pop();
+	}
+	reverse(ret_q.begin(), ret_q.end());
+	return ret_q;
+}
+
+template <typename T>
 std::vector<size_t> mips_antitopo_engine<T>::_query_k(const vec<T>& q0,
 																											size_t k) {
+	/*
 	const auto& q = q0.internal;
 	size_t entry_point = starting_vertex;
 #ifdef RECORD_STATS
@@ -500,49 +708,29 @@ std::vector<size_t> mips_antitopo_engine<T>::_query_k(const vec<T>& q0,
 			}
 		}
 	}
+	*/
 
-	std::vector<std::pair<T, size_t>> ret_combined;
+	std::vector<std::pair<T, size_t>> ret_combined_quantized =
+			subengine->query_k(q0.internal, k * ef_search_mult);
+	for (auto& [d_next, next] : ret_combined_quantized) {
+		d_next = dist2(q0.internal, all_entries[next]);
+	}
+	std::sort(ret_combined_quantized.begin(), ret_combined_quantized.end());
+
+	/*
 	ret_combined =
 			query_k_at_layer<true>(q, 0, {entry_point}, k * ef_search_mult);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
+		*/
 	std::vector<size_t> ret;
+	for (size_t i = 0; i < ret_combined_quantized.size() && i < k; ++i) {
+		ret.emplace_back(ret_combined_quantized[i].second);
+	}
+	/*
 	for (size_t i = 0; i < ret_combined.size() && i < k; ++i) {
 		ret.emplace_back(ret_combined[i].second);
 	}
+	*/
 	return ret;
-}
-
-template <typename T>
-std::vector<std::pair<T, size_t>>
-mips_antitopo_engine<T>::query_k_combined(const vec<T>& q, size_t k) {
-	size_t entry_point = starting_vertex;
-#ifdef RECORD_STATS
-	++num_distcomps;
-#endif
-	T ep_dist = dist2(all_entries[entry_point], q);
-	for (int layer = max_layer - 1; layer >= 0; --layer) {
-		bool changed = true;
-		while (changed) {
-			changed = false;
-			for (auto& neighbour : hadj_flat[entry_point][layer]) {
-				_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
-#ifdef RECORD_STATS
-				++num_distcomps;
-#endif
-				T neighbour_dist = dist2(q, all_entries[neighbour]);
-				if (neighbour_dist < ep_dist) {
-					entry_point = neighbour;
-					ep_dist = neighbour_dist;
-					changed = true;
-				}
-			}
-		}
-	}
-
-	auto ret_combined =
-			query_k_at_layer<true>(q, 0, {entry_point}, k * ef_search_mult);
-	if (ret_combined.size() > k)
-		ret_combined.resize(k);
-	return ret_combined;
 }
