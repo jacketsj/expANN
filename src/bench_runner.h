@@ -165,7 +165,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 												k * edge_count_search_factor, use_compression,
 												use_largest_direction_filtering);
 							}
-							if (true) {
+							if (false) {
 								for (size_t brute_force_size : {64, 128})
 									for (size_t line_count : {128}) {
 										ADD_JOB(line_pruning_exact_engine<float>, brute_force_size,
@@ -194,11 +194,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										for (bool coarse_search : {true}) { // false, true
 											std::vector<size_t> cluster_overlap_vals = {1};
 											if (coarse_search)
-												cluster_overlap_vals = {1, 4}; // 1,2,4
+												cluster_overlap_vals = {1}; // 1,2,4
 											for (size_t cluster_overlap : cluster_overlap_vals) {
-												for (bool use_pq : {true}) {
-													for (size_t pq_clusters : {8, 16}) {
-														for (size_t pq_subspaces : {8, 32}) {
+												for (bool use_pq : {false}) {
+													for (size_t pq_clusters : {8}) {		// 8,16
+														for (size_t pq_subspaces : {8}) { // 8,32
 															if (false) {
 																ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<
 																						float>,
