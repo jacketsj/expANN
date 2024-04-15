@@ -246,7 +246,7 @@ mips_antitopo_engine<T>::get_knn_per_layer(size_t data_index) {
 				if (old_neighbour != cur[0])
 					cur.emplace_back(old_neighbour);
 			}
-			// TODO add random samples from vertices_per_layer to cur
+			// TODO add random samples from vertices_per_layer to cur (no duplicates)
 			if (layer == 0) {
 				kNN_per_layer.emplace_back(
 						query_k_at_layer<false>(v, layer, cur, ef_construction));
