@@ -68,6 +68,11 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	void _store_vector(const vec<T>& v0);
+	void improve_entries(const std::vector<size_t>& data_indices);
+	std::vector<std::vector<std::pair<T, size_t>>>
+	get_knn_per_layer(size_t data_index);
+	void add_edges(size_t layer, size_t data_index,
+								 const std::vector<std::pair<T, size_t>>& new_edges);
 	void _build();
 	std::vector<char> visited; // booleans
 	std::vector<size_t> visited_recent;
@@ -91,9 +96,9 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 		}
 	}
 	void prune_edges(size_t layer, size_t from, bool lazy);
-	template <bool use_bottomlayer, typename T2 = T>
+	template <bool use_bottomlayer>
 	std::vector<std::pair<T, size_t>>
-	query_k_at_layer(const vec<T2>& q, size_t layer,
+	query_k_at_layer(const fvec& q, size_t layer,
 									 const std::vector<size_t>& entry_points, size_t k);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
@@ -114,6 +119,127 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 };
 
 template <typename T>
+void mips_antitopo_engine<T>::add_edges(
+		size_t layer, size_t data_index,
+		const std::vector<std::pair<T, size_t>>& new_edges) {
+	std::vector<std::pair<T, size_t>> pruned_edges_dupe;
+	{
+		for (const auto& edge : new_edges)
+			hadj_flat_with_lengths[data_index][layer].emplace_back(edge);
+		prune_edges(layer, data_index, false);
+		pruned_edges_dupe = hadj_flat_with_lengths[data_index][layer];
+	}
+	std::vector<std::pair<T, size_t>> pruned_edges_dupe_filtered;
+	size_t edge_count_mult = M;
+	if (layer == 0)
+		edge_count_mult *= 2;
+	for (auto& md : pruned_edges_dupe) {
+		bool same_edge_exists = false;
+		bool smaller_edge_exists =
+				hadj_flat_with_lengths[md.second][layer].size() < edge_count_mult;
+		;
+		for (auto& md_other : hadj_flat_with_lengths[md.second][layer]) {
+			if (md_other.second == data_index) {
+				same_edge_exists = true;
+				break;
+			}
+			if (md_other.first < md.first) {
+				smaller_edge_exists = true; // reduce contention for starting nodes
+			}
+		}
+		if (!same_edge_exists && smaller_edge_exists) {
+			pruned_edges_dupe_filtered.emplace_back(md);
+		}
+	}
+	std::vector<std::pair<T, size_t>> pruned_edges_dupe_refiltered;
+	for (auto& md : pruned_edges_dupe_filtered) {
+		if (hadj_flat_with_lengths[md.second][layer].size() ==
+				hadj_flat[md.second][layer].size())
+			pruned_edges_dupe_refiltered.emplace_back(md);
+		hadj_flat_with_lengths[md.second][layer].emplace_back(md.first, data_index);
+	}
+	for (auto& md : pruned_edges_dupe_refiltered) {
+		prune_edges(layer, md.second, true);
+	}
+}
+
+template <typename T>
+std::vector<std::vector<std::pair<T, size_t>>>
+mips_antitopo_engine<T>::get_knn_per_layer(size_t data_index) {
+	const auto& v = all_entries[data_index];
+	const auto local_max_layer = hadj_flat_with_lengths[data_index].size() - 1;
+	std::vector<std::vector<std::pair<T, size_t>>> kNN_per_layer;
+	if (all_entries.size() > 1) {
+		std::vector<size_t> cur = {starting_vertex};
+		{
+			size_t entry_point = starting_vertex;
+			T ep_dist = dist2(v, all_entries[entry_point]);
+			for (size_t layer = max_layer - 1; layer > local_max_layer; --layer) {
+				bool changed = true;
+				while (changed) {
+					changed = false;
+					for (auto& neighbour : hadj_flat[entry_point][layer]) {
+						_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
+						T neighbour_dist = dist2(v, all_entries[neighbour]);
+						if (neighbour_dist < ep_dist) {
+							entry_point = neighbour;
+							ep_dist = neighbour_dist;
+							changed = true;
+						}
+					}
+				}
+			}
+			cur = {entry_point};
+		}
+		for (int layer = std::min(local_max_layer, max_layer - 1); layer >= 0;
+				 --layer) {
+			// add old edges as candidates (if any)
+			for (size_t old_neighbour : hadj_flat[data_index][layer]) {
+				if (old_neighbour != cur[0])
+					cur.emplace_back(old_neighbour);
+			}
+			if (layer == 0) {
+				kNN_per_layer.emplace_back(
+						query_k_at_layer<false>(v, layer, cur, ef_construction));
+			} else {
+				kNN_per_layer.emplace_back(
+						query_k_at_layer<false>(v, layer, cur, ef_construction));
+			}
+			cur.clear();
+			for (auto& md : kNN_per_layer.back()) {
+				cur.emplace_back(md.second);
+			}
+			cur.resize(1);
+			// Don't add data_index to its own neighbours (but do use it for next
+			// layer of queries)
+			if (!kNN_per_layer.back().empty() &&
+					kNN_per_layer.back()[0].second == data_index) {
+				kNN_per_layer.back().erase(kNN_per_layer.back().begin());
+			}
+		}
+
+		std::reverse(kNN_per_layer.begin(), kNN_per_layer.end());
+	}
+	return kNN_per_layer;
+}
+
+template <typename T>
+void mips_antitopo_engine<T>::improve_entries(
+		const std::vector<size_t>& data_indices) {
+	for (size_t v_index : data_indices) {
+		auto kNN_per_layer = get_knn_per_layer(v_index);
+
+		const auto local_max_layer = hadj_flat_with_lengths[v_index].size() - 1;
+
+		// add the found edges to the graph
+		size_t layer = 0;
+		for (; layer < std::min(max_layer, local_max_layer + 1); ++layer) {
+			add_edges(layer, v_index, kNN_per_layer[layer]);
+		}
+	}
+}
+
+template <typename T>
 void mips_antitopo_engine<T>::prune_edges(size_t layer, size_t from,
 																					bool lazy) {
 	auto& to = hadj_flat_with_lengths[from][layer];
@@ -132,26 +258,26 @@ void mips_antitopo_engine<T>::prune_edges(size_t layer, size_t from,
 	std::vector<std::pair<T, size_t>> ret;
 	std::vector<fvec> normalized_ret;
 	auto origin = all_entries[from];
-	std::unordered_set<size_t> taken;
+	// std::unordered_set<size_t> taken;
 	for (const auto& md : to) {
 		bool choose = true;
 		auto v1 = (all_entries[md.second] - origin).normalized();
-		size_t max_i = 0;
+		// size_t max_i = 0;
 		float max_val = 0;
 		if (use_largest_direction_filtering) {
-			for (size_t i = 0; i < v1.size(); ++i) {
+			for (size_t i = 0; i < size_t(v1.size()); ++i) {
 				float cur_val = v1[i];
 				if (cur_val > max_val) {
-					max_i = i;
+					// max_i = i;
 					max_val = cur_val;
 				} else if (-cur_val > max_val) {
-					max_i = i + v1.size();
+					// max_i = i + v1.size();
 					max_val = -cur_val;
 				}
 			}
-			if (taken.contains(max_i)) {
-				choose = false;
-			}
+			// if (taken.contains(max_i)) {
+			// choose = false;
+			//}
 		} else {
 			for (size_t next_i = 0; next_i < normalized_ret.size(); ++next_i) {
 				const auto& v2 = normalized_ret[next_i];
@@ -164,7 +290,7 @@ void mips_antitopo_engine<T>::prune_edges(size_t layer, size_t from,
 			}
 		}
 		if (choose) {
-			taken.insert(max_i);
+			// taken.insert(max_i);
 			ret.emplace_back(md);
 			normalized_ret.emplace_back(v1);
 			if (ret.size() >= edge_count_mult)
@@ -176,92 +302,19 @@ void mips_antitopo_engine<T>::prune_edges(size_t layer, size_t from,
 }
 
 template <typename T>
-void mips_antitopo_engine<T>::_store_vector(const vec<T>& v0) {
-	auto v = v0.internal;
+void mips_antitopo_engine<T>::_store_vector(const vec<T>& v) {
 	size_t v_index = all_entries.size();
-	all_entries.emplace_back(v);
-
-	if (v_index % 1000 == 0) {
-		std::cout << "Storing v_index=" << v_index << std::endl;
-	}
+	all_entries.emplace_back(v.internal);
 
 	size_t new_max_layer = floor(-log(distribution(gen)) * 1 / log(double(M)));
-	// size_t new_max_layer = 0;
 
+	visited.emplace_back();
 	hadj_flat_with_lengths.emplace_back();
-	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
-		hadj_flat_with_lengths[v_index].emplace_back();
-	}
-
-	// get kNN for each layer
-	std::vector<std::vector<std::pair<T, size_t>>> kNN_per_layer;
-	if (all_entries.size() > 1) {
-		std::vector<size_t> cur = {starting_vertex};
-		{
-			size_t entry_point = starting_vertex;
-			T ep_dist = dist2(v, all_entries[entry_point]);
-			for (size_t layer = max_layer - 1; layer > new_max_layer; --layer) {
-				bool changed = true;
-				while (changed) {
-					changed = false;
-					for (auto& neighbour : hadj_flat[entry_point][layer]) {
-						_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
-						T neighbour_dist = dist2(v, all_entries[neighbour]);
-						if (neighbour_dist < ep_dist) {
-							entry_point = neighbour;
-							ep_dist = neighbour_dist;
-							changed = true;
-						}
-					}
-				}
-			}
-			cur = {entry_point};
-		}
-		for (int layer = std::min(new_max_layer, max_layer - 1); layer >= 0;
-				 --layer) {
-			if (layer == 0) {
-				kNN_per_layer.emplace_back(
-						query_k_at_layer<true>(v0, layer, cur, ef_construction));
-			} else {
-				kNN_per_layer.emplace_back(
-						query_k_at_layer<false>(v0, layer, cur, ef_construction));
-			}
-			cur.clear();
-			for (auto& md : kNN_per_layer.back()) {
-				cur.emplace_back(md.second);
-			}
-			cur.resize(1); // present in reference impl, but not in hnsw paper
-		}
-
-		std::reverse(kNN_per_layer.begin(), kNN_per_layer.end());
-	}
-
 	hadj_flat.emplace_back();
 	hadj_bottom.emplace_back();
 	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
+		hadj_flat_with_lengths[v_index].emplace_back();
 		hadj_flat[v_index].emplace_back();
-	}
-
-	// add the found edges to the graph
-	for (size_t layer = 0; layer < std::min(max_layer, new_max_layer + 1);
-			 ++layer) {
-		hadj_flat_with_lengths[v_index][layer] = kNN_per_layer[layer];
-		prune_edges(layer, v_index, false);
-		//  add bidirectional connections, prune if necessary
-		for (auto& md : hadj_flat_with_lengths[v_index][layer]) {
-			bool edge_exists = false;
-			for (auto& md_other : hadj_flat_with_lengths[md.second][layer]) {
-				if (md_other.second == v_index) {
-					edge_exists = true;
-					break;
-				}
-			}
-			if (!edge_exists) {
-				hadj_flat_with_lengths[md.second][layer].emplace_back(md.first,
-																															v_index);
-				prune_edges(layer, md.second, true);
-			}
-		}
 	}
 
 	// add new layers if necessary
@@ -269,13 +322,14 @@ void mips_antitopo_engine<T>::_store_vector(const vec<T>& v0) {
 		++max_layer;
 		starting_vertex = v_index;
 	}
-
-	visited.emplace_back();
 }
 
 template <typename T> void mips_antitopo_engine<T>::_build() {
 	assert(all_entries.size() > 0);
-
+	// TODO init random graph
+	for (size_t iter = 0; iter < 2; ++iter)
+		for (size_t v_index = 0; v_index < all_entries.size(); ++v_index)
+			improve_entries({v_index});
 #ifdef RECORD_STATS
 	// reset before queries
 	num_distcomps = 0;
@@ -283,12 +337,11 @@ template <typename T> void mips_antitopo_engine<T>::_build() {
 }
 
 template <typename T>
-template <bool use_bottomlayer, typename T2>
+template <bool use_bottomlayer>
 std::vector<std::pair<T, size_t>> mips_antitopo_engine<T>::query_k_at_layer(
-		const vec<T2>& q0, size_t layer, const std::vector<size_t>& entry_points,
+		const fvec& q, size_t layer, const std::vector<size_t>& entry_points,
 		size_t k) {
 	using measured_data = std::pair<T, size_t>;
-	const auto& q = q0.internal;
 
 	auto get_vertex = [&](const size_t& index) constexpr -> std::vector<size_t>& {
 		if constexpr (use_bottomlayer) {
@@ -441,7 +494,7 @@ std::vector<size_t> mips_antitopo_engine<T>::_query_k(const vec<T>& q0,
 
 	std::vector<std::pair<T, size_t>> ret_combined;
 	ret_combined =
-			query_k_at_layer<true>(q0, 0, {entry_point}, k * ef_search_mult);
+			query_k_at_layer<true>(q, 0, {entry_point}, k * ef_search_mult);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;

@@ -18,6 +18,7 @@
 #include "ensg_engine.h"
 #include "hnsw_engine_reference.h"
 #include "line_pruning_exact_engine.h"
+#include "mips_antitopo_engine.h"
 #include "multi_engine_partition.h"
 
 template <typename Engine, typename EngineConfig> struct job {
@@ -142,7 +143,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 ehnsw_engine_basic_fast_multilist<float>,
 					 multi_engine_partition<float>, hnsw_engine_reference<float>,
 					 ensg_engine<float>, antitopo_engine<float>,
-					 line_pruning_exact_engine<float>>
+					 line_pruning_exact_engine<float>, mips_antitopo_engine<float>>
 			job_lists;
 
 	for (size_t k = 70; k <= 80; k += 20) {
@@ -160,10 +161,17 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 											k * edge_count_search_factor, use_cuts, use_compression);
 						}
 						for (bool use_largest_direction_filtering : {false, true}) {
-							if (true) {
+							if (false) {
 								ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
 												k * edge_count_search_factor, use_compression,
 												use_largest_direction_filtering);
+							}
+							for (std::string scalar_quant : {"int8"}) {
+								if (true) {
+									ADD_JOB(mips_antitopo_engine<float>, k, 2 * k, num_for_1nn,
+													k * edge_count_search_factor, scalar_quant,
+													use_largest_direction_filtering);
+								}
 							}
 							if (false) {
 								for (size_t brute_force_size : {64, 128})

@@ -2,12 +2,14 @@
 
 #include <map>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "vec.h"
 
 typedef std::map<std::string, std::string> param_list_t;
 #define add_param(pl, p) pl[#p] = std::to_string(p)
+#define add_param_str(pl, p) pl[#p] = p
 #define add_sub_param(pl, prefix_name, pname, p)                               \
 	pl[std::string(prefix_name) + pname] = p
 
