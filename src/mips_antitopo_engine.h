@@ -45,15 +45,9 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 	struct mips_subengine {
 		std::vector<std::vector<size_t>> adj;
 		virtual void encode_and_add(const fvec& v0,
-																const std::vector<size_t>& neighbours) {
-			throw std::runtime_error(
-					"This shouldn't be called, linker required it to exist");
-		}
-		virtual std::vector<std::pair<T, size_t>> query_k(const vec<T>& q0,
-																											size_t k) {
-			throw std::runtime_error(
-					"This shouldn't be called, linker required it to exist");
-		}
+																const std::vector<size_t>& neighbours) = 0;
+		virtual std::vector<std::pair<T, size_t>>
+		query_k(const fvec& q0, size_t k, size_t starting_vertex) = 0;
 		virtual ~mips_subengine() = default;
 	};
 	template <typename Q> struct mips_subengine_q : public mips_subengine {
@@ -70,21 +64,22 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 				vq[i] = Q(factor * v0[i]);
 			vq[v0.size()] = Q(extra);
 			if (dimension > 0 && dimension != size_t(vq.size())) {
-				throw std::runtime_error("Dimensions mismatch during encoding");
+				throw std::runtime_error("Dimension mismatch during encoding");
 			}
 			dimension = vq.size();
 			return vq;
 		}
-		virtual void encode_and_add(const fvec& v0,
-																const std::vector<size_t>& neighbours) {
+		virtual void
+		encode_and_add(const fvec& v0,
+									 const std::vector<size_t>& neighbours) override {
 			qentries.emplace_back(encode(v0, 1, v0.squaredNorm()));
 			adj.emplace_back(neighbours);
 			visited.emplace_back(false);
 		}
 		std::vector<std::pair<T, size_t>> search_graph(const qvec& qq, size_t k,
 																									 size_t starting_vertex);
-		virtual std::vector<std::pair<T, size_t>> query_k(const fvec& q0, size_t k,
-																											size_t starting_vertex) {
+		virtual std::vector<std::pair<T, size_t>>
+		query_k(const fvec& q0, size_t k, size_t starting_vertex) override {
 			auto qq = encode(q0, -2, 1);
 			return search_graph(qq, k, starting_vertex);
 		}
@@ -119,6 +114,7 @@ struct mips_antitopo_engine : public ann_engine<T, mips_antitopo_engine<T>> {
 			hadj_bottom; // vector -> edges in bottom layer
 	std::vector<std::vector<std::vector<std::pair<T, size_t>>>>
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
+	std::vector<std::vector<size_t>> vertices_per_layer;
 	void _store_vector(const vec<T>& v0);
 	void improve_entries(const std::vector<size_t>& data_indices);
 	std::vector<std::vector<std::pair<T, size_t>>>
@@ -250,6 +246,7 @@ mips_antitopo_engine<T>::get_knn_per_layer(size_t data_index) {
 				if (old_neighbour != cur[0])
 					cur.emplace_back(old_neighbour);
 			}
+			// TODO add random samples from vertices_per_layer to cur
 			if (layer == 0) {
 				kNN_per_layer.emplace_back(
 						query_k_at_layer<false>(v, layer, cur, ef_construction));
@@ -360,6 +357,13 @@ void mips_antitopo_engine<T>::_store_vector(const vec<T>& v) {
 
 	size_t new_max_layer = floor(-log(distribution(gen)) * 1 / log(double(M)));
 
+	// add new layers if necessary
+	while (new_max_layer >= max_layer) {
+		++max_layer;
+		starting_vertex = v_index;
+		vertices_per_layer.emplace_back();
+	}
+
 	visited.emplace_back();
 	hadj_flat_with_lengths.emplace_back();
 	hadj_flat.emplace_back();
@@ -367,12 +371,7 @@ void mips_antitopo_engine<T>::_store_vector(const vec<T>& v) {
 	for (size_t layer = 0; layer <= new_max_layer; ++layer) {
 		hadj_flat_with_lengths[v_index].emplace_back();
 		hadj_flat[v_index].emplace_back();
-	}
-
-	// add new layers if necessary
-	while (new_max_layer >= max_layer) {
-		++max_layer;
-		starting_vertex = v_index;
+		vertices_per_layer[layer].emplace_back(v_index);
 	}
 }
 
@@ -397,6 +396,9 @@ template <typename T> void mips_antitopo_engine<T>::_build() {
 			}
 			improve_entries({v_index});
 		}
+		// TODO if iter isn't last, find vertices with low in-degree, and promote
+		// them up a layer (don't surpass max layer, add to vertices_per_layer, do
+		// this a maximum number of times, 10% or so).
 	}
 
 	for (size_t v_index = 0; v_index < all_entries.size(); ++v_index) {
@@ -711,7 +713,7 @@ std::vector<size_t> mips_antitopo_engine<T>::_query_k(const vec<T>& q0,
 	*/
 
 	std::vector<std::pair<T, size_t>> ret_combined_quantized =
-			subengine->query_k(q0.internal, k * ef_search_mult);
+			subengine->query_k(q0.internal, k * ef_search_mult, starting_vertex);
 	for (auto& [d_next, next] : ret_combined_quantized) {
 		d_next = dist2(q0.internal, all_entries[next]);
 	}
