@@ -56,6 +56,8 @@ struct VisitedContainerRef {
 struct VisitedContainerManager {
 	std::vector<std::shared_ptr<VisitedContainer>> visited_containers;
 	std::mutex visited_containers_mutex;
+	VisitedContainerManager()
+			: visited_containers(), visited_containers_mutex() {}
 	void resize_visit_containers(size_t num_threads_lower_bound,
 															 size_t data_size) {
 		if (visited_containers.size() < num_threads_lower_bound) {
