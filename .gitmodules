@@ -10,3 +10,6 @@
 [submodule "mmap_allocator"]
 	path = mmap_allocator
 	url = https://github.com/johannesthoma/mmap_allocator.git
+[submodule "MopBucket"]
+	path = MopBucket
+	url = https://github.com/procedurecall/MopBucket.git

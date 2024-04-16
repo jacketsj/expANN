@@ -6,7 +6,7 @@ nmap <leader>p :term ++shell python3 src/pyplotter.py<CR>
 nmap <leader>c :term ++shell ./build.sh<CR>
 nmap <leader>C :term ++shell ./build.sh --clang<CR>
 nmap <leader>g :term ++shell ./build.sh && gdb -ex run build/expann<CR>
-nmap <leader>v :term ++shell ./build.sh --stack-info && valgrind build/expann<CR>
+nmap <leader>v :term ++shell ./build.sh --stack-info && valgrind --track-origins=yes build/expann<CR>
 nmap <leader>a :term ++shell ./build.sh --clang --asan && build/expann<CR>
 "nmap <leader>u :term ++shell ./build.sh && perf record -a build/expann<CR>
 nmap <leader>u :term ++shell ./build.sh --stack-info && perf record -F 60000 -g build/expann && hotspot<CR>
