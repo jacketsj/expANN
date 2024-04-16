@@ -74,7 +74,7 @@ void par_antitopo_engine::improve_entries(
 		const std::vector<size_t>& data_indices) {
 	size_t num_threads = data_indices.size();
 
-	resize_visit_containers(num_threads);
+	visit_manager.resize_visit_containers(num_threads, all_entries.size());
 
 	std::barrier sync_point(num_threads);
 
@@ -114,6 +114,10 @@ void par_antitopo_engine::build() {
 				 data_index < all_entries.size() &&
 				 data_index < block_start_index + num_threads;
 				 ++data_index) {
+			if (data_index % 20000 == 0) {
+				std::cout << "Adding data_index=" << data_index << " to improve block"
+									<< std::endl;
+			}
 			data_indices.emplace_back(data_index);
 		}
 		improve_entries(data_indices);
@@ -130,7 +134,7 @@ par_antitopo_engine::query_k_at_layer(const fvec& q, size_t layer,
 																			const std::vector<size_t>& entry_points,
 																			size_t k,
 																			std::optional<size_t> thread_index) {
-	auto visitref = get_visitref(thread_index);
+	auto visitref = visit_manager.get_visitref(thread_index, all_entries.size());
 	using measured_data = std::pair<dist_t, size_t>;
 
 	auto get_vertex = [&](const size_t& index) constexpr -> std::vector<size_t>& {
@@ -258,10 +262,6 @@ par_antitopo_engine::query_k_at_layer(const fvec& q, size_t layer,
 	}
 	reverse(ret.begin(), ret.end());
 	return ret;
-}
-std::vector<size_t> par_antitopo_engine::_query_k(const vec<float>& q,
-																									size_t k) {
-	return query_k(to_fvec(q), k);
 }
 std::vector<size_t>
 par_antitopo_engine::query_k(const fvec& q, size_t k,

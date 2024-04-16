@@ -163,8 +163,10 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 											k * edge_count_search_factor, use_cuts, use_compression);
 						}
 						for (size_t build_threads : {10}) {
-							ADD_JOB(par_antitopo_engine, k, k * edge_count_search_factor,
-											build_threads, num_for_1nn);
+							if (true) {
+								ADD_JOB(par_antitopo_engine, k, k * edge_count_search_factor,
+												build_threads, num_for_1nn);
+							}
 						}
 						for (bool use_largest_direction_filtering : {false}) {
 							if (false) {
