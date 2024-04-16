@@ -14,12 +14,6 @@
 #include "robin_hood.h"
 #include "topk_t.h"
 
-namespace {
-// template <typename A, typename B> auto dist2(const A& a, const B& b) {
-// 	return (a - b).squaredNorm();
-// }
-} // namespace
-
 struct mips_antitopo_engine_config {
 	size_t M;
 	size_t M0;
@@ -383,8 +377,12 @@ void mips_antitopo_engine<T>::_store_vector(const vec<T>& v) {
 template <typename T> void mips_antitopo_engine<T>::_build() {
 	if (scalar_quant == "int8")
 		subengine = std::make_unique<mips_subengine_q<int8_t>>();
-	else if (scalar_quant == "uint8")
-		subengine = std::make_unique<mips_subengine_q<uint8_t>>();
+	else if (scalar_quant == "int16_t")
+		subengine = std::make_unique<mips_subengine_q<int16_t>>();
+	else if (scalar_quant == "int32_t")
+		subengine = std::make_unique<mips_subengine_q<int32_t>>();
+	else if (scalar_quant == "half")
+		subengine = std::make_unique<mips_subengine_q<Eigen::half>>();
 	else if (scalar_quant == "float")
 		subengine = std::make_unique<mips_subengine_q<float>>();
 	else
