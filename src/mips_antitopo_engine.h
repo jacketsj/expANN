@@ -553,7 +553,7 @@ mips_antitopo_engine<T>::mips_subengine_q<Q>::search_graph(
 		return qentries[data_index];
 	};
 	auto score = [&](size_t index) constexpr -> Q {
-		return qq.dot(get_data(index));
+		return (-qq).dot(get_data(index));
 #ifdef RECORD_STATS
 		// TODO
 		// ++num_distcomps;
@@ -613,7 +613,7 @@ mips_antitopo_engine<T>::mips_subengine_q<Q>::search_graph(
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
 		candidates.pop();
-		if (cur.first > nearest.top().first && nearest.size() == k) {
+		if (cur.first < nearest.top().first && nearest.size() == k) {
 			break;
 		}
 		neighbour_list.clear();
@@ -660,7 +660,7 @@ mips_antitopo_engine<T>::mips_subengine_q<Q>::search_graph(
 			loop_iter.template operator()<false, false>(next_i);
 		}
 		for (const auto& [d_next, next] : neighbour_list)
-			if (nearest.size() < k || d_next < nearest.top().first) {
+			if (nearest.size() < k || d_next > nearest.top().first) {
 				candidates.emplace(d_next, next);
 				nearest.emplace(d_next, next);
 				if (nearest.size() > k)
@@ -673,7 +673,6 @@ mips_antitopo_engine<T>::mips_subengine_q<Q>::search_graph(
 	visited_recent.clear();
 	using measured_data = std::pair<T, size_t>;
 	std::vector<measured_data> ret_q;
-	std::sort(ret_q.begin(), ret_q.end());
 	while (!nearest.empty()) {
 		ret_q.emplace_back(nearest.top());
 		nearest.pop();
