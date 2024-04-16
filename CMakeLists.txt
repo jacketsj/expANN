@@ -69,7 +69,9 @@ find_package(nlohmann_json)
 
 add_subdirectory(eigen)
 
-file(GLOB SOURCES ${SRC}/*.cpp)
+include_directories(MopBucket/src/rough)
+
+file(GLOB SOURCES ${SRC}/*.cpp MopBucket/src/rough/*.cpp)
 
 add_executable(expann ${SOURCES})
 
@@ -79,4 +81,4 @@ add_library(plt INTERFACE)
 target_include_directories(plt INTERFACE plt)
 
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
+target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)# mopbucket)
