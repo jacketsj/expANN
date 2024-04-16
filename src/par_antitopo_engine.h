@@ -44,13 +44,14 @@ struct par_antitopo_engine : public ann_engine<float, par_antitopo_engine> {
 	size_t num_threads;
 	size_t ef_search_mult;
 	size_t max_layer;
+	VisitedContainerManager visit_manager;
 #ifdef RECORD_STATS
 	size_t num_distcomps = 0;
 #endif
 	par_antitopo_engine(par_antitopo_engine_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M),
 				ef_construction(conf.ef_construction), num_threads(conf.build_threads),
-				ef_search_mult(conf.ef_search_mult), max_layer(0) {}
+				ef_search_mult(conf.ef_search_mult), max_layer(0), visit_manager() {}
 	using config = par_antitopo_engine_config;
 	std::vector<fvec> all_entries;
 	std::vector<fvec> all_entries_extended;
@@ -68,7 +69,6 @@ struct par_antitopo_engine : public ann_engine<float, par_antitopo_engine> {
 	}
 	void _store_vector(const vec<float>& v0) { store_vector(to_fvec(v0)); }
 	void edit_vector(size_t data_index, const fvec& v);
-	VisitedContainerManager visit_manager;
 	void improve_entries(const std::vector<size_t>& data_indices);
 	std::vector<std::vector<std::pair<dist_t, size_t>>>
 	get_knn_per_layer(size_t data_index, std::optional<size_t> thread_index);
