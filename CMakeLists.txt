@@ -42,7 +42,7 @@ endif()
 
 if(ENABLE_STACK_INFO)
     message("Enabling stack info (-march=native omitted).")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -g")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-avx -fno-omit-frame-pointer -g")
 else()
     message("Disabling stack info.")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -ggdb3 -funroll-loops")
