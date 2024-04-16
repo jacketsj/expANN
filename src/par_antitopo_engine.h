@@ -15,13 +15,9 @@
 
 #include <Eigen/Dense>
 
-namespace {
-template <typename A, typename B> auto dist2(const A& a, const B& b) {
-	return (a - b).squaredNorm();
-}
-} // namespace
+#include "ann_engine.h"
+#include "vec.h"
 
-namespace Mop {
 struct par_antitopo_engine_build_config {
 	size_t M;
 	size_t ef_construction;
@@ -35,8 +31,15 @@ struct par_antitopo_engine_query_config {
 	par_antitopo_engine_query_config(size_t ef_search_mult)
 			: ef_search_mult(ef_search_mult) {}
 };
+struct par_antitopo_engine_wrapped_config {
+	par_antitopo_engine_build_config build_config;
+	par_antitopo_engine_query_config query_config;
+	par_antitopo_engine_wrapped_config(par_antitopo_engine_build_config bconf,
+																		 par_antitopo_engine_query_config qconf)
+			: build_config(bconf), query_config(qconf) {}
+};
 
-struct par_antitopo_engine {
+struct par_antitopo_engine : public ann_engine<float, par_antitopo_engine> {
 	using fvec = Eigen::VectorXf;
 	using dist_t = float;
 	std::random_device rd;
@@ -47,11 +50,23 @@ struct par_antitopo_engine {
 	size_t ef_construction;
 	size_t num_threads;
 	size_t max_layer;
-	par_antitopo_engine(par_antitopo_engine_build_config conf)
+#ifdef RECORD_STATS
+	size_t num_distcomps;
+#endif
+	par_antitopo_engine_query_config default_query_conf;
+	par_antitopo_engine(par_antitopo_engine_build_config conf,
+											par_antitopo_engine_query_config default_query_conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M),
 				ef_construction(conf.ef_construction), num_threads(conf.threads),
-				max_layer(0) {}
+				max_layer(0), default_query_conf(default_query_conf) {}
+	par_antitopo_engine(par_antitopo_engine_wrapped_config conf)
+			: rd(), gen(0), distribution(0, 1), M(conf.build_config.M),
+				ef_construction(conf.build_config.ef_construction),
+				num_threads(conf.build_config.threads), max_layer(0),
+				default_query_conf(conf.query_config) {}
+	using config = par_antitopo_engine_wrapped_config;
 	std::vector<fvec> all_entries;
+	std::vector<fvec> all_entries_extended;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
 	std::vector<std::vector<size_t>>
@@ -60,6 +75,15 @@ struct par_antitopo_engine {
 			hadj_flat_with_lengths; // vector -> layer -> edges with lengths
 	std::vector<std::vector<std::unique_ptr<std::mutex>>> edge_list_locks;
 	void store_vector(const fvec& v);
+	fvec to_fvec(const vec<float>& v0) {
+		fvec ret;
+		ret.resize(v0.size());
+		for (size_t i = 0; i < size_t(ret.size()); ++i) {
+			ret[i] = v0.at(i);
+		}
+		return ret;
+	}
+	void _store_vector(const vec<float>& v0);
 	void edit_vector(size_t data_index, const fvec& v);
 	void improve_entries(const std::vector<size_t>& data_indices);
 	std::vector<std::vector<std::pair<dist_t, size_t>>>
@@ -69,6 +93,7 @@ struct par_antitopo_engine {
 											const std::vector<std::pair<dist_t, size_t>>& new_edges,
 											std::barrier<>& mem_barrier);
 	void build();
+	void _build();
 	struct VisitedContainer {
 		bool taken;
 		std::vector<char> visited; // booleans
@@ -182,5 +207,16 @@ struct par_antitopo_engine {
 	std::vector<size_t>
 	query_k(const fvec& v, size_t k, par_antitopo_engine_query_config qconf,
 					std::optional<size_t> thread_index = std::nullopt);
+	std::vector<size_t> _query_k(const vec<float>& v, size_t k);
+	const std::string _name() { return "Parallel Anti-Topo Engine"; }
+	const param_list_t _param_list() {
+		param_list_t pl;
+		add_param(pl, M);
+		add_param(pl, default_query_conf.ef_search_mult);
+		add_param(pl, ef_construction);
+#ifdef RECORD_STATS
+		add_param(pl, num_distcomps);
+#endif
+		return pl;
+	}
 };
-} // namespace Mop

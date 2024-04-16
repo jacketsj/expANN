@@ -3,7 +3,12 @@
 #include <thread>
 #include <vector>
 
-namespace Mop {
+namespace {
+template <typename A, typename B> auto dist2(const A& a, const B& b) {
+	return (a - b).squaredNorm();
+}
+} // namespace
+
 void par_antitopo_engine::prune_edges(size_t layer, size_t from, bool lazy) {
 	auto& to = hadj_flat_with_lengths[from][layer];
 
@@ -18,23 +23,23 @@ void par_antitopo_engine::prune_edges(size_t layer, size_t from, bool lazy) {
 
 	std::sort(to.begin(), to.end());
 	std::vector<std::pair<dist_t, size_t>> ret;
-	std::vector<fvec> normalized_ret;
+	// std::vector<fvec> normalized_ret;
 	auto origin = all_entries[from];
 	for (const auto& md : to) {
 		bool choose = true;
-		auto v1 = (all_entries[md.second] - origin).normalized();
-		for (size_t next_i = 0; next_i < normalized_ret.size(); ++next_i) {
-			const auto& v2 = normalized_ret[next_i];
-			// if (dist2(all_entries[md.second], all_entries[ret[next_i].second]) <
-			//		dist2(all_entries[md.second], origin)) {
-			if (dist2(v1, v2) <= 1.0) {
+		// auto v1 = (all_entries[md.second] - origin).normalized();
+		for (size_t next_i = 0; next_i < ret.size(); ++next_i) {
+			// const auto& v2 = normalized_ret[next_i];
+			if (dist2(all_entries[md.second], all_entries[ret[next_i].second]) <
+					dist2(all_entries[md.second], origin)) {
+				// if (dist2(v1, v2) <= 1.0) {
 				choose = false;
 				break;
 			}
 		}
 		if (choose) {
 			ret.emplace_back(md);
-			normalized_ret.emplace_back(v1);
+			// normalized_ret.emplace_back(v1);
 			if (ret.size() >= edge_count_mult)
 				break;
 		}
@@ -43,6 +48,9 @@ void par_antitopo_engine::prune_edges(size_t layer, size_t from, bool lazy) {
 	update_edges(layer, from);
 }
 
+void par_antitopo_engine::_store_vector(const vec<float>& v0) {
+	store_vector(to_fvec(v0));
+}
 void par_antitopo_engine::store_vector(const fvec& v) {
 	size_t v_index = all_entries.size();
 	all_entries.emplace_back(v);
@@ -104,6 +112,7 @@ void par_antitopo_engine::improve_entries(
 	}
 }
 
+void par_antitopo_engine::_build() { build(); }
 void par_antitopo_engine::build() {
 	for (size_t block_start_index = 0; block_start_index < all_entries.size();
 			 block_start_index += num_threads) {
@@ -116,6 +125,10 @@ void par_antitopo_engine::build() {
 		}
 		improve_entries(data_indices);
 	}
+#ifdef RECORD_STATS
+	// reset before queries
+	num_distcomps = 0;
+#endif
 }
 
 template <bool use_bottomlayer>
@@ -253,7 +266,10 @@ par_antitopo_engine::query_k_at_layer(const fvec& q, size_t layer,
 	reverse(ret.begin(), ret.end());
 	return ret;
 }
-
+std::vector<size_t> par_antitopo_engine::_query_k(const vec<float>& q,
+																									size_t k) {
+	return query_k(to_fvec(q), k, default_query_conf);
+}
 std::vector<size_t>
 par_antitopo_engine::query_k(const fvec& q, size_t k,
 														 par_antitopo_engine_query_config qconf,
@@ -398,4 +414,3 @@ void par_antitopo_engine::add_edges_with_lock(
 		prune_edges(layer, md.second, true);
 	}
 }
-} // namespace Mop

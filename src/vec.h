@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-//#include "distance.h"
+// #include "distance.h"
 
 #include <Eigen/Dense>
 
@@ -52,7 +52,13 @@ public:
 	}
 	T* data() { return internal.data(); }
 	void set_dim(size_t dim) { internal.resize(dim); }
-	size_t size() const { return size_t(internal.size()); }
+	size_t size() const {
+#ifdef DIM
+		return DIM;
+#else
+		return size_t(internal.size());
+#endif
+	}
 	size_t dim() const { return size(); }
 	void clear() { internal.setZero(); }
 	std::string to_string() const {
