@@ -1,7 +1,4 @@
 #include "par_antitopo_engine.h"
-#include <latch>
-#include <thread>
-#include <vector>
 
 namespace {
 template <typename A, typename B> auto dist2(const A& a, const B& b) {
@@ -46,10 +43,6 @@ void par_antitopo_engine::prune_edges(size_t layer, size_t from, bool lazy) {
 	}
 	to = ret;
 	update_edges(layer, from);
-}
-
-void par_antitopo_engine::_store_vector(const vec<float>& v0) {
-	store_vector(to_fvec(v0));
 }
 void par_antitopo_engine::store_vector(const fvec& v) {
 	size_t v_index = all_entries.size();
@@ -216,7 +209,7 @@ par_antitopo_engine::query_k_at_layer(const fvec& q, size_t layer,
 		constexpr size_t in_advance_extra = 2;
 		auto do_loop_prefetch = [&](size_t i) constexpr {
 #ifdef DIM
-			for (size_t mult = 0; mult < DIM * sizeof(T) / 64; ++mult)
+			for (size_t mult = 0; mult < DIM * sizeof(float) / 64; ++mult)
 				_mm_prefetch(((char*)&get_data(neighbour_list[i])) + mult * 64,
 										 _MM_HINT_T0);
 #endif
@@ -268,11 +261,10 @@ par_antitopo_engine::query_k_at_layer(const fvec& q, size_t layer,
 }
 std::vector<size_t> par_antitopo_engine::_query_k(const vec<float>& q,
 																									size_t k) {
-	return query_k(to_fvec(q), k, default_query_conf);
+	return query_k(to_fvec(q), k);
 }
 std::vector<size_t>
 par_antitopo_engine::query_k(const fvec& q, size_t k,
-														 par_antitopo_engine_query_config qconf,
 														 std::optional<size_t> thread_index) {
 	size_t entry_point = starting_vertex;
 	dist_t ep_dist = dist2(all_entries[entry_point], q);
@@ -293,7 +285,7 @@ par_antitopo_engine::query_k(const fvec& q, size_t k,
 	}
 
 	std::vector<std::pair<dist_t, size_t>> ret_combined = query_k_at_layer<true>(
-			q, 0, {entry_point}, k * qconf.ef_search_mult, thread_index);
+			q, 0, {entry_point}, k * ef_search_mult, thread_index);
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;

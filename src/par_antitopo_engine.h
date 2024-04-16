@@ -3,12 +3,14 @@
 #include <algorithm>
 #include <barrier>
 #include <iostream>
+#include <latch>
 #include <memory>
 #include <optional>
 #include <queue>
 #include <random>
 #include <set>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -18,25 +20,15 @@
 #include "ann_engine.h"
 #include "vec.h"
 
-struct par_antitopo_engine_build_config {
+struct par_antitopo_engine_config {
 	size_t M;
 	size_t ef_construction;
-	size_t threads;
-	par_antitopo_engine_build_config(size_t M, size_t ef_construction,
-																	 size_t threads)
-			: M(M), ef_construction(ef_construction), threads(threads) {}
-};
-struct par_antitopo_engine_query_config {
+	size_t build_threads;
 	size_t ef_search_mult;
-	par_antitopo_engine_query_config(size_t ef_search_mult)
-			: ef_search_mult(ef_search_mult) {}
-};
-struct par_antitopo_engine_wrapped_config {
-	par_antitopo_engine_build_config build_config;
-	par_antitopo_engine_query_config query_config;
-	par_antitopo_engine_wrapped_config(par_antitopo_engine_build_config bconf,
-																		 par_antitopo_engine_query_config qconf)
-			: build_config(bconf), query_config(qconf) {}
+	par_antitopo_engine_config(size_t _M, size_t _ef_construction,
+														 size_t _build_threads, size_t _ef_search_mult)
+			: M(_M), ef_construction(_ef_construction), build_threads(_build_threads),
+				ef_search_mult(_ef_search_mult) {}
 };
 
 struct par_antitopo_engine : public ann_engine<float, par_antitopo_engine> {
@@ -49,22 +41,18 @@ struct par_antitopo_engine : public ann_engine<float, par_antitopo_engine> {
 	size_t M;
 	size_t ef_construction;
 	size_t num_threads;
+	size_t ef_search_mult;
 	size_t max_layer;
 #ifdef RECORD_STATS
-	size_t num_distcomps;
+	size_t num_distcomps = 0;
 #endif
-	par_antitopo_engine_query_config default_query_conf;
-	par_antitopo_engine(par_antitopo_engine_build_config conf,
-											par_antitopo_engine_query_config default_query_conf)
+	par_antitopo_engine(par_antitopo_engine_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M),
-				ef_construction(conf.ef_construction), num_threads(conf.threads),
-				max_layer(0), default_query_conf(default_query_conf) {}
-	par_antitopo_engine(par_antitopo_engine_wrapped_config conf)
-			: rd(), gen(0), distribution(0, 1), M(conf.build_config.M),
-				ef_construction(conf.build_config.ef_construction),
-				num_threads(conf.build_config.threads), max_layer(0),
-				default_query_conf(conf.query_config) {}
-	using config = par_antitopo_engine_wrapped_config;
+				ef_construction(conf.ef_construction), num_threads(conf.build_threads),
+				ef_search_mult(conf.ef_search_mult), max_layer(0) {
+		// std::cout << "Inside constructor as expected" << std::endl;
+	}
+	using config = par_antitopo_engine_config;
 	std::vector<fvec> all_entries;
 	std::vector<fvec> all_entries_extended;
 	std::vector<std::vector<std::vector<size_t>>>
@@ -76,14 +64,10 @@ struct par_antitopo_engine : public ann_engine<float, par_antitopo_engine> {
 	std::vector<std::vector<std::unique_ptr<std::mutex>>> edge_list_locks;
 	void store_vector(const fvec& v);
 	fvec to_fvec(const vec<float>& v0) {
-		fvec ret;
-		ret.resize(v0.size());
-		for (size_t i = 0; i < size_t(ret.size()); ++i) {
-			ret[i] = v0.at(i);
-		}
+		fvec ret = v0.internal;
 		return ret;
 	}
-	void _store_vector(const vec<float>& v0);
+	void _store_vector(const vec<float>& v0) { store_vector(to_fvec(v0)); }
 	void edit_vector(size_t data_index, const fvec& v);
 	void improve_entries(const std::vector<size_t>& data_indices);
 	std::vector<std::vector<std::pair<dist_t, size_t>>>
@@ -205,14 +189,14 @@ struct par_antitopo_engine : public ann_engine<float, par_antitopo_engine> {
 									 const std::vector<size_t>& entry_points, size_t k,
 									 std::optional<size_t> thread_index);
 	std::vector<size_t>
-	query_k(const fvec& v, size_t k, par_antitopo_engine_query_config qconf,
+	query_k(const fvec& v, size_t k,
 					std::optional<size_t> thread_index = std::nullopt);
 	std::vector<size_t> _query_k(const vec<float>& v, size_t k);
 	const std::string _name() { return "Parallel Anti-Topo Engine"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
-		add_param(pl, default_query_conf.ef_search_mult);
+		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
 #ifdef RECORD_STATS
 		add_param(pl, num_distcomps);
