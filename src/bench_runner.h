@@ -148,8 +148,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 par_antitopo_engine>
 			job_lists;
 
-	for (size_t k = 70; k <= 80; k += 20) {
-		for (size_t num_for_1nn : {2, 4}) { // 5
+	for (size_t k = 100; k <= 100; k += 20) {
+		for (size_t num_for_1nn : {2, 3, 4, 5}) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
@@ -158,7 +158,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			for (size_t edge_count_search_factor : {3}) { // 3
 				for (bool use_cuts : {false, true}) {
 					for (bool use_compression : {false}) {
-						if (true) {
+						if (false) {
 							ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 											k * edge_count_search_factor, use_cuts, use_compression);
 						}
@@ -259,7 +259,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					}
 				}
 				if (true) {
-					for (bool use_ecuts : {false}) {
+					for (bool use_ecuts : {true, false}) {
 						ADD_JOB(hnsw_engine_reference<float>, k,
 										edge_count_search_factor * k, num_for_1nn, use_ecuts);
 					}
