@@ -155,17 +155,19 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
 				}
 			}
-			for (size_t edge_count_search_factor : {3}) { // 3
+			for (size_t edge_count_search_factor : {2}) { // 3
 				for (bool use_cuts : {false}) {
 					for (bool use_compression : {false}) {
 						if (false) {
 							ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 											k * edge_count_search_factor, use_cuts, use_compression);
 						}
-						for (size_t build_threads : {10}) {
-							if (true) {
-								ADD_JOB(par_antitopo_engine, k, k * edge_count_search_factor,
-												build_threads, num_for_1nn);
+						for (size_t build_threads : {14}) {
+							for (bool use_mips : {false}) {
+								if (true) {
+									ADD_JOB(par_antitopo_engine, k, k * edge_count_search_factor,
+													build_threads, num_for_1nn, use_mips);
+								}
 							}
 						}
 						for (bool use_largest_direction_filtering : {false}) {
