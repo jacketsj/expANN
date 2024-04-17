@@ -1,0 +1,9 @@
+{
+  "dataset": "Synthetic",
+  "ds_name": "presentation_synthetic_n_200000_m_4000_d_128_k_10",
+  "num_threads": 4,
+  "n": 200000,
+  "m": 4000,
+  "d": 128,
+  "k": 10
+}
