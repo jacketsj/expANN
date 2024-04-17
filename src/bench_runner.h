@@ -258,7 +258,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										num_for_1nn, k * edge_count_search_factor, use_cuts);
 					}
 				}
-				if (false) {
+				if (true) {
 					for (bool use_ecuts : {false}) {
 						ADD_JOB(hnsw_engine_reference<float>, k,
 										edge_count_search_factor * k, num_for_1nn, use_ecuts);
