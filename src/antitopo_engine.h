@@ -294,14 +294,14 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
 	using measured_data = std::pair<T, size_t>;
 	const auto& q = q0.internal;
 
-	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
+	auto get_vertex = [&](const size_t& index) constexpr -> std::vector<size_t>& {
 		if constexpr (use_bottomlayer) {
 			return hadj_bottom[index];
 		} else {
 			return hadj_flat[index][layer];
 		}
 	};
-	auto get_data = [&](const size_t& data_index) constexpr->auto& {
+	auto get_data = [&](const size_t& data_index) constexpr -> auto& {
 		if constexpr (use_compressed)
 			return all_entries_compressed[data_index];
 		else
@@ -368,7 +368,7 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
 			do_loop_prefetch(next_i_pre);
 		}
 		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
-				size_t next_i) constexpr {
+												 size_t next_i) constexpr {
 			if constexpr (inAdvanceIterExtra) {
 				_mm_prefetch(&neighbour_list[next_i + in_advance + in_advance_extra],
 										 _MM_HINT_T0);
