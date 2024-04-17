@@ -124,7 +124,7 @@ ehnsw_engine_basic_fast<T>::prune_edges(size_t layer, size_t from,
 				break;
 			}
 		}
-		if (layer == 0 && ret.size() + num_cuts() >= edge_count_mult) {
+		if (choose && layer == 0 && ret.size() + num_cuts() >= edge_count_mult) {
 			bool found_bin = false;
 			for (size_t bin = 0; bin < bins.size(); ++bin) {
 				if (!bins[bin] && e_labels[md.second][bin] != e_labels[from][bin]) {
@@ -277,7 +277,7 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 		size_t k) {
 	using measured_data = std::pair<T, size_t>;
 
-	auto get_vertex = [&](const size_t& index) constexpr->std::vector<size_t>& {
+	auto get_vertex = [&](const size_t& index) constexpr -> std::vector<size_t>& {
 		if constexpr (use_bottomlayer) {
 			return hadj_bottom[index];
 		} else {
@@ -354,7 +354,7 @@ std::vector<std::pair<T, size_t>> ehnsw_engine_basic_fast<T>::query_k_at_layer(
 			do_loop_prefetch(next_i_pre);
 		}
 		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
-				size_t next_i) constexpr {
+												 size_t next_i) constexpr {
 			if constexpr (inAdvanceIterExtra) {
 				_mm_prefetch(&neighbour_list[next_i + in_advance + in_advance_extra],
 										 _MM_HINT_T0);
