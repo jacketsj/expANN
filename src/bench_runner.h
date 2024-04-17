@@ -148,14 +148,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 par_antitopo_engine>
 			job_lists;
 
-	for (size_t k = 100; k <= 100; k += 20) {
+	for (size_t k = 40; k <= 50; k += 20) {
 		for (size_t num_for_1nn : {2, 3, 4, 5}) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
 				}
 			}
-			for (size_t edge_count_search_factor : {3}) { // 3
+			for (size_t edge_count_search_factor : {2}) { // 3
 				for (bool use_cuts : {false, true}) {
 					for (bool use_compression : {false}) {
 						if (false) {
