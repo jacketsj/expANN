@@ -43,7 +43,10 @@ struct hnsw_engine_reference : public ann_engine<T, hnsw_engine_reference<T>> {
 	void _store_vector(vec<T> v);
 	void _build();
 	std::vector<size_t> _query_k(vec<T> v, size_t k);
-	const std::string _name() { return "HNSW Reference Engine(ecuts optional)"; }
+	const std::string _name() {
+		return std::string("HNSW Reference Engine") +
+					 std::string(use_ecuts ? " (ecuts)" : "");
+	}
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
