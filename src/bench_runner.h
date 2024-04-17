@@ -149,29 +149,33 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 70; k <= 80; k += 20) {
-		for (size_t num_for_1nn : {2}) { // 5
+		for (size_t num_for_1nn : {2, 4}) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
 				}
 			}
-			for (size_t edge_count_search_factor : {2}) { // 3
-				for (bool use_cuts : {false}) {
+			for (size_t edge_count_search_factor : {3}) { // 3
+				for (bool use_cuts : {false, true}) {
 					for (bool use_compression : {false}) {
-						if (false) {
+						if (true) {
 							ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
 											k * edge_count_search_factor, use_cuts, use_compression);
 						}
+					}
+				}
+				for (bool use_cuts : {false}) {
+					for (bool use_compression : {false}) {
 						for (size_t build_threads : {14}) {
 							for (bool use_mips : {false}) {
-								if (true) {
+								if (false) {
 									ADD_JOB(par_antitopo_engine, k, k * edge_count_search_factor,
 													build_threads, num_for_1nn, use_mips);
 								}
 							}
 						}
 						for (bool use_largest_direction_filtering : {false}) {
-							if (false) {
+							if (true) {
 								ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
 												k * edge_count_search_factor, use_compression,
 												use_largest_direction_filtering);
