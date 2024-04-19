@@ -26,13 +26,16 @@ struct antitopo_engine_config {
 	size_t M0;
 	size_t ef_search_mult;
 	size_t ef_construction;
+	size_t ortho_count;
 	bool use_compression;
 	bool use_largest_direction_filtering;
 	antitopo_engine_config(size_t _M, size_t _M0, size_t _ef_search_mult,
-												 size_t _ef_construction, bool _use_compression = false,
+												 size_t _ef_construction, size_t _ortho_count,
+												 bool _use_compression = false,
 												 bool _use_largest_direction_filtering = false)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
-				ef_construction(_ef_construction), use_compression(_use_compression),
+				ef_construction(_ef_construction), ortho_count(_ortho_count),
+				use_compression(_use_compression),
 				use_largest_direction_filtering(_use_largest_direction_filtering) {}
 };
 
@@ -47,6 +50,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	size_t M0;
 	size_t ef_search_mult;
 	size_t ef_construction;
+	size_t ortho_count;
 	bool use_compression;
 	bool use_largest_direction_filtering;
 	size_t max_layer;
@@ -56,7 +60,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	antitopo_engine(antitopo_engine_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
-				ef_construction(conf.ef_construction),
+				ef_construction(conf.ef_construction), ortho_count(conf.ortho_count),
 				use_compression(conf.use_compression),
 				use_largest_direction_filtering(conf.use_largest_direction_filtering),
 				max_layer(0) {}
@@ -94,10 +98,12 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 		}
 	}
 	void prune_edges(size_t layer, size_t from, bool lazy);
-	template <bool use_bottomlayer, bool use_compressed, typename T2 = T>
+	template <bool use_bottomlayer, bool use_compressed, bool use_ortho,
+						typename T2 = T>
 	std::vector<std::pair<T, size_t>>
 	query_k_at_layer(const vec<T2>& q, size_t layer,
-									 const std::vector<size_t>& entry_points, size_t k);
+									 const std::vector<size_t>& entry_points, size_t k,
+									 const std::vector<size_t>& ortho_points);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
 	const std::string _name() { return "Anti-Topo Engine"; }
@@ -107,6 +113,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 		add_param(pl, M0);
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
+		add_param(pl, ortho_count);
 		add_param(pl, use_compression);
 		add_param(pl, use_largest_direction_filtering);
 #ifdef RECORD_STATS
@@ -201,39 +208,87 @@ void antitopo_engine<T>::_store_vector(const vec<T>& v0, bool silent) {
 	if (all_entries.size() > 1) {
 		std::vector<size_t> cur = {starting_vertex};
 		{
-			size_t entry_point = starting_vertex;
-			T ep_dist = dist2(v, all_entries[entry_point]);
-			for (size_t layer = max_layer - 1; layer > new_max_layer; --layer) {
-				bool changed = true;
-				while (changed) {
-					changed = false;
-					for (auto& neighbour : hadj_flat[entry_point][layer]) {
-						_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
-						T neighbour_dist = dist2(v, all_entries[neighbour]);
-						if (neighbour_dist < ep_dist) {
-							entry_point = neighbour;
-							ep_dist = neighbour_dist;
-							changed = true;
+			std::vector<size_t> entry_points;
+			for (size_t i = 0; i < ortho_count; ++i) {
+				const auto& q = v;
+				size_t entry_point = starting_vertex;
+#ifdef RECORD_STATS
+				++num_distcomps;
+#endif
+				float lambda = 1.0f;
+				float gamma = 1.0f;
+				auto score = [&](size_t data_index) constexpr {
+					T basic_dist = dist2(all_entries[data_index], q);
+					T res = basic_dist;
+					for (size_t prev_index : entry_points) {
+						T co_dist = dist2(all_entries[prev_index], all_entries[data_index]);
+						if (co_dist > basic_dist)
+							res += lambda * (co_dist - basic_dist) + gamma;
+					}
+					return res;
+				};
+				T ep_dist = score(entry_point);
+				for (size_t layer = max_layer - 1; layer > new_max_layer; --layer) {
+					bool changed = true;
+					while (changed) {
+						changed = false;
+						for (auto& neighbour : hadj_flat[entry_point][layer]) {
+							_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
+#ifdef RECORD_STATS
+							++num_distcomps;
+#endif
+							T neighbour_dist = score(neighbour);
+							if (neighbour_dist < ep_dist) {
+								entry_point = neighbour;
+								ep_dist = neighbour_dist;
+								changed = true;
+							}
 						}
 					}
 				}
+				bool dupe = false;
+				for (size_t existing_ep : entry_points)
+					if (existing_ep == entry_point) {
+						dupe = true;
+						break;
+					}
+				if (!dupe)
+					entry_points.emplace_back(entry_point);
 			}
-			cur = {entry_point};
+			cur = entry_points;
 		}
 		for (int layer = std::min(new_max_layer, max_layer - 1); layer >= 0;
 				 --layer) {
-			if (layer == 0) {
-				kNN_per_layer.emplace_back(
-						query_k_at_layer<true, false>(v0, layer, cur, ef_construction));
-			} else {
-				kNN_per_layer.emplace_back(
-						query_k_at_layer<false, false>(v0, layer, cur, ef_construction));
+			std::vector<std::vector<std::pair<T, size_t>>> result_lists;
+			std::vector<size_t> new_cur;
+			for (size_t i = 0; i < ortho_count; ++i) {
+				if (layer == 0) {
+					result_lists.emplace_back(query_k_at_layer<true, false, true>(
+							v0, layer, cur, ef_construction, new_cur));
+				} else {
+					result_lists.emplace_back(query_k_at_layer<false, false, true>(
+							v0, layer, cur, ef_construction, new_cur));
+				}
+				bool dupe = false;
+				size_t candidate = result_lists.back()[0].second;
+				for (size_t already : new_cur)
+					if (already == candidate) {
+						dupe = true;
+						break;
+					}
+				if (!dupe)
+					new_cur.emplace_back(candidate);
 			}
-			cur.clear();
-			for (auto& md : kNN_per_layer.back()) {
-				cur.emplace_back(md.second);
+			std::set<std::pair<T, size_t>> results_combined_set;
+			for (const auto& result_list : result_lists) {
+				for (const auto& result : result_list)
+					results_combined_set.emplace(result);
 			}
-			cur.resize(1); // present in reference impl, but not in hnsw paper
+			std::vector<std::pair<T, size_t>> results_combined;
+			for (const auto& p : results_combined_set)
+				results_combined.emplace_back(p);
+			kNN_per_layer.emplace_back(results_combined);
+			cur = new_cur;
 		}
 
 		std::reverse(kNN_per_layer.begin(), kNN_per_layer.end());
@@ -286,11 +341,11 @@ template <typename T> void antitopo_engine<T>::_build() {
 }
 
 template <typename T>
-template <bool use_bottomlayer, bool use_compressed, typename T2>
-std::vector<std::pair<T, size_t>>
-antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
-																		 const std::vector<size_t>& entry_points,
-																		 size_t k) {
+template <bool use_bottomlayer, bool use_compressed, bool use_ortho,
+					typename T2>
+std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
+		const vec<T2>& q0, size_t layer, const std::vector<size_t>& entry_points,
+		size_t k, const std::vector<size_t>& ortho_points) {
 	using measured_data = std::pair<T, size_t>;
 	const auto& q = q0.internal;
 
@@ -308,6 +363,23 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
 			return all_entries[data_index];
 	};
 
+	float lambda = 1.0f;
+	float gamma = 1.0f;
+	auto score = [&](size_t data_index) constexpr {
+		if constexpr (use_ortho) {
+			T basic_dist = dist2(all_entries[data_index], q);
+			T res = basic_dist;
+			for (size_t prev_index : ortho_points) {
+				T co_dist = dist2(all_entries[prev_index], all_entries[data_index]);
+				if (co_dist > basic_dist)
+					res += lambda * (co_dist - basic_dist) + gamma;
+			}
+			return res;
+		} else {
+			return dist2(q, get_data(data_index));
+		}
+	};
+
 	auto worst_elem = [](const measured_data& a, const measured_data& b) {
 		return a.first < b.first;
 	};
@@ -319,8 +391,7 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
 #ifdef RECORD_STATS
 		++num_distcomps;
 #endif
-		entry_points_with_dist.emplace_back(dist2(q, get_data(entry_point)),
-																				entry_point);
+		entry_points_with_dist.emplace_back(score(entry_point), entry_point);
 	}
 
 	std::priority_queue<measured_data, std::vector<measured_data>,
@@ -383,7 +454,7 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
 #ifdef RECORD_STATS
 			++num_distcomps;
 #endif
-			T d_next = dist2(q, get_data(next));
+			T d_next = score(next);
 			if (nearest.size() < k || d_next < nearest.top().first) {
 				candidates.emplace(d_next, next);
 				nearest.emplace(d_next, next);
@@ -415,7 +486,7 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
 	}
 	if constexpr (use_compressed) {
 		for (auto& [d, data_index] : ret) {
-			d = dist2(get_data(data_index), q);
+			d = score(data_index);
 		}
 	}
 	reverse(ret.begin(), ret.end());
@@ -425,39 +496,62 @@ antitopo_engine<T>::query_k_at_layer(const vec<T2>& q0, size_t layer,
 template <typename T>
 std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
 	const auto& q = q0.internal;
-	size_t entry_point = starting_vertex;
+	std::vector<size_t> entry_points;
+	for (size_t i = 0; i < 1; ++i) {
+		size_t entry_point = starting_vertex;
 #ifdef RECORD_STATS
-	++num_distcomps;
+		++num_distcomps;
 #endif
-	T ep_dist = dist2(all_entries[entry_point], q);
-	for (size_t layer = max_layer - 1; layer > 0; --layer) {
-		bool changed = true;
-		while (changed) {
-			changed = false;
-			for (auto& neighbour : hadj_flat[entry_point][layer]) {
-				_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
+		float lambda = 1.0f;
+		float gamma = 1.0f;
+		auto score = [&](size_t data_index) constexpr {
+			T basic_dist = dist2(all_entries[data_index], q);
+			T res = basic_dist;
+			for (size_t prev_index : entry_points) {
+				T co_dist = dist2(all_entries[prev_index], all_entries[data_index]);
+				if (co_dist > basic_dist)
+					res += lambda * (co_dist - basic_dist) + gamma;
+			}
+			return res;
+		};
+		T ep_dist = score(entry_point);
+		for (size_t layer = max_layer - 1; layer > 0; --layer) {
+			bool changed = true;
+			while (changed) {
+				changed = false;
+				for (auto& neighbour : hadj_flat[entry_point][layer]) {
+					_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
 #ifdef RECORD_STATS
-				++num_distcomps;
+					++num_distcomps;
 #endif
-				T neighbour_dist = dist2(q, all_entries[neighbour]);
-				if (neighbour_dist < ep_dist) {
-					entry_point = neighbour;
-					ep_dist = neighbour_dist;
-					changed = true;
+					T neighbour_dist = score(neighbour);
+					if (neighbour_dist < ep_dist) {
+						entry_point = neighbour;
+						ep_dist = neighbour_dist;
+						changed = true;
+					}
 				}
 			}
 		}
+		bool dupe = false;
+		for (size_t existing_ep : entry_points)
+			if (existing_ep == entry_point) {
+				dupe = true;
+				break;
+			}
+		if (!dupe)
+			entry_points.emplace_back(entry_point);
 	}
 
 	std::vector<std::pair<T, size_t>> ret_combined;
 	if (use_compression) {
 		// TODO fix
 		auto qc = vec<compressed_t>(q0);
-		ret_combined =
-				query_k_at_layer<true, true>(qc, 0, {entry_point}, k * ef_search_mult);
+		ret_combined = query_k_at_layer<true, true, false>(qc, 0, entry_points,
+																											 k * ef_search_mult, {});
 	} else {
-		ret_combined =
-				query_k_at_layer<true, false>(q0, 0, {entry_point}, k * ef_search_mult);
+		ret_combined = query_k_at_layer<true, false, false>(q0, 0, entry_points,
+																												k * ef_search_mult, {});
 	}
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
@@ -495,8 +589,8 @@ antitopo_engine<T>::query_k_combined(const vec<T>& q, size_t k) {
 		}
 	}
 
-	auto ret_combined =
-			query_k_at_layer<true, false>(q, 0, {entry_point}, k * ef_search_mult);
+	auto ret_combined = query_k_at_layer<true, false, false>(
+			q, 0, {entry_point}, k * ef_search_mult, {});
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	return ret_combined;

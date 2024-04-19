@@ -149,7 +149,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 70; k <= 80; k += 20) {
-		for (size_t num_for_1nn : {3}) { // 5
+		for (size_t num_for_1nn : {2, 3, 4}) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
@@ -175,10 +175,12 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							}
 						}
 						for (bool use_largest_direction_filtering : {false}) {
-							if (true) {
-								ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
-												k * edge_count_search_factor, use_compression,
-												use_largest_direction_filtering);
+							for (size_t ortho_count : {1, 4, 8, 13}) {
+								if (true) {
+									ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
+													k * edge_count_search_factor, ortho_count,
+													use_compression, use_largest_direction_filtering);
+								}
 							}
 							for (std::string scalar_quant : {"int32_t", "float", "half"}) {
 								for (size_t num_iters : {1}) {
