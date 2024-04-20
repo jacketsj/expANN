@@ -175,9 +175,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							}
 						}
 						for (bool use_largest_direction_filtering : {false}) {
-							for (size_t ortho_count : {1, 5, 10}) {
-								for (float ortho_factor : {1.0f, 0.5f, 2.0f}) {
-									for (float ortho_bias : {0.0f, 1.0f, 1000000000.0f}) {
+							for (size_t ortho_count : {1, 3, 5}) {
+								for (float ortho_factor :
+										 (ortho_count == 1 ? std::vector({0.0f})
+																			 : std::vector({1.0f, 0.5f, 2.0f}))) {
+									for (float ortho_bias :
+											 ortho_factor == 1
+													 ? std::vector({0.0f})
+													 : std::vector({0.0f, 1.0f})) { //, 1000000000.0f})) {
 										if (true) {
 											ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
 															k * edge_count_search_factor, ortho_count,

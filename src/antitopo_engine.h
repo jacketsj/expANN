@@ -268,14 +268,25 @@ void antitopo_engine<T>::_store_vector(const vec<T>& v0, bool silent) {
 				 --layer) {
 			std::vector<std::vector<std::pair<T, size_t>>> result_lists;
 			std::vector<size_t> new_cur;
+			std::vector<size_t> seeds = cur;
+			std::set<size_t> seeds_set(seeds.begin(), seeds.end());
+			auto populate_seeds = [&]() {
+				for (const auto& [_, new_point] : result_lists.back()) {
+					if (!seeds_set.contains(new_point)) {
+						seeds.emplace_back(new_point);
+						seeds_set.insert(new_point);
+					}
+				}
+			};
 			for (size_t i = 0; i < ortho_count; ++i) {
 				if (layer == 0) {
 					result_lists.emplace_back(query_k_at_layer<true, false, true>(
-							v0, layer, cur, ef_construction, new_cur));
+							v0, layer, seeds, ef_construction, new_cur));
 				} else {
 					result_lists.emplace_back(query_k_at_layer<false, false, true>(
-							v0, layer, cur, ef_construction, new_cur));
+							v0, layer, seeds, ef_construction, new_cur));
 				}
+				populate_seeds();
 				bool dupe = false;
 				size_t candidate = result_lists.back()[0].second;
 				for (size_t already : new_cur)
