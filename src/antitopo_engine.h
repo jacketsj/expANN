@@ -4,6 +4,7 @@
 #include <iostream>
 #include <queue>
 #include <random>
+#include <ranges>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -113,7 +114,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 									 const std::vector<size_t>& ortho_points);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
-	const std::string _name() { return "Anti-Topo Engine+"; }
+	const std::string _name() { return "Anti-Topo Engine+(leniency=2)"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
@@ -147,10 +148,39 @@ void antitopo_engine<T>::prune_edges(size_t layer, size_t from, bool lazy) {
 	}
 
 	sort(to.begin(), to.end());
+	std::set<std::pair<T, size_t>> candidates(to.begin(), to.end());
 	std::vector<std::pair<T, size_t>> ret;
-	std::vector<fvec> normalized_ret;
-	auto origin = all_entries[from];
-	std::unordered_set<size_t> taken;
+	// std::vector<fvec> normalized_ret;
+	// auto origin = all_entries[from];
+	// std::unordered_set<size_t> taken;
+
+	float prune_score = std::numeric_limits<float>::max();
+	auto score =
+			[&](const std::pair<T, size_t>& data_index_with_length) constexpr {
+				T basic_dist = data_index_with_length.first;
+				T res = basic_dist;
+				size_t data_index = data_index_with_length.second;
+				size_t leniency = 2;
+				for (auto [_, prev_index] : ret) {
+					T co_dist = dist2(all_entries[prev_index], all_entries[data_index]);
+					if (co_dist < basic_dist) {
+						res += ortho_factor * (basic_dist - co_dist) + ortho_bias;
+						if (--leniency == 0) {
+							return prune_score;
+						}
+					}
+				}
+				return res;
+			};
+	while (ret.size() < edge_count_mult && !candidates.empty()) {
+		auto it = std::ranges::min_element(candidates, {}, score);
+		if (score(*it) == prune_score)
+			break;
+		ret.emplace_back(*it);
+		candidates.erase(it);
+	}
+
+	/*
 	for (const auto& md : to) {
 		bool choose = true;
 		auto v1 = (all_entries[md.second] - origin).normalized();
@@ -189,6 +219,7 @@ void antitopo_engine<T>::prune_edges(size_t layer, size_t from, bool lazy) {
 				break;
 		}
 	}
+	*/
 	to = ret;
 	update_edges(layer, from);
 }
