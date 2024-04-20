@@ -113,7 +113,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 									 const std::vector<size_t>& ortho_points);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
-	const std::string _name() { return "Anti-Topo Engine"; }
+	const std::string _name() { return "Anti-Topo Engine+"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
