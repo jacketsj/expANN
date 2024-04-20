@@ -27,14 +27,18 @@ struct antitopo_engine_config {
 	size_t ef_search_mult;
 	size_t ef_construction;
 	size_t ortho_count;
+	float ortho_factor;
+	float ortho_bias;
 	bool use_compression;
 	bool use_largest_direction_filtering;
 	antitopo_engine_config(size_t _M, size_t _M0, size_t _ef_search_mult,
 												 size_t _ef_construction, size_t _ortho_count,
+												 float _ortho_factor, float _ortho_bias,
 												 bool _use_compression = false,
 												 bool _use_largest_direction_filtering = false)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), ortho_count(_ortho_count),
+				ortho_factor(_ortho_factor), ortho_bias(_ortho_bias),
 				use_compression(_use_compression),
 				use_largest_direction_filtering(_use_largest_direction_filtering) {}
 };
@@ -51,6 +55,8 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	size_t ef_search_mult;
 	size_t ef_construction;
 	size_t ortho_count;
+	float ortho_factor;
+	float ortho_bias;
 	bool use_compression;
 	bool use_largest_direction_filtering;
 	size_t max_layer;
@@ -61,6 +67,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), ortho_count(conf.ortho_count),
+				ortho_factor(conf.ortho_factor), ortho_bias(conf.ortho_bias),
 				use_compression(conf.use_compression),
 				use_largest_direction_filtering(conf.use_largest_direction_filtering),
 				max_layer(0) {}
@@ -114,6 +121,8 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 		add_param(pl, ef_search_mult);
 		add_param(pl, ef_construction);
 		add_param(pl, ortho_count);
+		add_param(pl, ortho_factor);
+		add_param(pl, ortho_bias);
 		add_param(pl, use_compression);
 		add_param(pl, use_largest_direction_filtering);
 #ifdef RECORD_STATS
@@ -148,7 +157,7 @@ void antitopo_engine<T>::prune_edges(size_t layer, size_t from, bool lazy) {
 		size_t max_i = 0;
 		float max_val = 0;
 		if (use_largest_direction_filtering) {
-			for (size_t i = 0; i < v1.size(); ++i) {
+			for (size_t i = 0; i < size_t(v1.size()); ++i) {
 				float cur_val = v1[i];
 				if (cur_val > max_val) {
 					max_i = i;
@@ -215,15 +224,13 @@ void antitopo_engine<T>::_store_vector(const vec<T>& v0, bool silent) {
 #ifdef RECORD_STATS
 				++num_distcomps;
 #endif
-				float lambda = 1.0f;
-				float gamma = 1.0f;
 				auto score = [&](size_t data_index) constexpr {
 					T basic_dist = dist2(all_entries[data_index], q);
 					T res = basic_dist;
 					for (size_t prev_index : entry_points) {
 						T co_dist = dist2(all_entries[prev_index], all_entries[data_index]);
-						if (co_dist > basic_dist)
-							res += lambda * (co_dist - basic_dist) + gamma;
+						if (co_dist < basic_dist)
+							res += ortho_factor * (basic_dist - co_dist) + ortho_bias;
 					}
 					return res;
 				};
@@ -363,16 +370,14 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 			return all_entries[data_index];
 	};
 
-	float lambda = 1.0f;
-	float gamma = 1.0f;
 	auto score = [&](size_t data_index) constexpr {
 		if constexpr (use_ortho) {
 			T basic_dist = dist2(all_entries[data_index], q);
 			T res = basic_dist;
 			for (size_t prev_index : ortho_points) {
 				T co_dist = dist2(all_entries[prev_index], all_entries[data_index]);
-				if (co_dist > basic_dist)
-					res += lambda * (co_dist - basic_dist) + gamma;
+				if (co_dist < basic_dist)
+					res += ortho_factor * (basic_dist - co_dist) + ortho_bias;
 			}
 			return res;
 		} else {
@@ -502,15 +507,13 @@ std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
 #ifdef RECORD_STATS
 		++num_distcomps;
 #endif
-		float lambda = 1.0f;
-		float gamma = 1.0f;
 		auto score = [&](size_t data_index) constexpr {
 			T basic_dist = dist2(all_entries[data_index], q);
 			T res = basic_dist;
 			for (size_t prev_index : entry_points) {
 				T co_dist = dist2(all_entries[prev_index], all_entries[data_index]);
-				if (co_dist > basic_dist)
-					res += lambda * (co_dist - basic_dist) + gamma;
+				if (co_dist < basic_dist)
+					res += ortho_factor * (basic_dist - co_dist) + ortho_bias;
 			}
 			return res;
 		};

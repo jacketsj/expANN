@@ -149,7 +149,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 70; k <= 80; k += 20) {
-		for (size_t num_for_1nn : {2, 3, 4}) { // 5
+		for (size_t num_for_1nn : {3}) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
@@ -175,11 +175,16 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							}
 						}
 						for (bool use_largest_direction_filtering : {false}) {
-							for (size_t ortho_count : {1, 4, 8, 13}) {
-								if (true) {
-									ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
-													k * edge_count_search_factor, ortho_count,
-													use_compression, use_largest_direction_filtering);
+							for (size_t ortho_count : {1, 5, 10}) {
+								for (float ortho_factor : {1.0f, 0.5f, 2.0f}) {
+									for (float ortho_bias : {0.0f, 1.0f, 1000000000.0f}) {
+										if (true) {
+											ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
+															k * edge_count_search_factor, ortho_count,
+															ortho_factor, ortho_bias, use_compression,
+															use_largest_direction_filtering);
+										}
+									}
 								}
 							}
 							for (std::string scalar_quant : {"int32_t", "float", "half"}) {
@@ -192,15 +197,17 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								}
 							}
 							if (false) {
-								for (size_t brute_force_size : {64, 128})
-									for (size_t line_count : {128}) {
-										ADD_JOB(line_pruning_exact_engine<float>, brute_force_size,
-														line_count,
-														antitopo_engine_config(
-																k, 2 * k, num_for_1nn,
-																k * edge_count_search_factor, use_compression,
-																use_largest_direction_filtering));
-									}
+								// for (size_t brute_force_size : {64, 128})
+								// for (size_t line_count : {128}) {
+								/*
+								ADD_JOB(line_pruning_exact_engine<float>, brute_force_size,
+												line_count,
+												antitopo_engine_config(
+														k, 2 * k, num_for_1nn,
+														k * edge_count_search_factor, use_compression,
+														use_largest_direction_filtering));
+														*/
+								//}
 							}
 						}
 					}
