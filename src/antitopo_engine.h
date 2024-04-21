@@ -30,17 +30,18 @@ struct antitopo_engine_config {
 	size_t ortho_count;
 	float ortho_factor;
 	float ortho_bias;
+	size_t prune_overflow;
 	bool use_compression;
 	bool use_largest_direction_filtering;
 	antitopo_engine_config(size_t _M, size_t _M0, size_t _ef_search_mult,
 												 size_t _ef_construction, size_t _ortho_count,
 												 float _ortho_factor, float _ortho_bias,
-												 bool _use_compression = false,
+												 size_t _prune_overflow, bool _use_compression = false,
 												 bool _use_largest_direction_filtering = false)
 			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
 				ef_construction(_ef_construction), ortho_count(_ortho_count),
 				ortho_factor(_ortho_factor), ortho_bias(_ortho_bias),
-				use_compression(_use_compression),
+				prune_overflow(_prune_overflow), use_compression(_use_compression),
 				use_largest_direction_filtering(_use_largest_direction_filtering) {}
 };
 
@@ -58,6 +59,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	size_t ortho_count;
 	float ortho_factor;
 	float ortho_bias;
+	size_t prune_overflow;
 	bool use_compression;
 	bool use_largest_direction_filtering;
 	size_t max_layer;
@@ -69,6 +71,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				ef_search_mult(conf.ef_search_mult),
 				ef_construction(conf.ef_construction), ortho_count(conf.ortho_count),
 				ortho_factor(conf.ortho_factor), ortho_bias(conf.ortho_bias),
+				prune_overflow(conf.prune_overflow),
 				use_compression(conf.use_compression),
 				use_largest_direction_filtering(conf.use_largest_direction_filtering),
 				max_layer(0) {}
@@ -114,7 +117,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 									 const std::vector<size_t>& ortho_points);
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
-	const std::string _name() { return "Anti-Topo Engine+(leniency=2)"; }
+	const std::string _name() { return "Anti-Topo Engine+"; }
 	const param_list_t _param_list() {
 		param_list_t pl;
 		add_param(pl, M);
@@ -124,6 +127,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 		add_param(pl, ortho_count);
 		add_param(pl, ortho_factor);
 		add_param(pl, ortho_bias);
+		add_param(pl, prune_overflow);
 		add_param(pl, use_compression);
 		add_param(pl, use_largest_direction_filtering);
 #ifdef RECORD_STATS
@@ -160,7 +164,7 @@ void antitopo_engine<T>::prune_edges(size_t layer, size_t from, bool lazy) {
 				T basic_dist = data_index_with_length.first;
 				T res = basic_dist;
 				size_t data_index = data_index_with_length.second;
-				size_t leniency = 2;
+				size_t leniency = prune_overflow + 1;
 				for (auto [_, prev_index] : ret) {
 					T co_dist = dist2(all_entries[prev_index], all_entries[data_index]);
 					if (co_dist < basic_dist) {
