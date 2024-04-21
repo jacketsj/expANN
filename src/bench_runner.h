@@ -149,7 +149,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 70; k <= 80; k += 20) {
-		for (size_t num_for_1nn : {3}) { // 5
+		for (size_t num_for_1nn : {2, 3}) { // 5
 			for (bool use_cuts : {false}) {
 				if (false) {
 					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
@@ -184,11 +184,14 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 											 ortho_count == 1
 													 ? std::vector({0.0f})
 													 : std::vector({0.0f})) { //,1.0f, 1000000000.0f})) {
-										if (true) {
-											ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
-															k * edge_count_search_factor, ortho_count,
-															ortho_factor, ortho_bias, use_compression,
-															use_largest_direction_filtering);
+										for (size_t prune_overflow : {0, 1, 3}) {
+											if (true) {
+												ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
+																k * edge_count_search_factor, ortho_count,
+																ortho_factor, ortho_bias, prune_overflow,
+																use_compression,
+																use_largest_direction_filtering);
+											}
 										}
 									}
 								}
