@@ -1,15 +1,9 @@
-[submodule "plt"]
-	path = plt
-	url = https://github.com/jacketsj/matplotlib-cpp.git
 [submodule "eigen"]
 	path = eigen
 	url = https://gitlab.com/libeigen/eigen.git
 [submodule "hnswlib"]
 	path = hnswlib
 	url = https://github.com/jacketsj/hnswlib.git
-[submodule "mmap_allocator"]
-	path = mmap_allocator
-	url = https://github.com/johannesthoma/mmap_allocator.git
 [submodule "MopBucket"]
 	path = MopBucket
 	url = https://github.com/procedurecall/MopBucket.git

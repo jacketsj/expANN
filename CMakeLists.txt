@@ -77,11 +77,9 @@ add_executable(expann ${SOURCES})
 
 find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS} mmap_allocator)
-add_library(plt INTERFACE)
-target_include_directories(plt INTERFACE plt)
 
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)# mopbucket)
+target_link_libraries(expann PUBLIC ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)# mopbucket)
 
 # Pybinds
 add_subdirectory(pybind11)
