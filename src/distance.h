@@ -52,3 +52,13 @@ float distance_compare_avx512f_f16(const float* vec1, const float* vec2,
 	}
 	*/
 }
+
+float dot_avx512f_f16(const float* vec1, const float* vec2, size_t size) {
+	__m512 sum = _mm512_setzero_ps();
+	for (size_t i = 0; i < size; i += 16) {
+		__m512 a = _mm512_loadu_ps(&vec1[i]);
+		__m512 b = _mm512_loadu_ps(&vec2[i]);
+		sum = _mm512_fmadd_ps(a, b, sum);
+	}
+	return _mm512_reduce_add_ps(sum);
+}
