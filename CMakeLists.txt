@@ -56,11 +56,11 @@ else()
 endif()
 
 
-include(./cmake/CPM.cmake)  # Package manager for simple requirements.
+#include(./cmake/CPM.cmake)  # Package manager for simple requirements.
 
 # run `conan install .. --build=missing` in `./cmake`
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+#list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
+#list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 #CPMAddPackage("gh:fmtlib/fmt#9.1.0")  # fmt for nice strings
 
@@ -91,5 +91,5 @@ pybind11_add_module(expann_py MODULE src/pyrunner.cpp)
 target_link_libraries(expann_py PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
 set_target_properties(expann_py PROPERTIES
                                 INTERPROCEDURAL_OPTIMIZATION ON
-                                CXX_VISIBILITY_PRESET ON
+                                CXX_VISIBILITY_PRESET default
                                 VISIBILITY_INLINES_HIDDEN ON)
