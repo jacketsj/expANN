@@ -15,7 +15,8 @@ PYBIND11_MODULE(expann_py, m) {
 						 return py::memoryview::from_buffer(v.data(), {v.size()},
 																								{sizeof(float)});
 					 })
-			.def("size", &vec<float>::size);
+			.def("size", &vec<float>::size)
+			.def("normalize", &vec<float>::normalize);
 
 	py::class_<antitopo_engine<float>>(m, "AntitopoEngine")
 			.def(py::init<size_t, size_t, size_t, float, float, size_t>())
