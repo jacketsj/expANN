@@ -12,7 +12,6 @@
 #include "bench_runner.h"
 #include "brute_force_engine.h"
 #include "dataset_loader.h"
-#include "hnsw_engine.h"
 #include "matplotlibcpp.h"
 #include "plotter.h"
 #include "randomgeometry.h"

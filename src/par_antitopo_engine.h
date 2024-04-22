@@ -19,7 +19,6 @@
 
 #include "ann_engine.h"
 #include "vec.h"
-#include "visited_container_manager.h"
 
 #include "antitopo_engine_basic.h"
 
