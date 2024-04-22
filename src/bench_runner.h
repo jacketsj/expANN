@@ -11,15 +11,8 @@
 #include "antitopo_engine.h"
 #include "dataset.h"
 #include "dataset_loader.h"
-#include "ehnsw_engine_basic_fast.h"
-#include "ehnsw_engine_basic_fast_clusterchunks.h"
-#include "ehnsw_engine_basic_fast_clusterchunks_pqprune.h"
-#include "ehnsw_engine_basic_fast_multilist.h"
-#include "ensg_engine.h"
 #include "hnsw_engine_reference.h"
 #include "line_pruning_exact_engine.h"
-#include "mips_antitopo_engine.h"
-#include "multi_engine_partition.h"
 #include "par_antitopo_engine.h"
 
 template <typename Engine, typename EngineConfig> struct job {
@@ -138,142 +131,56 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 
 	size_t job_index = 0;
 
-	JobTuple<ehnsw_engine_basic_fast<float>,
-					 ehnsw_engine_basic_fast_clusterchunks<float>,
-					 ehnsw_engine_basic_fast_clusterchunks_pqprune<float>,
-					 ehnsw_engine_basic_fast_multilist<float>,
-					 multi_engine_partition<float>, hnsw_engine_reference<float>,
-					 ensg_engine<float>, antitopo_engine<float>,
-					 line_pruning_exact_engine<float>, mips_antitopo_engine<float>,
-					 par_antitopo_engine>
+	JobTuple<hnsw_engine_reference<float>, antitopo_engine<float>,
+					 line_pruning_exact_engine<float>, par_antitopo_engine>
 			job_lists;
 
 	for (size_t k = 70; k <= 80; k += 20) {
-		for (size_t num_for_1nn : {2, 3}) { // 5
-			for (bool use_cuts : {false}) {
-				if (false) {
-					ADD_JOB(ensg_engine<float>, k, num_for_1nn, use_cuts, 1.0f);
-				}
-			}
+		for (size_t num_for_1nn : {2, 3}) {							// 5
 			for (size_t edge_count_search_factor : {2}) { // 3
-				for (bool use_cuts : {false, true}) {
-					for (bool use_compression : {false}) {
-						if (false) {
-							ADD_JOB(ehnsw_engine_basic_fast<float>, k, 2 * k, num_for_1nn,
-											k * edge_count_search_factor, use_cuts, use_compression);
-						}
-					}
-				}
-				for (bool use_cuts : {false}) {
-					for (bool use_compression : {false}) {
-						for (size_t build_threads : {14}) {
-							for (bool use_mips : {false}) {
-								if (false) {
-									ADD_JOB(par_antitopo_engine, k, k * edge_count_search_factor,
-													build_threads, num_for_1nn, use_mips);
-								}
-							}
-						}
-						for (bool use_largest_direction_filtering : {false}) {
-							for (size_t ortho_count : {1, 3}) { // 1,3,5
-								for (float ortho_factor :
-										 (ortho_count == 1
-													? std::vector({0.5f})
-													: std::vector({0.5f}))) { // 1.0f, 0.5f, 2.0f
-									for (float ortho_bias :
-											 ortho_count == 1
-													 ? std::vector({0.0f})
-													 : std::vector({0.0f})) { //,1.0f, 1000000000.0f})) {
-										for (size_t prune_overflow : {0, 1, 3}) {
-											if (true) {
-												ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
-																k * edge_count_search_factor, ortho_count,
-																ortho_factor, ortho_bias, prune_overflow,
-																use_compression,
-																use_largest_direction_filtering);
-											}
-										}
-									}
-								}
-							}
-							for (std::string scalar_quant : {"int32_t", "float", "half"}) {
-								for (size_t num_iters : {1}) {
-									if (false) {
-										ADD_JOB(mips_antitopo_engine<float>, k, 2 * k, num_for_1nn,
-														k * edge_count_search_factor, scalar_quant,
-														use_largest_direction_filtering, num_iters);
-									}
-								}
-							}
+				for (bool use_compression : {false}) {
+					for (size_t build_threads : {14}) {
+						for (bool use_mips : {false}) {
 							if (false) {
-								// for (size_t brute_force_size : {64, 128})
-								// for (size_t line_count : {128}) {
-								/*
-								ADD_JOB(line_pruning_exact_engine<float>, brute_force_size,
-												line_count,
-												antitopo_engine_config(
-														k, 2 * k, num_for_1nn,
-														k * edge_count_search_factor, use_compression,
-														use_largest_direction_filtering));
-														*/
-								//}
+								ADD_JOB(par_antitopo_engine, k, k * edge_count_search_factor,
+												build_threads, num_for_1nn, use_mips);
 							}
 						}
 					}
-					for (size_t num_splits : {4, 12, 32}) {
-						if (false) {
-							ehnsw_engine_basic_fast_config subconf(
-									k, 2 * k, 1, k * edge_count_search_factor, use_cuts, false);
-							ADD_JOB(multi_engine_partition<float>, subconf, num_splits,
-											num_for_1nn);
-						}
-					}
-					for (size_t min_cluster_size : {32, 128}) {								 // 32
-						for (size_t max_cluster_size : {min_cluster_size * 4}) { // * 4
-							for (bool very_early_termination : {false}) {
-								for (bool use_clusters_data : {true}) {
-									for (bool minimize_noncluster_edges : {false}) {
-										for (bool coarse_search : {true}) { // false, true
-											std::vector<size_t> cluster_overlap_vals = {1};
-											if (coarse_search)
-												cluster_overlap_vals = {1}; // 1,2,4
-											for (size_t cluster_overlap : cluster_overlap_vals) {
-												for (bool use_pq : {false}) {
-													for (size_t pq_clusters : {8}) {		// 8,16
-														for (size_t pq_subspaces : {8}) { // 8,32
-															if (false) {
-																ADD_JOB(ehnsw_engine_basic_fast_clusterchunks<
-																						float>,
-																				k, 2 * k, num_for_1nn,
-																				k * edge_count_search_factor, use_cuts,
-																				min_cluster_size, max_cluster_size,
-																				very_early_termination,
-																				use_clusters_data,
-																				minimize_noncluster_edges,
-																				coarse_search, cluster_overlap, use_pq,
-																				pq_clusters, pq_subspaces);
-															}
-														}
-													}
-												}
-											}
-										}
-										if (false) {
-											ADD_JOB(
-													ehnsw_engine_basic_fast_clusterchunks_pqprune<float>,
-													k, 2 * k, num_for_1nn, k * edge_count_search_factor,
-													use_cuts, min_cluster_size, max_cluster_size,
-													very_early_termination, use_clusters_data,
-													minimize_noncluster_edges);
+					for (bool use_largest_direction_filtering : {false}) {
+						for (size_t ortho_count : {1, 3}) { // 1,3,5
+							for (float ortho_factor :
+									 (ortho_count == 1
+												? std::vector({0.5f})
+												: std::vector({0.5f}))) { // 1.0f, 0.5f, 2.0f
+								for (float ortho_bias :
+										 ortho_count == 1
+												 ? std::vector({0.0f})
+												 : std::vector({0.0f})) { //,1.0f, 1000000000.0f})) {
+									for (size_t prune_overflow : {0, 1, 3}) {
+										if (true) {
+											ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
+															k * edge_count_search_factor, ortho_count,
+															ortho_factor, ortho_bias, prune_overflow,
+															use_compression, use_largest_direction_filtering);
 										}
 									}
 								}
 							}
 						}
-					}
-					if (false) {
-						ADD_JOB(ehnsw_engine_basic_fast_multilist<float>, k, 2 * k,
-										num_for_1nn, k * edge_count_search_factor, use_cuts);
+						if (false) {
+							// for (size_t brute_force_size : {64, 128})
+							// for (size_t line_count : {128}) {
+							/*
+							ADD_JOB(line_pruning_exact_engine<float>, brute_force_size,
+											line_count,
+											antitopo_engine_config(
+													k, 2 * k, num_for_1nn,
+													k * edge_count_search_factor, use_compression,
+													use_largest_direction_filtering));
+													*/
+							//}
+						}
 					}
 				}
 				if (false) {
