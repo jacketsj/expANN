@@ -1,6 +1,6 @@
 {
   "dataset": "Sift1M",
-  "ds_name": "presentation_sift_k_10_v2",
-  "num_threads": 1,
+  "ds_name": "blazeit_sift_k_10",
+  "num_threads": 12,
   "k": 10
 }
