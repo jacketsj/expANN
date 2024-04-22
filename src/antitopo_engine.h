@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <optional>
 #include <queue>
 #include <random>
 #include <ranges>
@@ -22,10 +23,19 @@ template <typename A, typename B> auto dist2(const A& a, const B& b) {
 }
 } // namespace
 
-struct antitopo_engine_config {
+struct antitopo_engine_query_config {
+	size_t ef_search_mult;
+	std::optional<size_t> ef_search;
+	antitopo_engine_query_config(size_t _ef_search_mult,
+															 std::optional<size_t> _ef_search = std::nullopt)
+			: ef_search_mult(_ef_search_mult), ef_search(_ef_search) {}
+};
+
+struct antitopo_engine_config : public antitopo_engine_query_config {
+	using antitopo_engine_query_config::ef_search;
+	using antitopo_engine_query_config::ef_search_mult;
 	size_t M;
 	size_t M0;
-	size_t ef_search_mult;
 	size_t ef_construction;
 	size_t ortho_count;
 	float ortho_factor;
@@ -38,7 +48,7 @@ struct antitopo_engine_config {
 												 float _ortho_factor, float _ortho_bias,
 												 size_t _prune_overflow, bool _use_compression = false,
 												 bool _use_largest_direction_filtering = false)
-			: M(_M), M0(_M0), ef_search_mult(_ef_search_mult),
+			: antitopo_engine_query_config(_ef_search_mult), M(_M), M0(_M0),
 				ef_construction(_ef_construction), ortho_count(_ortho_count),
 				ortho_factor(_ortho_factor), ortho_bias(_ortho_bias),
 				prune_overflow(_prune_overflow), use_compression(_use_compression),
@@ -55,6 +65,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	size_t M;
 	size_t M0;
 	size_t ef_search_mult;
+	std::optional<size_t> ef_search;
 	size_t ef_construction;
 	size_t ortho_count;
 	float ortho_factor;
@@ -66,9 +77,18 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 #ifdef RECORD_STATS
 	size_t num_distcomps;
 #endif
+	antitopo_engine(size_t _M, size_t _ef_construction, size_t _ortho_count,
+									float _ortho_factor, float _ortho_bias,
+									size_t _prune_overflow)
+			: rd(), gen(0), distribution(0, 1), M(_M), M0(2 * _M), ef_search_mult(1),
+				ef_search(std::nullopt), ef_construction(_ef_construction),
+				ortho_count(_ortho_count), ortho_factor(_ortho_factor),
+				ortho_bias(_ortho_bias), prune_overflow(_prune_overflow),
+				use_compression(false), use_largest_direction_filtering(false),
+				max_layer(0) {}
 	antitopo_engine(antitopo_engine_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
-				ef_search_mult(conf.ef_search_mult),
+				ef_search_mult(conf.ef_search_mult), ef_search(conf.ef_search),
 				ef_construction(conf.ef_construction), ortho_count(conf.ortho_count),
 				ortho_factor(conf.ortho_factor), ortho_bias(conf.ortho_bias),
 				prune_overflow(conf.prune_overflow),
@@ -76,6 +96,8 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				use_largest_direction_filtering(conf.use_largest_direction_filtering),
 				max_layer(0) {}
 	using config = antitopo_engine_config;
+	using query_config = antitopo_engine_query_config;
+	void set_ef_search(size_t _ef_search) { ef_search = _ef_search; }
 	std::vector<fvec> all_entries;
 	using compressed_t = Eigen::half;
 	std::vector<vec<compressed_t>::Underlying> all_entries_compressed;
@@ -546,6 +568,9 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 
 template <typename T>
 std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
+	if (!ef_search.has_value())
+		ef_search = k * ef_search_mult;
+
 	const auto& q = q0.internal;
 	std::vector<size_t> entry_points;
 	for (size_t i = 0; i < 1; ++i) {
@@ -597,10 +622,10 @@ std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
 		// TODO fix
 		auto qc = vec<compressed_t>(q0);
 		ret_combined = query_k_at_layer<true, true, false>(qc, 0, entry_points,
-																											 k * ef_search_mult, {});
+																											 ef_search.value(), {});
 	} else {
 		ret_combined = query_k_at_layer<true, false, false>(q0, 0, entry_points,
-																												k * ef_search_mult, {});
+																												ef_search.value(), {});
 	}
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
@@ -609,38 +634,4 @@ std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
 		ret.emplace_back(ret_combined[i].second);
 	}
 	return ret;
-}
-
-template <typename T>
-std::vector<std::pair<T, size_t>>
-antitopo_engine<T>::query_k_combined(const vec<T>& q, size_t k) {
-	size_t entry_point = starting_vertex;
-#ifdef RECORD_STATS
-	++num_distcomps;
-#endif
-	T ep_dist = dist2(all_entries[entry_point], q);
-	for (int layer = max_layer - 1; layer >= 0; --layer) {
-		bool changed = true;
-		while (changed) {
-			changed = false;
-			for (auto& neighbour : hadj_flat[entry_point][layer]) {
-				_mm_prefetch(&all_entries[neighbour], _MM_HINT_T0);
-#ifdef RECORD_STATS
-				++num_distcomps;
-#endif
-				T neighbour_dist = dist2(q, all_entries[neighbour]);
-				if (neighbour_dist < ep_dist) {
-					entry_point = neighbour;
-					ep_dist = neighbour_dist;
-					changed = true;
-				}
-			}
-		}
-	}
-
-	auto ret_combined = query_k_at_layer<true, false, false>(
-			q, 0, {entry_point}, k * ef_search_mult, {});
-	if (ret_combined.size() > k)
-		ret_combined.resize(k);
-	return ret_combined;
 }

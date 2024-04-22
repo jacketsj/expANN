@@ -56,11 +56,11 @@ else()
 endif()
 
 
-include(./cmake/CPM.cmake)  # Package manager for simple requirements.
+#include(./cmake/CPM.cmake)  # Package manager for simple requirements.
 
 # run `conan install .. --build=missing` in `./cmake`
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+#list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
+#list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 #CPMAddPackage("gh:fmtlib/fmt#9.1.0")  # fmt for nice strings
 
@@ -71,14 +71,23 @@ add_subdirectory(eigen)
 
 include_directories(MopBucket/src/rough)
 
-file(GLOB SOURCES ${SRC}/*.cpp MopBucket/src/rough/*.cpp)
+file(GLOB SOURCES ${SRC}/main.cpp MopBucket/src/rough/*.cpp)
 
 add_executable(expann ${SOURCES})
 
 find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS} mmap_allocator)
-add_library(plt INTERFACE)
-target_include_directories(plt INTERFACE plt)
 
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC plt ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)# mopbucket)
+target_link_libraries(expann PUBLIC ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)# mopbucket)
+
+# Pybinds
+add_subdirectory(pybind11)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+file(GLOB SOURCES ${SRC}/pyrunner.cpp)
+pybind11_add_module(expann_py MODULE src/pyrunner.cpp)
+target_link_libraries(expann_py PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
+set_target_properties(expann_py PROPERTIES
+                                INTERPROCEDURAL_OPTIMIZATION ON
+                                CXX_VISIBILITY_PRESET default
+                                VISIBILITY_INLINES_HIDDEN ON)

@@ -159,10 +159,11 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 												 : std::vector({0.0f})) { //,1.0f, 1000000000.0f})) {
 									for (size_t prune_overflow : {0, 1, 3}) {
 										if (true) {
-											ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
-															k * edge_count_search_factor, ortho_count,
-															ortho_factor, ortho_bias, prune_overflow,
-															use_compression, use_largest_direction_filtering);
+											ADD_JOB(antitopo_engine<float>, k, 2 * k,
+															10 * num_for_1nn, k * edge_count_search_factor,
+															ortho_count, ortho_factor, ortho_bias,
+															prune_overflow, use_compression,
+															use_largest_direction_filtering);
 										}
 									}
 								}

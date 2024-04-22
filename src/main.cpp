@@ -12,8 +12,6 @@
 #include "bench_runner.h"
 #include "brute_force_engine.h"
 #include "dataset_loader.h"
-#include "matplotlibcpp.h"
-#include "plotter.h"
 #include "randomgeometry.h"
 
 using json = nlohmann::json;
@@ -107,9 +105,6 @@ int main(int argc, char* argv[]) {
 
 	std::string data_prefix = "./data/" + ds_name + "/";
 	bdm->save(data_prefix);
-	std::string plot_prefix = "./plots/" + ds_name + "/";
-	make_plots(bdm->get_latest(data_prefix), plot_prefix + "latest_");
-	make_plots(bdm->get_all(data_prefix), plot_prefix + "/all_");
 
 	return 0;
 }
