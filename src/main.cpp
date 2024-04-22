@@ -8,7 +8,6 @@
 #define DIM 128
 #include "vec.h"
 
-#include "arrangement_engine.h"
 #include "basic_bench.h"
 #include "bench_runner.h"
 #include "brute_force_engine.h"
