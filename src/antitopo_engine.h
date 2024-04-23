@@ -692,7 +692,7 @@ std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
 
 	std::vector<std::pair<T, size_t>> ret_combined;
 	if (use_compression) {
-		ret_combined = query_k_at_layer<true, false, true>(q0, 0, entry_points,
+		ret_combined = query_k_at_layer<true, true, false>(q0, 0, entry_points,
 																											 ef_search.value(), {});
 	} else {
 		ret_combined = query_k_at_layer<true, false, false>(q0, 0, entry_points,
