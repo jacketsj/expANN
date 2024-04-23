@@ -136,9 +136,9 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 70; k <= 80; k += 20) {
-		for (size_t num_for_1nn : {2, 3}) {							// 5
+		for (size_t num_for_1nn : {2}) {								// 5
 			for (size_t edge_count_search_factor : {2}) { // 3
-				for (bool use_compression : {false}) {
+				for (bool use_compression : {true, false}) {
 					for (size_t build_threads : {14}) {
 						for (bool use_mips : {false}) {
 							if (false) {
@@ -148,7 +148,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						}
 					}
 					for (bool use_largest_direction_filtering : {false}) {
-						for (size_t ortho_count : {1, 3}) { // 1,3,5
+						for (size_t ortho_count : {1}) { // 1,3,5
 							for (float ortho_factor :
 									 (ortho_count == 1
 												? std::vector({0.5f})
@@ -157,13 +157,12 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										 ortho_count == 1
 												 ? std::vector({0.0f})
 												 : std::vector({0.0f})) { //,1.0f, 1000000000.0f})) {
-									for (size_t prune_overflow : {0, 1, 3}) {
+									for (size_t prune_overflow : {1}) { // 0,1,3
 										if (true) {
-											ADD_JOB(antitopo_engine<float>, k, 2 * k,
-															10 * num_for_1nn, k * edge_count_search_factor,
-															ortho_count, ortho_factor, ortho_bias,
-															prune_overflow, use_compression,
-															use_largest_direction_filtering);
+											ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
+															k * edge_count_search_factor, ortho_count,
+															ortho_factor, ortho_bias, prune_overflow,
+															use_compression, use_largest_direction_filtering);
 										}
 									}
 								}
