@@ -455,6 +455,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 #ifdef RECORD_STATS
 			++num_distcomps;
 #endif
+			/*
 #ifdef DIM
 			return distance_compare_avx512f_f16(q.data(), get_data(data_index).data(),
 																					DIM);
@@ -462,7 +463,8 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 			return distance_compare_avx512f_f16(q.data(), get_data(data_index).data(),
 																					dimension);
 #endif
-			// return dist2(q, get_data(data_index));
+*/
+			return dist2(q, get_data(data_index));
 		}
 	};
 	auto scorer = quant->generate_scorer(q);
@@ -689,8 +691,13 @@ std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
 	}
 
 	std::vector<std::pair<T, size_t>> ret_combined;
-	ret_combined = query_k_at_layer<true, false, false>(q0, 0, entry_points,
-																											ef_search.value(), {});
+	if (use_compression) {
+		ret_combined = query_k_at_layer<true, false, true>(q0, 0, entry_points,
+																											 ef_search.value(), {});
+	} else {
+		ret_combined = query_k_at_layer<true, false, false>(q0, 0, entry_points,
+																												ef_search.value(), {});
+	}
 	if (ret_combined.size() > k)
 		ret_combined.resize(k);
 	std::vector<size_t> ret;
