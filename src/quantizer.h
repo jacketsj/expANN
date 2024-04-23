@@ -5,7 +5,7 @@
 
 #include <Eigen/Dense>
 
-#include <vec.h>
+#include "vec.h"
 
 // TODO this should just be a normal scorer, it's more general
 class quantized_scorer {
@@ -78,18 +78,23 @@ private:
 	vec<int8_t>::Underlying query;
 	const std::vector<vec<int8_t>::Underlying>& stored;
 	size_t dimension;
+	float scale_factor;
 
 public:
 	quantized_scorer_ranged_q8(
 			const vec<int8_t>::Underlying& _query,
-			const std::vector<vec<int8_t>::Underlying>& _stored)
-			: query(_query), stored(_stored), dimension(_query.size()) {}
+			const std::vector<vec<int8_t>::Underlying>& _stored, float _scale_factor)
+			: query(_query), stored(_stored), dimension(_query.size()),
+				scale_factor(_scale_factor) {}
 
 public:
 	virtual float score(size_t index) override {
 		// TODO somehow make this work properly. Use stuff from distance.h
 		// need to use distance_compare_avx512f_i64
-		return (query - stored.at(index)).squaredNorm();
+		return scale_factor *
+					 float(distance_compare_avx512f_i64(
+							 query.data(), stored.at(index).data(), dimension));
+		// return (query - stored.at(index)).squaredNorm();
 	}
 	virtual void prefetch(size_t index) override {
 #ifdef DIM
@@ -108,8 +113,8 @@ class quantizer_ranged_q8 : public quantizer {
 	std::vector<vec<int8_t>::Underlying> stored;
 	size_t dimension;
 	float scale_factor, offset;
-	size_t q_min = std::numeric_limits<int8_t>::min() / 2;
-	size_t q_max = std::numeric_limits<int8_t>::max() / 2;
+	size_t q_min = 0; // std::numeric_limits<int8_t>::min() / 2;
+	size_t q_max = std::numeric_limits<int8_t>::max();
 	constexpr size_t q_range() { return q_max - q_min + 1; }
 
 	int8_t convert_single(float x) {
@@ -149,7 +154,7 @@ public:
 	}
 	virtual std::unique_ptr<quantized_scorer>
 	generate_scorer(const fvec& query) override {
-		return std::make_unique<quantized_scorer_ranged_q8>(convert_vec(query),
-																												stored);
+		return std::make_unique<quantized_scorer_ranged_q8>(
+				convert_vec(query), stored, 1 / (scale_factor * scale_factor));
 	}
 };

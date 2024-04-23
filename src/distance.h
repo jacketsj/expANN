@@ -2,6 +2,8 @@
 #include <immintrin.h>
 #include <math.h>
 
+#include <Eigen/Dense>
+
 inline __m256i load_128bit_to_256bit(const __m128i* ptr) {
 	__m128i value128 = _mm_loadu_si128(ptr);
 	__m256i value256 = _mm256_castsi128_si256(value128);
@@ -30,14 +32,53 @@ inline int32_t distance_compare_avx512f_i64(const int8_t* vec1,
 		__m512i a = _mm512_loadu_si512((__m512i*)&vec1[i]);
 		__m512i b = _mm512_loadu_si512((__m512i*)&vec2[i]);
 		__m512i diff = _mm512_sub_epi8(a, b);
-		// Convert diff to 16-bit by multiplying by 1
-		__m512i diff16 = _mm512_maddubs_epi16(_mm512_set1_epi8(1), diff);
-		// Square the differences and convert to 32-bit
-		__m512i sqr_diff = _mm512_madd_epi16(diff16, diff16);
-		sum_squared_diff = _mm512_add_epi32(sum_squared_diff, sqr_diff);
+
+		// Extend 8-bit differences to 16-bit by zero extension
+		__m512i diff16_lo = _mm512_unpacklo_epi8(diff, _mm512_setzero_si512());
+		__m512i diff16_hi = _mm512_unpackhi_epi8(diff, _mm512_setzero_si512());
+
+		// Square the 16-bit differences and produce 32-bit integers directly
+		__m512i sqr_diff_lo = _mm512_madd_epi16(diff16_lo, diff16_lo);
+		__m512i sqr_diff_hi = _mm512_madd_epi16(diff16_hi, diff16_hi);
+
+		// Sum the lower and higher squared differences as 32-bit integers
+		sum_squared_diff = _mm512_add_epi32(sum_squared_diff, sqr_diff_lo);
+		sum_squared_diff = _mm512_add_epi32(sum_squared_diff, sqr_diff_hi);
 	}
+
 	// Reduce across the vector to get a single sum
 	return _mm512_reduce_add_epi32(sum_squared_diff);
+
+	/*
+Eigen::Map<const Eigen::Array<int8_t, Eigen::Dynamic, 1>> mappedVec1(vec1,
+																																		 size);
+Eigen::Map<const Eigen::Array<int8_t, Eigen::Dynamic, 1>> mappedVec2(vec2,
+																																		 size);
+
+return (mappedVec1.cast<int>() - mappedVec2.cast<int>()).square().sum();
+*/
+	// __m512i sum_squared_diff = _mm512_setzero_si512();
+
+	// for (size_t i = 0; i < size; i += 64) { // Process 64 elements at a time
+	// 	__m512i a = _mm512_loadu_si512((__m512i*)&vec1[i]);
+	// 	__m512i b = _mm512_loadu_si512((__m512i*)&vec2[i]);
+	// 	__m512i diff = _mm512_sub_epi8(a, b);
+	// 	// Convert diff to 16-bit by multiplying by 1
+	// 	__m512i diff16 = _mm512_maddubs_epi16(_mm512_set1_epi8(1), diff);
+	// 	// Square the differences and convert to 32-bit
+	// 	__m512i sqr_diff = _mm512_madd_epi16(diff16, diff16);
+	// 	sum_squared_diff = _mm512_add_epi32(sum_squared_diff, sqr_diff);
+	// }
+	// // Reduce across the vector to get a single sum
+	// return _mm512_reduce_add_epi32(sum_squared_diff);
+	/*
+// Cast to int to prevent overflow and compute the squared differences
+Eigen::Array<int, Eigen::Dynamic, 1> diff =
+	(mappedVec1.cast<int>() - mappedVec2.cast<int>()).square();
+
+// Sum all the squared differences
+return diff.sum();
+*/
 }
 
 inline float distance_compare_avx512f_f16(const float* vec1, const float* vec2,

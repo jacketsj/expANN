@@ -13,10 +13,10 @@
 #include <vector>
 
 #include "ann_engine.h"
-#include "distance.h"
 #include "quantizer.h"
 #include "robin_hood.h"
 #include "topk_t.h"
+#include "vec.h"
 
 namespace {
 template <typename A, typename B> auto dist2(const A& a, const B& b) {
@@ -88,7 +88,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				ortho_bias(_ortho_bias), prune_overflow(_prune_overflow),
 				use_compression(false), use_largest_direction_filtering(false),
 				max_layer(0) {
-		quant = std::make_unique<quantizer_simple>();
+		quant = std::make_unique<quantizer_ranged_q8>();
 	}
 	antitopo_engine(antitopo_engine_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
@@ -99,7 +99,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				use_compression(conf.use_compression),
 				use_largest_direction_filtering(conf.use_largest_direction_filtering),
 				max_layer(0) {
-		quant = std::make_unique<quantizer_simple>();
+		quant = std::make_unique<quantizer_ranged_q8>();
 	}
 	using config = antitopo_engine_config;
 	using query_config = antitopo_engine_query_config;
