@@ -14,3 +14,4 @@ nmap <leader>i :term ++shell ./build.sh --stack-info && valgrind --tool=callgrin
 nmap <leader>y :term ++shell ./build.sh --stack-info && valgrind --tool=cachegrind build/expann && kcachegrind<CR>
 nmap <leader>I :term ++shell ./build.sh --stack-info && /snap/bin/valgrind --tool=callgrind --collect-atstart=no --instr-atstart=no build/expann && kcachegrind<CR>
 nmap <leader>o :term ++shell ./build.sh --gcov && build/expann && gcovr --html-details gcov_report/report.html && xdg-open gcov_report/report.html<CR>
+nmap <leader>z :term ++shell ./build.sh --pgo-gen && build/expann && ./build.sh --pgo-use && build/expann<CR>
