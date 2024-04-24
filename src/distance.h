@@ -81,6 +81,56 @@ return diff.sum();
 */
 }
 
+inline float distance_compare_avx512f_f16_batch128(const float* vec1,
+																									 const float* vec2,
+																									 size_t size) {
+	__m512 sum_squared_diff = _mm512_setzero_ps();
+	__m512 a[8], b[8]; //, diff[8];
+
+	// Loop processes 128 elements per iteration (8 * 16 floats)
+	for (size_t i = 0; i < size; i += 128) {
+		// Load data into registers
+		for (int j = 0; j < 8; ++j) {
+			a[j] = _mm512_loadu_ps(&vec1[i + 16 * j]);
+			b[j] = _mm512_loadu_ps(&vec2[i + 16 * j]);
+		}
+
+		// Perform computations after all loads are completed
+		for (int j = 0; j < 8; ++j) {
+			// TODO consider modifying this to simplify register coloring
+			// diff[j] = _mm512_sub_ps(a[j], b[j]);
+			// sum_squared_diff = _mm512_fmadd_ps(diff[j], diff[j], sum_squared_diff);
+			b[j] = _mm512_sub_ps(a[j], b[j]);
+			sum_squared_diff = _mm512_fmadd_ps(b[j], b[j], sum_squared_diff);
+		}
+	}
+	// Horizontal reduction to sum up all elements in sum_squared_diff
+	return _mm512_reduce_add_ps(sum_squared_diff);
+}
+inline float distance_compare_avx512f_f16_prefetched(const float* vec1,
+																										 const float* vec2,
+																										 size_t size) {
+	__m512 sum_squared_diff = _mm512_setzero_ps();
+
+	auto iter = [&](size_t i) constexpr {
+		__m512 a = _mm512_loadu_ps(&vec1[i]);
+		__m512 b = _mm512_loadu_ps(&vec2[i]);
+		__m512 diff = _mm512_sub_ps(a, b);
+		sum_squared_diff = _mm512_fmadd_ps(diff, diff, sum_squared_diff);
+	};
+	auto prefetch = [&](size_t i) {
+		_mm_prefetch(&vec1[i], _MM_HINT_T0);
+		_mm_prefetch(&vec2[i], _MM_HINT_T0);
+	};
+	size_t i = 0;
+	for (; i < size - 16; i += 16) {
+		prefetch(i);
+		iter(i);
+	}
+	iter(i);
+	return _mm512_reduce_add_ps(sum_squared_diff);
+}
+
 inline float distance_compare_avx512f_f16(const float* vec1, const float* vec2,
 																					size_t size) {
 

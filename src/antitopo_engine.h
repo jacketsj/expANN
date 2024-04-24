@@ -20,7 +20,14 @@
 
 namespace {
 template <typename A, typename B> auto dist2(const A& a, const B& b) {
+#ifdef DIM
+	// return distance_compare_avx512f_f16_batch128(
+	return distance_compare_avx512f_f16_batch128(a.data(), b.data(), DIM);
+	// return distance_compare_avx512f_f16(a.data(), b.data(), DIM);
+	// return distance_compare_avx512f_f16_prefetched(a.data(), b.data(), DIM);
+#else
 	return (a - b).squaredNorm();
+#endif
 }
 } // namespace
 
@@ -455,15 +462,6 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 #ifdef RECORD_STATS
 			++num_distcomps;
 #endif
-			/*
-#ifdef DIM
-			return distance_compare_avx512f_f16(q.data(), get_data(data_index).data(),
-																					DIM);
-#else
-			return distance_compare_avx512f_f16(q.data(), get_data(data_index).data(),
-																					dimension);
-#endif
-*/
 			return dist2(q, get_data(data_index));
 		}
 	};
@@ -500,7 +498,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 											decltype(worst_elem)>
 			nearest_big(entry_points_with_dist.begin(), entry_points_with_dist.end(),
 									worst_elem);
-	size_t big_factor = 1;
+	size_t big_factor = 5;
 	if constexpr (use_compressed) {
 		while (nearest_big.size() > big_factor * k)
 			nearest_big.pop();
