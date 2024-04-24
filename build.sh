@@ -4,6 +4,8 @@ ENABLE_STACK_INFO="OFF"
 ENABLE_GCOV="OFF"
 ENABLE_ASAN="OFF" # Ensure this is defined
 GENERATE_COMPILE_COMMANDS="OFF"
+ENABLE_PGO_USE="OFF"
+ENABLE_PGO_GENERATE="OFF"
 
 # Process command line arguments
 while [[ $# -gt 0 ]]; do
@@ -28,6 +30,14 @@ while [[ $# -gt 0 ]]; do
             GENERATE_COMPILE_COMMANDS="ON"
             shift
             ;;
+        --pgo-use)
+            ENABLE_PGO_USE="ON"
+            shift
+            ;;
+        --pgo-gen)
+            ENABLE_PGO_GENERATE="ON"
+            shift
+            ;;
         *)
             echo "Unknown argument: $1"
             exit 1
@@ -44,6 +54,8 @@ cmake -D CMAKE_CXX_COMPILER="$CXX_COMPILER" \
       -D ENABLE_STACK_INFO="$ENABLE_STACK_INFO" \
       -D ENABLE_GCOV="$ENABLE_GCOV" \
       -D ENABLE_ASAN="$ENABLE_ASAN" \
+      -D ENABLE_PGO_USE="$ENABLE_PGO_USE" \
+      -D ENABLE_PGO_GENERATE="$ENABLE_PGO_GENERATE" \
       $( [ "$GENERATE_COMPILE_COMMANDS" = "ON" ] && echo "-DCMAKE_EXPORT_COMPILE_COMMANDS=1" ) \
       ..
       #-G Ninja \

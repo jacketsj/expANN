@@ -16,7 +16,8 @@ include_directories("${SRC}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Og -mavx -ggdb3 ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -mavx -g ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -ggdb3 ${OpenMP_CXX_FLAGS}") # For profiling
-set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ftree-vectorize -funroll-loops -ggdb3 ${OpenMP_CXX_FLAGS}") # The real one
+#set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ftree-vectorize -funroll-loops -ggdb3 ${OpenMP_CXX_FLAGS}") # The real one
+set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ggdb3 ${OpenMP_CXX_FLAGS}") # Improve the instruction cache...?
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -fno-omit-frame-pointer -g ${OpenMP_CXX_FLAGS}") # For running perf
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Og -mavx -fprofile-arcs -ftest-coverage -ggdb3 ${OpenMP_CXX_FLAGS}") # For running line coverage
 
@@ -24,6 +25,8 @@ set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ftree-vectorize -funroll-
 # Different build options for profiling of various kinds
 option(ENABLE_STACK_INFO "Enable stack info" OFF)
 option(ENABLE_GCOV "Enable gcov" OFF)
+option(ENABLE_PGO_GENERATE "Enable PGO - Profile generation phase" OFF)
+option(ENABLE_PGO_USE "Enable PGO - Use profile data" OFF)
 
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Ofast -ftree-vectorize -ftree-vectorizer-verbose=0 ${OpenMP_CXX_FLAGS}")
@@ -53,6 +56,14 @@ if(ENABLE_GCOV)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
 else()
     message("Disabling gcov.")
+endif()
+
+if (ENABLE_PGO_GENERATE)
+    message("Enabling PGO: profile generation.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-generate")
+elseif (ENABLE_PGO_USE)
+    message("Enabling PGO: use profile data.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-use")
 endif()
 
 
