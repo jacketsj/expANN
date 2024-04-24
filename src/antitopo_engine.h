@@ -22,8 +22,8 @@ namespace {
 template <typename A, typename B> auto dist2(const A& a, const B& b) {
 #ifdef DIM
 	// return distance_compare_avx512f_f16_batch128(
-	return distance_compare_avx512f_f16_batch128(a.data(), b.data(), DIM);
-	// return distance_compare_avx512f_f16(a.data(), b.data(), DIM);
+	// return distance_compare_avx512f_f16_batch128(a.data(), b.data(), DIM);
+	return distance_compare_avx512f_f16(a.data(), b.data(), DIM);
 	// return distance_compare_avx512f_f16_prefetched(a.data(), b.data(), DIM);
 #else
 	return (a - b).squaredNorm();
@@ -110,6 +110,8 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	}
 	using config = antitopo_engine_config;
 	using query_config = antitopo_engine_query_config;
+	void serialize(std::ostream& out) const;
+	void deserialize(std::istream& in);
 	void set_ef_search(size_t _ef_search) { ef_search = _ef_search; }
 	std::vector<fvec> all_entries;
 	std::unique_ptr<quantizer> quant;
@@ -703,4 +705,139 @@ std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
 		ret.emplace_back(ret_combined[i].second);
 	}
 	return ret;
+}
+
+// Serialization
+template <typename T>
+void antitopo_engine<T>::serialize(std::ostream& out) const {
+	// Serialize simple types
+	out.write(reinterpret_cast<const char*>(&starting_vertex),
+						sizeof(starting_vertex));
+	out.write(reinterpret_cast<const char*>(&M), sizeof(M));
+	out.write(reinterpret_cast<const char*>(&M0), sizeof(M0));
+	out.write(reinterpret_cast<const char*>(&ef_search_mult),
+						sizeof(ef_search_mult));
+
+	// Optional type needs special handling
+	bool has_ef_search = ef_search.has_value();
+	out.write(reinterpret_cast<const char*>(&has_ef_search),
+						sizeof(has_ef_search));
+	if (has_ef_search) {
+		const size_t value = ef_search.value();
+		out.write(reinterpret_cast<const char*>(&value), sizeof(value));
+	}
+
+	out.write(reinterpret_cast<const char*>(&ef_construction),
+						sizeof(ef_construction));
+	out.write(reinterpret_cast<const char*>(&ortho_count), sizeof(ortho_count));
+	out.write(reinterpret_cast<const char*>(&ortho_factor), sizeof(ortho_factor));
+	out.write(reinterpret_cast<const char*>(&ortho_bias), sizeof(ortho_bias));
+	out.write(reinterpret_cast<const char*>(&prune_overflow),
+						sizeof(prune_overflow));
+	out.write(reinterpret_cast<const char*>(&use_compression),
+						sizeof(use_compression));
+	out.write(reinterpret_cast<const char*>(&use_largest_direction_filtering),
+						sizeof(use_largest_direction_filtering));
+	out.write(reinterpret_cast<const char*>(&max_layer), sizeof(max_layer));
+
+	// Serialize complex types
+	size_t entries_count = all_entries.size();
+	out.write(reinterpret_cast<const char*>(&entries_count),
+						sizeof(entries_count));
+	for (const auto& entry : all_entries) {
+		size_t entry_size = entry.size();
+		out.write(reinterpret_cast<const char*>(&entry_size), sizeof(entry_size));
+		out.write(reinterpret_cast<const char*>(entry.data()),
+							entry_size * sizeof(T));
+	}
+
+	// Serialize hadj_flat_with_lengths
+	size_t num_vectors = hadj_flat_with_lengths.size();
+	out.write(reinterpret_cast<const char*>(&num_vectors), sizeof(num_vectors));
+	for (const auto& vec : hadj_flat_with_lengths) {
+		size_t num_layers = vec.size();
+		out.write(reinterpret_cast<const char*>(&num_layers), sizeof(num_layers));
+		for (const auto& layer : vec) {
+			size_t num_edges = layer.size();
+			out.write(reinterpret_cast<const char*>(&num_edges), sizeof(num_edges));
+			for (const auto& edge : layer) {
+				out.write(reinterpret_cast<const char*>(&edge.first),
+									sizeof(edge.first));
+				out.write(reinterpret_cast<const char*>(&edge.second),
+									sizeof(edge.second));
+			}
+		}
+	}
+}
+
+// Deserialization
+template <typename T> void antitopo_engine<T>::deserialize(std::istream& in) {
+	// Deserialize simple types
+	in.read(reinterpret_cast<char*>(&starting_vertex), sizeof(starting_vertex));
+	in.read(reinterpret_cast<char*>(&M), sizeof(M));
+	in.read(reinterpret_cast<char*>(&M0), sizeof(M0));
+	in.read(reinterpret_cast<char*>(&ef_search_mult), sizeof(ef_search_mult));
+
+	bool has_ef_search;
+	in.read(reinterpret_cast<char*>(&has_ef_search), sizeof(has_ef_search));
+	if (has_ef_search) {
+		size_t value;
+		in.read(reinterpret_cast<char*>(&value), sizeof(value));
+		ef_search = value;
+	} else {
+		ef_search.reset();
+	}
+
+	in.read(reinterpret_cast<char*>(&ef_construction), sizeof(ef_construction));
+	in.read(reinterpret_cast<char*>(&ortho_count), sizeof(ortho_count));
+	in.read(reinterpret_cast<char*>(&ortho_factor), sizeof(ortho_factor));
+	in.read(reinterpret_cast<char*>(&ortho_bias), sizeof(ortho_bias));
+	in.read(reinterpret_cast<char*>(&prune_overflow), sizeof(prune_overflow));
+	in.read(reinterpret_cast<char*>(&use_compression), sizeof(use_compression));
+	in.read(reinterpret_cast<char*>(&use_largest_direction_filtering),
+					sizeof(use_largest_direction_filtering));
+	in.read(reinterpret_cast<char*>(&max_layer), sizeof(max_layer));
+
+	// Deserialize complex types
+	size_t entries_count;
+	in.read(reinterpret_cast<char*>(&entries_count), sizeof(entries_count));
+	all_entries.resize(entries_count);
+	for (auto& entry : all_entries) {
+		size_t entry_size;
+		in.read(reinterpret_cast<char*>(&entry_size), sizeof(entry_size));
+		entry.resize(entry_size); // Ensure the vector has the correct size
+		in.read(reinterpret_cast<char*>(entry.data()), entry_size * sizeof(T));
+	}
+
+	size_t num_vectors;
+	in.read(reinterpret_cast<char*>(&num_vectors), sizeof(num_vectors));
+	hadj_flat_with_lengths.resize(num_vectors);
+	for (auto& vec : hadj_flat_with_lengths) {
+		size_t num_layers;
+		in.read(reinterpret_cast<char*>(&num_layers), sizeof(num_layers));
+		vec.resize(num_layers);
+		for (auto& layer : vec) {
+			size_t num_edges;
+			in.read(reinterpret_cast<char*>(&num_edges), sizeof(num_edges));
+			layer.resize(num_edges);
+			for (auto& edge : layer) {
+				in.read(reinterpret_cast<char*>(&edge.first), sizeof(edge.first));
+				in.read(reinterpret_cast<char*>(&edge.second), sizeof(edge.second));
+			}
+		}
+	}
+
+	// Update hadj_flat and hadj_bottom
+	for (size_t entry_index = 0; entry_index < hadj_flat_with_lengths.size();
+			 ++entry_index) {
+		for (size_t layer = 0; layer < hadj_flat_with_lengths[entry_index].size();
+				 ++layer) {
+			update_edges(layer, entry_index);
+		}
+	}
+
+	// Build
+	visited.resize(all_entries.size());
+	visited_recent.reserve(visited.size());
+	_build();
 }
