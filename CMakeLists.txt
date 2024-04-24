@@ -16,8 +16,9 @@ include_directories("${SRC}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Og -mavx -ggdb3 ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -mavx -g ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -ggdb3 ${OpenMP_CXX_FLAGS}") # For profiling
-#set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ftree-vectorize -funroll-loops -ggdb3 ${OpenMP_CXX_FLAGS}") # The real one
-set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ggdb3 ${OpenMP_CXX_FLAGS}") # Improve the instruction cache...?
+#set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ftree-vectorize -funroll-loops -frename-registers -ggdb3 ${OpenMP_CXX_FLAGS}") # The real one
+#set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ggdb3 ${OpenMP_CXX_FLAGS}") # Improve the instruction cache...?
+set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -ggdb3 -frename-registers ${OpenMP_CXX_FLAGS}") # Non-standard options
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 -march=native -fno-omit-frame-pointer -g ${OpenMP_CXX_FLAGS}") # For running perf
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Og -mavx -fprofile-arcs -ftest-coverage -ggdb3 ${OpenMP_CXX_FLAGS}") # For running line coverage
 
