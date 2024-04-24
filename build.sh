@@ -11,6 +11,7 @@ ENABLE_PGO_GENERATE="OFF"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --clang)
+            echo "Enabling clang"
             CXX_COMPILER="/usr/bin/clang++"
             shift
             ;;
