@@ -99,6 +99,12 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 #endif
 	void constructor_helper() {
 		quant = std::make_unique<quantizer_ranged_q8>();
+		std::filesystem::path directory =
+				std::filesystem::path(index_filename).parent_path();
+		if (!std::filesystem::exists(directory)) {
+			std::filesystem::create_directories(directory);
+			std::printf("Directory %s created\n", directory.c_str());
+		}
 		if (read_index) {
 			if (std::filesystem::exists(index_filename)) {
 				std::printf("Index file %s exists, disabling write\n",
