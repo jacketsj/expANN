@@ -136,8 +136,8 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 30; k <= 60; k += 10) {
-		for (size_t num_for_1nn : {3}) {								// 5
-			for (size_t edge_count_search_factor : {4}) { // 3
+		for (size_t num_for_1nn : {3}) {											// 5
+			for (size_t edge_count_search_factor : {500 / k}) { // 3
 				for (bool use_compression : {false}) {
 					for (size_t build_threads : {14}) {
 						for (bool use_mips : {false}) {
