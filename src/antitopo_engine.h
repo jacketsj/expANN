@@ -288,6 +288,7 @@ void antitopo_engine<T>::prune_edges(size_t layer, size_t from, bool lazy) {
 	}
 	*/
 	to = ret;
+	to.shrink_to_fit();
 	update_edges(layer, from);
 }
 
