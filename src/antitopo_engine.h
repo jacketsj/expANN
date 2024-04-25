@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <queue>
@@ -21,10 +22,9 @@
 namespace {
 template <typename A, typename B> auto dist2(const A& a, const B& b) {
 #ifdef DIM
-	// return distance_compare_avx512f_f16_batch128(
-	// return distance_compare_avx512f_f16_batch128(a.data(), b.data(), DIM);
-	return distance_compare_avx512f_f16(a.data(), b.data(), DIM);
-	// return distance_compare_avx512f_f16_prefetched(a.data(), b.data(), DIM);
+	return distance_compare_avx512f_f16_batch128(a.data(), b.data(), DIM);
+//  return distance_compare_avx512f_f16(a.data(), b.data(), DIM);
+//   return distance_compare_avx512f_f16_prefetched(a.data(), b.data(), DIM);
 #else
 	return (a - b).squaredNorm();
 #endif
@@ -51,16 +51,23 @@ struct antitopo_engine_config : public antitopo_engine_query_config {
 	size_t prune_overflow;
 	bool use_compression;
 	bool use_largest_direction_filtering;
+	std::string index_filename;
+	bool read_index;
+	bool write_index;
 	antitopo_engine_config(size_t _M, size_t _M0, size_t _ef_search_mult,
 												 size_t _ef_construction, size_t _ortho_count,
 												 float _ortho_factor, float _ortho_bias,
 												 size_t _prune_overflow, bool _use_compression = false,
-												 bool _use_largest_direction_filtering = false)
+												 bool _use_largest_direction_filtering = false,
+												 std::string _index_filename = "",
+												 bool _read_index = false, bool _write_index = false)
 			: antitopo_engine_query_config(_ef_search_mult), M(_M), M0(_M0),
 				ef_construction(_ef_construction), ortho_count(_ortho_count),
 				ortho_factor(_ortho_factor), ortho_bias(_ortho_bias),
 				prune_overflow(_prune_overflow), use_compression(_use_compression),
-				use_largest_direction_filtering(_use_largest_direction_filtering) {}
+				use_largest_direction_filtering(_use_largest_direction_filtering),
+				index_filename(_index_filename), read_index(_read_index),
+				write_index(_write_index) {}
 };
 
 template <typename T>
@@ -81,6 +88,9 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	size_t prune_overflow;
 	bool use_compression;
 	bool use_largest_direction_filtering;
+	std::string index_filename;
+	bool read_index;
+	bool write_index;
 	size_t max_layer;
 #ifdef RECORD_STATS
 	size_t num_distcomps;
@@ -94,6 +104,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				ortho_count(_ortho_count), ortho_factor(_ortho_factor),
 				ortho_bias(_ortho_bias), prune_overflow(_prune_overflow),
 				use_compression(false), use_largest_direction_filtering(false),
+				index_filename(""), read_index(false), write_index(false),
 				max_layer(0) {
 		quant = std::make_unique<quantizer_ranged_q8>();
 	}
@@ -105,7 +116,8 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				prune_overflow(conf.prune_overflow),
 				use_compression(conf.use_compression),
 				use_largest_direction_filtering(conf.use_largest_direction_filtering),
-				max_layer(0) {
+				index_filename(conf.index_filename), read_index(conf.read_index),
+				write_index(conf.write_index), max_layer(0) {
 		quant = std::make_unique<quantizer_ranged_q8>();
 	}
 	using config = antitopo_engine_config;
@@ -266,6 +278,9 @@ void antitopo_engine<T>::prune_edges(size_t layer, size_t from, bool lazy) {
 
 template <typename T>
 void antitopo_engine<T>::_store_vector(const vec<T>& v0, bool silent) {
+	if (read_index)
+		return;
+
 	auto v = v0.internal;
 	size_t v_index = all_entries.size();
 	all_entries.emplace_back(v);
@@ -420,6 +435,22 @@ void antitopo_engine<T>::_store_vector(const vec<T>& v0, bool silent) {
 }
 
 template <typename T> void antitopo_engine<T>::_build() {
+	std::string filename = "sift_k70_efx2.index";
+	// serialize
+	if (write_index) {
+		std::ofstream out(filename, std::ios::binary);
+		serialize(out);
+		out.close();
+		std::cout << "Wrote index to " << filename << std::endl;
+	}
+	// deserialize
+	if (read_index) {
+		std::ifstream in(filename, std::ios::binary);
+		deserialize(in);
+		in.close();
+		std::cout << "Read index from " << filename << std::endl;
+	}
+
 	assert(all_entries.size() > 0);
 
 	quant->build(all_entries);
@@ -510,6 +541,23 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		visited[entry_point] = true;
 		visited_recent.emplace_back(entry_point);
 	}
+	std::vector<measured_data> candidates_backup;
+	auto clean_candidates = [&]() constexpr {
+		return;
+		candidates_backup.resize(k);
+		if (candidates.size() > k * 4) {
+			while (candidates_backup.size() < k) {
+				candidates_backup.emplace_back(candidates.top());
+				candidates.pop();
+			}
+			// candidates.clear();
+			candidates =
+					std::priority_queue<measured_data, std::vector<measured_data>,
+															decltype(best_elem)>(
+							candidates_backup.begin(), candidates_backup.end(), best_elem);
+			candidates_backup.clear();
+		}
+	};
 
 	std::vector<size_t> neighbour_list, neighbour_list_unfiltered;
 	while (!candidates.empty()) {
@@ -623,6 +671,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 				loop_iter.template operator()<false, false>(next_i);
 			}
 		}
+		// clean_candidates();
 	}
 	for (auto& v : visited_recent)
 		visited[v] = false;
@@ -776,7 +825,9 @@ template <typename T> void antitopo_engine<T>::deserialize(std::istream& in) {
 	in.read(reinterpret_cast<char*>(&starting_vertex), sizeof(starting_vertex));
 	in.read(reinterpret_cast<char*>(&M), sizeof(M));
 	in.read(reinterpret_cast<char*>(&M0), sizeof(M0));
+	size_t original_ef_search_mult = ef_search_mult;
 	in.read(reinterpret_cast<char*>(&ef_search_mult), sizeof(ef_search_mult));
+	ef_search_mult = original_ef_search_mult;
 
 	bool has_ef_search;
 	in.read(reinterpret_cast<char*>(&has_ef_search), sizeof(has_ef_search));
@@ -828,8 +879,11 @@ template <typename T> void antitopo_engine<T>::deserialize(std::istream& in) {
 	}
 
 	// Update hadj_flat and hadj_bottom
+	hadj_flat.resize(hadj_flat_with_lengths.size());
+	hadj_bottom.resize(hadj_flat_with_lengths.size());
 	for (size_t entry_index = 0; entry_index < hadj_flat_with_lengths.size();
 			 ++entry_index) {
+		hadj_flat[entry_index].resize(hadj_flat_with_lengths[entry_index].size());
 		for (size_t layer = 0; layer < hadj_flat_with_lengths[entry_index].size();
 				 ++layer) {
 			update_edges(layer, entry_index);
@@ -839,5 +893,4 @@ template <typename T> void antitopo_engine<T>::deserialize(std::istream& in) {
 	// Build
 	visited.resize(all_entries.size());
 	visited_recent.reserve(visited.size());
-	_build();
 }

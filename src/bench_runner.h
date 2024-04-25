@@ -135,9 +135,9 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 line_pruning_exact_engine<float>, par_antitopo_engine>
 			job_lists;
 
-	for (size_t k = 70; k <= 80; k += 20) {
-		for (size_t num_for_1nn : {2}) {								// 5
-			for (size_t edge_count_search_factor : {2}) { // 3
+	for (size_t k = 30; k <= 60; k += 10) {
+		for (size_t num_for_1nn : {3}) {								// 5
+			for (size_t edge_count_search_factor : {4}) { // 3
 				for (bool use_compression : {false}) {
 					for (size_t build_threads : {14}) {
 						for (bool use_mips : {false}) {
@@ -148,21 +148,32 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 						}
 					}
 					for (bool use_largest_direction_filtering : {false}) {
-						for (size_t ortho_count : {1}) { // 1,3,5
+						for (size_t ortho_count : {1, 3}) { // 1,3,5
 							for (float ortho_factor :
 									 (ortho_count == 1
 												? std::vector({0.5f})
-												: std::vector({0.5f}))) { // 1.0f, 0.5f, 2.0f
+												: std::vector(
+															{1.0f, 0.5f, 0.4f}))) { // 1.0f, 0.5f, 2.0f
 								for (float ortho_bias :
 										 ortho_count == 1
 												 ? std::vector({0.0f})
 												 : std::vector({0.0f})) { //,1.0f, 1000000000.0f})) {
-									for (size_t prune_overflow : {1}) { // 0,1,3
+									for (size_t prune_overflow : {1, 2}) { // 0,1,3
 										if (true) {
+											std::string filename = "sift";
+											filename += "_k" + std::to_string(k);
+											filename +=
+													"_efx" + std::to_string(edge_count_search_factor);
+											filename += "_orthocount" + std::to_string(ortho_count);
+											filename += "_orthofactor" + std::to_string(ortho_factor);
+											filename += "_orthobias" + std::to_string(ortho_bias);
+											filename +=
+													"_pruneoverflow" + std::to_string(prune_overflow);
 											ADD_JOB(antitopo_engine<float>, k, 2 * k, num_for_1nn,
 															k * edge_count_search_factor, ortho_count,
 															ortho_factor, ortho_bias, prune_overflow,
-															use_compression, use_largest_direction_filtering);
+															use_compression, use_largest_direction_filtering,
+															filename, false, true);
 										}
 									}
 								}
