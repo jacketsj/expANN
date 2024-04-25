@@ -135,7 +135,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 					 line_pruning_exact_engine<float>, par_antitopo_engine>
 			job_lists;
 
-	for (size_t k = 30; k <= 60; k += 10) {
+	for (size_t k = 30; k <= 60; k += 15) {
 		for (size_t num_for_1nn : {3}) {											// 5
 			for (size_t edge_count_search_factor : {500 / k}) { // 3
 				for (bool use_compression : {false}) {
@@ -158,7 +158,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										 ortho_count == 1
 												 ? std::vector({0.0f})
 												 : std::vector({0.0f})) { //,1.0f, 1000000000.0f})) {
-									for (size_t prune_overflow : {1, 2}) { // 0,1,3
+									for (size_t prune_overflow : {0, 1}) { // 0,1,3
 										if (true) {
 											std::string filename = "sift";
 											filename += "_k" + std::to_string(k);
