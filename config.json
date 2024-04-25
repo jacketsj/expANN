@@ -1,6 +1,6 @@
 {
   "dataset": "Sift1M",
-  "ds_name": "with_index_files_sift_k_10",
-  "num_threads": 3,
+  "ds_name": "using_index_files_sift_k_10",
+  "num_threads": 1,
   "k": 10
 }
