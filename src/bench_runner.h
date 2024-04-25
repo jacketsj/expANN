@@ -173,7 +173,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 															k * edge_count_search_factor, ortho_count,
 															ortho_factor, ortho_bias, prune_overflow,
 															use_compression, use_largest_direction_filtering,
-															filename, false, true);
+															filename, true, true);
 										}
 									}
 								}

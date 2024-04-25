@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -96,6 +97,20 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	size_t num_distcomps;
 	size_t num_distcomps_compressed;
 #endif
+	void constructor_helper() {
+		quant = std::make_unique<quantizer_ranged_q8>();
+		if (read_index) {
+			if (std::filesystem::exists(index_filename)) {
+				std::cout << "Index file " << index_filename
+									<< " exists, disabling write" << std::endl;
+				write_index = false;
+			} else {
+				std::cout << "Index file " << index_filename
+									<< " does not exist, disabling read" << std::endl;
+				read_index = false;
+			}
+		}
+	}
 	antitopo_engine(size_t _M, size_t _ef_construction, size_t _ortho_count,
 									float _ortho_factor, float _ortho_bias,
 									size_t _prune_overflow)
@@ -106,7 +121,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				use_compression(false), use_largest_direction_filtering(false),
 				index_filename(""), read_index(false), write_index(false),
 				max_layer(0) {
-		quant = std::make_unique<quantizer_ranged_q8>();
+		constructor_helper();
 	}
 	antitopo_engine(antitopo_engine_config conf)
 			: rd(), gen(0), distribution(0, 1), M(conf.M), M0(conf.M0),
@@ -118,7 +133,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				use_largest_direction_filtering(conf.use_largest_direction_filtering),
 				index_filename(conf.index_filename), read_index(conf.read_index),
 				write_index(conf.write_index), max_layer(0) {
-		quant = std::make_unique<quantizer_ranged_q8>();
+		constructor_helper();
 	}
 	using config = antitopo_engine_config;
 	using query_config = antitopo_engine_query_config;
