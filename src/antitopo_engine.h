@@ -846,6 +846,8 @@ template <typename T> void antitopo_engine<T>::deserialize(std::istream& in) {
 	in.read(reinterpret_cast<char*>(&starting_vertex), sizeof(starting_vertex));
 	in.read(reinterpret_cast<char*>(&M), sizeof(M));
 	in.read(reinterpret_cast<char*>(&M0), sizeof(M0));
+
+	// search-time param, don't load
 	size_t original_ef_search_mult = ef_search_mult;
 	in.read(reinterpret_cast<char*>(&ef_search_mult), sizeof(ef_search_mult));
 	ef_search_mult = original_ef_search_mult;
@@ -865,7 +867,12 @@ template <typename T> void antitopo_engine<T>::deserialize(std::istream& in) {
 	in.read(reinterpret_cast<char*>(&ortho_factor), sizeof(ortho_factor));
 	in.read(reinterpret_cast<char*>(&ortho_bias), sizeof(ortho_bias));
 	in.read(reinterpret_cast<char*>(&prune_overflow), sizeof(prune_overflow));
+
+	// search-time param, don't load
+	bool original_use_compression = use_compression;
 	in.read(reinterpret_cast<char*>(&use_compression), sizeof(use_compression));
+	use_compression = original_use_compression;
+
 	in.read(reinterpret_cast<char*>(&use_largest_direction_filtering),
 					sizeof(use_largest_direction_filtering));
 	in.read(reinterpret_cast<char*>(&max_layer), sizeof(max_layer));
