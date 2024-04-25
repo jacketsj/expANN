@@ -101,12 +101,12 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 		quant = std::make_unique<quantizer_ranged_q8>();
 		if (read_index) {
 			if (std::filesystem::exists(index_filename)) {
-				std::cout << "Index file " << index_filename
-									<< " exists, disabling write" << std::endl;
+				std::printf("Index file %s exists, disabling write\n",
+										index_filename.c_str());
 				write_index = false;
 			} else {
-				std::cout << "Index file " << index_filename
-									<< " does not exist, disabling read" << std::endl;
+				std::printf("Index file %s does not exist, disabling read\n",
+										index_filename.c_str());
 				read_index = false;
 			}
 		}
@@ -450,20 +450,19 @@ void antitopo_engine<T>::_store_vector(const vec<T>& v0, bool silent) {
 }
 
 template <typename T> void antitopo_engine<T>::_build() {
-	std::string filename = "sift_k70_efx2.index";
 	// serialize
 	if (write_index) {
-		std::ofstream out(filename, std::ios::binary);
+		std::ofstream out(index_filename, std::ios::binary);
 		serialize(out);
 		out.close();
-		std::cout << "Wrote index to " << filename << std::endl;
+		std::cout << "Wrote index to " << index_filename << std::endl;
 	}
 	// deserialize
 	if (read_index) {
-		std::ifstream in(filename, std::ios::binary);
+		std::ifstream in(index_filename, std::ios::binary);
 		deserialize(in);
 		in.close();
-		std::cout << "Read index from " << filename << std::endl;
+		std::cout << "Read index from " << index_filename << std::endl;
 	}
 
 	assert(all_entries.size() > 0);
