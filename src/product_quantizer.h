@@ -38,7 +38,7 @@ public:
 		std::array<std::array<float, NUM_CENTROIDS>, NUM_SUBSPACES> distance_table;
 		for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
 			Eigen::VectorXf subquery =
-					query.segment(cursubspace * subspace_size, subspace_size).transpose();
+					query.segment(cursubspace * subspace_size, subspace_size);
 			for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid) {
 				auto res =
 						(sub_centroids[cur_vert][cursubspace][curcentroid] - subquery)
@@ -51,9 +51,9 @@ public:
 				 ++entry_index) {
 			float res = 0;
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
-				res +=
-						distance_table[cursubspace][codes[cur_vert][cursubspace]
-																						 [to_filter_offsets[entry_index]]];
+				res += distance_table[cursubspace]
+														 [codes[cur_vert][to_filter_offsets[entry_index]]
+																	 [cursubspace]];
 			}
 			if (res < cutoff) {
 				filtered_out.emplace_back(to_filter[entry_index]);
