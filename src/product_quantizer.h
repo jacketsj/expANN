@@ -2,6 +2,7 @@
 
 #include "clusterer.h"
 #include "quantizer.h"
+#include <iostream>
 #include <optional>
 
 class product_quantizer_scorer : public quantized_scorer {
@@ -86,7 +87,11 @@ public:
 	virtual void build(const std::vector<fvec>& unquantized,
 										 const std::vector<std::vector<size_t>>& adj) override {
 		sub_centroids.resize(unquantized.size());
+		codes.resize(unquantized.size());
+		std::cout << "Running k-means on each neighbourhood" << std::endl;
 		for (size_t base = 0; base < unquantized.size(); ++base) {
+			if (base % 5000 == 0)
+				std::cout << "base=" << base << std::endl;
 			std::vector<std::vector<Eigen::VectorXf>> neighbours_per_sub(
 					NUM_SUBSPACES);
 			for (size_t neighbour_index : adj[base]) {
@@ -98,16 +103,20 @@ public:
 							cursubspace * subspace_size, subspace_size));
 				}
 			}
-			std::vector<std::vector<size_t>> sub_labels(NUM_SUBSPACES);
 			// sub dimension -> index(16) -> centroid for subdim
+			codes[base].resize(adj[base].size());
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
 				std::vector<Eigen::VectorXf> current_centroids;
+				std::vector<size_t> sub_labels;
 				clust.k_means(neighbours_per_sub[cursubspace], NUM_CENTROIDS,
-											sub_labels[cursubspace], current_centroids);
+											sub_labels, current_centroids);
 				for (size_t i = 0; i < NUM_CENTROIDS; ++i)
 					sub_centroids[base][cursubspace][i] = current_centroids[i];
+				for (size_t neighbour = 0; neighbour < adj[base].size(); ++neighbour)
+					codes[base][neighbour][cursubspace] = uint8_t(sub_labels[neighbour]);
 			}
 		}
+		std::cout << "Done running k-means on each neighbourhood" << std::endl;
 	}
 	virtual std::unique_ptr<quantized_scorer>
 	generate_scorer(const fvec& query) override {

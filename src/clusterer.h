@@ -25,8 +25,11 @@ public:
 
 		labels.resize(data.size());
 
+		size_t max_iters = k * data.size() / 4;
+
 		bool changed = true;
-		while (changed) {
+		size_t iter = max_iters;
+		while (changed && iter-- > 0) {
 			changed = false;
 
 			// Assign labels
