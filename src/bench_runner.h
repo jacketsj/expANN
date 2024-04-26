@@ -136,9 +136,9 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 			job_lists;
 
 	for (size_t k = 60; k <= 60; k += 15) {
-		for (size_t num_for_1nn : {1, 2, 3, 4, 5, 6}) {				// 5
+		for (size_t num_for_1nn : {1}) { //, 2, 3, 4, 5, 6}) {				// 5
 			for (size_t edge_count_search_factor : {500 / k}) { // 3
-				for (bool use_compression : {false, true}) {
+				for (bool use_compression : {true, false}) {
 					for (size_t build_threads : {14}) {
 						for (bool use_mips : {false}) {
 							if (false) {
@@ -157,7 +157,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										 ortho_count == 1
 												 ? std::vector({0.0f})
 												 : std::vector({0.0f})) { //,1.0f, 1000000000.0f})) {
-									for (size_t prune_overflow : {0, 1, 2, 4}) { // 0,1,3
+									for (size_t prune_overflow : {0}) { //, 1, 2, 4}) { // 0,1,3
 										if (true) {
 											std::string filename = "index/sift";
 											filename += "_k" + std::to_string(k);
