@@ -13,7 +13,7 @@ protected:
 	quantized_scorer() = default;
 
 public:
-	~quantized_scorer() = default;
+	virtual ~quantized_scorer() = default;
 	virtual float score(size_t index) = 0;
 	virtual void prefetch(size_t index) = 0;
 	// TODO add a prefetched loop with a callback too
@@ -63,7 +63,7 @@ protected:
 	quantizer() = default;
 
 public:
-	~quantizer() = default;
+	virtual ~quantizer() = default;
 	// TODO this should just be the constructor
 	virtual void build(const std::vector<vec<float>::Underlying>& unquantized,
 										 const std::vector<std::vector<size_t>>& adj) = 0;
@@ -103,7 +103,7 @@ class quantizer_simple : public quantizer {
 
 public:
 	quantizer_simple() = default;
-	~quantizer_simple() = default;
+	virtual ~quantizer_simple() = default;
 
 	virtual void build(const std::vector<vec<float>::Underlying>& unquantized,
 										 const std::vector<std::vector<size_t>>& _adj) override {
@@ -174,7 +174,7 @@ class quantizer_ranged_q8 : public quantizer {
 
 public:
 	quantizer_ranged_q8() = default;
-	~quantizer_ranged_q8() = default;
+	virtual ~quantizer_ranged_q8() = default;
 
 	virtual void build(const std::vector<fvec>& unquantized,
 										 const std::vector<std::vector<size_t>>& _adj) override {

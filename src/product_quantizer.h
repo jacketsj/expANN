@@ -24,6 +24,7 @@ public:
 			const std::vector<std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>,
 																	 NUM_SUBSPACES>>& _sub_centroids)
 			: query(_query), codes(_codes), sub_centroids(_sub_centroids) {}
+	virtual ~product_quantizer_scorer() {}
 
 	virtual float score(size_t index) override { return 0; }
 	virtual void prefetch(size_t index) override {}
@@ -89,12 +90,15 @@ class product_quantizer : public quantizer {
 
 public:
 	product_quantizer() = default;
-	~product_quantizer() = default;
+	virtual ~product_quantizer() = default;
 
 	virtual void build(const std::vector<fvec>& unquantized,
 										 const std::vector<std::vector<size_t>>& adj) override {
 		sub_centroids.resize(unquantized.size());
 		codes.resize(unquantized.size());
+		for (size_t base = 0; base < unquantized.size(); ++base) {
+			codes[base].resize(adj[base].size());
+		}
 		std::cout << "Running k-means on each neighbourhood" << std::endl;
 		for (size_t base = 0; base < unquantized.size(); ++base) {
 			if (base % 5000 == 0)
@@ -111,7 +115,6 @@ public:
 				}
 			}
 			// sub dimension -> index(16) -> centroid for subdim
-			codes[base].resize(adj[base].size());
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
 				std::vector<Eigen::VectorXf> current_centroids;
 				std::vector<size_t> sub_labels;
