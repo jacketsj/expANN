@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include <iostream>
+#include <random>
 
 #include "vec.h"
 
