@@ -607,6 +607,10 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 			float cutoff = nearest_big.size() < big_factor * k
 												 ? std::numeric_limits<T>::max()
 												 : nearest_big.top().first;
+
+#ifdef RECORD_STATS
+			num_distcomps_compressed += neighbour_list_unfiltered.size();
+#endif
 			scorer->filter_by_score(cur.second, neighbour_list_unfiltered,
 															neighbour_list_unfiltered_offsets, neighbour_list,
 															cutoff);
