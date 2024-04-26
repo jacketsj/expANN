@@ -15,15 +15,18 @@ class product_quantizer_scorer : public quantized_scorer {
 	using codes_t = std::array<uint8_t, NUM_SUBSPACES>;
 
 	const std::vector<std::vector<codes_t>>& codes;
-	const std::vector<std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>,
-															 NUM_SUBSPACES>>& sub_centroids;
+
+	using centroids_t = Eigen::Matrix<float, NUM_CENTROIDS, Eigen::Dynamic>;
+	const std::vector<centroids_t>& sub_centroids_compact;
+	// const std::vector<std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>,
+	//														 NUM_SUBSPACES>>& sub_centroids;
 
 public:
 	product_quantizer_scorer(
 			const fvec& _query, const std::vector<std::vector<codes_t>>& _codes,
-			const std::vector<std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>,
-																	 NUM_SUBSPACES>>& _sub_centroids)
-			: query(_query), codes(_codes), sub_centroids(_sub_centroids) {}
+			const std::vector<centroids_t>& _sub_centroids_compact)
+			: query(_query), codes(_codes),
+				sub_centroids_compact(_sub_centroids_compact) {}
 	virtual ~product_quantizer_scorer() {}
 
 	virtual float score(size_t index) override { return 0; }
@@ -41,9 +44,12 @@ public:
 			Eigen::VectorXf subquery =
 					query.segment(cursubspace * subspace_size, subspace_size);
 			for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid) {
-				auto res =
-						(sub_centroids[cur_vert][cursubspace][curcentroid] - subquery)
-								.squaredNorm();
+				auto res = (sub_centroids_compact[cur_vert]
+												.row(curcentroid)
+												.segment(cursubspace * subspace_size, subspace_size) -
+										subquery)
+											 .squaredNorm();
+				//(sub_centroids[cur_vert][cursubspace][curcentroid] - subquery)
 				distance_table[cursubspace][curcentroid] = res;
 			}
 		}
@@ -66,16 +72,17 @@ public:
 
 class product_quantizer : public quantizer {
 	using fvec = vec<float>::Underlying;
-	clusterer clust;
 
 	static constexpr size_t NUM_SUBSPACES = 16;
 	static constexpr size_t NUM_CENTROIDS = 16;
 
 	using codes_t = std::array<uint8_t, NUM_SUBSPACES>;
 	std::vector<std::vector<codes_t>> codes;
-	std::vector<
-			std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>, NUM_SUBSPACES>>
-			sub_centroids;
+	using centroids_t = Eigen::Matrix<float, NUM_CENTROIDS, Eigen::Dynamic>;
+	std::vector<centroids_t> sub_centroids_compact;
+	// std::vector<
+	//		std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>, NUM_SUBSPACES>>
+	//		sub_centroids;
 
 	Eigen::VectorXf pad(const fvec& input) {
 		size_t dimension = input.size();
@@ -94,17 +101,24 @@ public:
 
 	virtual void build(const std::vector<fvec>& unquantized,
 										 const std::vector<std::vector<size_t>>& adj) override {
-		sub_centroids.resize(unquantized.size());
+		size_t dimension = unquantized[0].size();
+		size_t subspace_size = dimension / NUM_SUBSPACES;
+		std::cout << "Initializing memory for centroids" << std::endl;
+		sub_centroids_compact = std::vector<centroids_t>(
+				unquantized.size(), centroids_t::Zero(NUM_CENTROIDS, dimension));
 		codes.resize(unquantized.size());
 		for (size_t base = 0; base < unquantized.size(); ++base) {
 			codes[base].resize(adj[base].size());
 		}
 		std::cout << "Running k-means on each neighbourhood" << std::endl;
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::vector<std::vector<Eigen::VectorXf>> neighbours_per_sub(NUM_SUBSPACES);
 		for (size_t base = 0; base < unquantized.size(); ++base) {
 			if (base % 5000 == 0)
 				std::cout << "base=" << base << std::endl;
-			std::vector<std::vector<Eigen::VectorXf>> neighbours_per_sub(
-					NUM_SUBSPACES);
+			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace)
+				neighbours_per_sub[cursubspace].clear();
 			for (size_t neighbour_index : adj[base]) {
 				auto padded_neighbour = pad(unquantized[neighbour_index]);
 				size_t subspace_size = padded_neighbour.size() / NUM_SUBSPACES;
@@ -118,11 +132,20 @@ public:
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
 				std::vector<Eigen::VectorXf> current_centroids;
 				std::vector<size_t> sub_labels;
+				clusterer clust(gen);
 				clust.k_means(neighbours_per_sub[cursubspace], NUM_CENTROIDS,
 											sub_labels, current_centroids);
-				for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid)
-					sub_centroids[base][cursubspace][curcentroid] =
+				for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS;
+						 ++curcentroid) {
+					if (subspace_size != size_t(current_centroids[curcentroid].size()))
+						throw std::runtime_error("Subdimension-size mismatch");
+					sub_centroids_compact[base]
+							.row(curcentroid)
+							.segment(cursubspace * subspace_size, subspace_size) =
 							current_centroids[curcentroid];
+					// sub_centroids[base][cursubspace][curcentroid] =
+					//		current_centroids[curcentroid];
+				}
 				for (size_t neighbour = 0; neighbour < adj[base].size(); ++neighbour)
 					codes[base][neighbour][cursubspace] = uint8_t(sub_labels[neighbour]);
 			}
@@ -133,6 +156,6 @@ public:
 	generate_scorer(const fvec& query) override {
 		auto padded_query = pad(query);
 		return std::make_unique<product_quantizer_scorer>(padded_query, codes,
-																											sub_centroids);
+																											sub_centroids_compact);
 	}
 };

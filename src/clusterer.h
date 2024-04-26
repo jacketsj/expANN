@@ -7,11 +7,10 @@
 #include "vec.h"
 
 class clusterer {
-	std::random_device rd;
-	std::mt19937 gen;
+	std::mt19937& gen;
 
 public:
-	clusterer() : rd(), gen(rd()) {}
+	clusterer(std::mt19937& gen) : gen(gen) {}
 	void k_means(const std::vector<Eigen::VectorXf>& data, size_t k,
 							 std::vector<size_t>& labels,
 							 std::vector<Eigen::VectorXf>& centroids) {
