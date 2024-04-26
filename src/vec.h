@@ -6,11 +6,10 @@
 #include <string>
 #include <vector>
 
-// #include "distance.h"
+#include "distance.h"
 
 #include <Eigen/Dense>
 
-#include "distance.h"
 #include "small_vector.hpp"
 
 template <typename> struct ChooseUnderlying;
