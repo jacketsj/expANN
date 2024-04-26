@@ -99,7 +99,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	size_t num_distcomps_compressed;
 #endif
 	void constructor_helper() {
-		quant = std::make_unique<quantizer_ranged_q8>();
+		quant = std::make_unique<product_quantizer>();
 		std::filesystem::path directory =
 				std::filesystem::path(index_filename).parent_path();
 		if (!std::filesystem::exists(directory)) {

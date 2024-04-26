@@ -55,7 +55,7 @@ public:
 	}
 };
 
-class product_quantizer : quantizer {
+class product_quantizer : public quantizer {
 	using fvec = vec<float>::Underlying;
 	clusterer clust;
 
