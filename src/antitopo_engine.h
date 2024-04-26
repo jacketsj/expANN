@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "ann_engine.h"
+#include "product_quantizer.h"
 #include "quantizer.h"
 #include "robin_hood.h"
 #include "topk_t.h"
@@ -474,7 +475,7 @@ template <typename T> void antitopo_engine<T>::_build() {
 
 	assert(all_entries.size() > 0);
 
-	quant->build(all_entries);
+	quant->build(all_entries, hadj_bottom);
 
 #ifdef RECORD_STATS
 	// reset before queries
@@ -552,7 +553,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 											decltype(worst_elem)>
 			nearest_big(entry_points_with_dist.begin(), entry_points_with_dist.end(),
 									worst_elem);
-	size_t big_factor = 5;
+	size_t big_factor = 2;
 	if constexpr (use_compressed) {
 		while (nearest_big.size() > big_factor * k)
 			nearest_big.pop();
@@ -580,7 +581,8 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		}
 	};
 
-	std::vector<size_t> neighbour_list, neighbour_list_unfiltered;
+	std::vector<size_t> neighbour_list, neighbour_list_unfiltered,
+			neighbour_list_unfiltered_offsets;
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
 		candidates.pop();
@@ -589,10 +591,12 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		}
 		neighbour_list.clear();
 		neighbour_list_unfiltered.clear();
+		neighbour_list_unfiltered_offsets.clear();
 		for (size_t neighbour : get_vertex(cur.second))
 			if (!visited[neighbour]) {
 				if constexpr (use_compressed) {
 					neighbour_list_unfiltered.emplace_back(neighbour);
+					neighbour_list_unfiltered_offsets.emplace_back(neighbour);
 				} else {
 					neighbour_list.emplace_back(neighbour);
 				}
@@ -600,43 +604,12 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 				visited_recent.emplace_back(neighbour);
 			}
 		if constexpr (use_compressed) {
-			constexpr size_t in_advance = 4;
-			constexpr size_t in_advance_extra = 2;
-			auto do_loop_prefetch = [&](size_t i) constexpr { scorer->prefetch(i); };
-			for (size_t next_i_pre = 0;
-					 next_i_pre < std::min(in_advance, neighbour_list_unfiltered.size());
-					 ++next_i_pre) {
-				do_loop_prefetch(next_i_pre);
-			}
-			auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
-													 size_t next_i) constexpr {
-				if constexpr (inAdvanceIterExtra) {
-					_mm_prefetch(&neighbour_list_unfiltered[next_i + in_advance +
-																									in_advance_extra],
-											 _MM_HINT_T0);
-				}
-				if constexpr (inAdvanceIter) {
-					do_loop_prefetch(next_i + in_advance);
-				}
-				const auto& next = neighbour_list_unfiltered[next_i];
-				T d_next = score_compressed(next);
-				if (nearest_big.size() < big_factor * k ||
-						d_next < nearest_big.top().first) {
-					neighbour_list.emplace_back(next);
-				}
-			};
-			size_t next_i = 0;
-			for (; next_i + in_advance + in_advance_extra <
-						 neighbour_list_unfiltered.size();
-					 ++next_i) {
-				loop_iter.template operator()<true, true>(next_i);
-			}
-			for (; next_i + in_advance < neighbour_list_unfiltered.size(); ++next_i) {
-				loop_iter.template operator()<true, false>(next_i);
-			}
-			for (; next_i < neighbour_list_unfiltered.size(); ++next_i) {
-				loop_iter.template operator()<false, false>(next_i);
-			}
+			float cutoff = nearest_big.size() < big_factor * k
+												 ? std::numeric_limits<T>::max()
+												 : nearest_big.top().first;
+			scorer->filter_by_score(cur.second, neighbour_list_unfiltered,
+															neighbour_list_unfiltered_offsets, neighbour_list,
+															cutoff);
 		}
 		{
 			constexpr size_t in_advance = 4;

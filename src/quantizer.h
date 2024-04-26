@@ -17,6 +17,45 @@ public:
 	virtual float score(size_t index) = 0;
 	virtual void prefetch(size_t index) = 0;
 	// TODO add a prefetched loop with a callback too
+	virtual void filter_by_score(size_t _cur_vert,
+															 const std::vector<size_t>& to_filter,
+															 const std::vector<size_t>& _to_filter_offsets,
+															 std::vector<size_t>& filtered_out,
+															 float cutoff) {
+		constexpr size_t in_advance = 4;
+		constexpr size_t in_advance_extra = 2;
+		auto do_loop_prefetch = [&](size_t i) constexpr { prefetch(i); };
+		for (size_t next_i_pre = 0;
+				 next_i_pre < std::min(in_advance, to_filter.size()); ++next_i_pre) {
+			do_loop_prefetch(next_i_pre);
+		}
+		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
+												 size_t next_i) constexpr {
+			if constexpr (inAdvanceIterExtra) {
+				_mm_prefetch(&to_filter[next_i + in_advance + in_advance_extra],
+										 _MM_HINT_T0);
+			}
+			if constexpr (inAdvanceIter) {
+				do_loop_prefetch(next_i + in_advance);
+			}
+			const auto& next = to_filter[next_i];
+			float d_next = score(next);
+			if (d_next < cutoff) {
+				filtered_out.emplace_back(next);
+			}
+		};
+		size_t next_i = 0;
+		for (; next_i + in_advance + in_advance_extra < to_filter.size();
+				 ++next_i) {
+			loop_iter.template operator()<true, true>(next_i);
+		}
+		for (; next_i + in_advance < to_filter.size(); ++next_i) {
+			loop_iter.template operator()<true, false>(next_i);
+		}
+		for (; next_i < to_filter.size(); ++next_i) {
+			loop_iter.template operator()<false, false>(next_i);
+		}
+	}
 };
 
 class quantizer {
@@ -26,8 +65,8 @@ protected:
 public:
 	~quantizer() = default;
 	// TODO this should just be the constructor
-	virtual void
-	build(const std::vector<vec<float>::Underlying>& unquantized) = 0;
+	virtual void build(const std::vector<vec<float>::Underlying>& unquantized,
+										 const std::vector<std::vector<size_t>>& adj) = 0;
 	virtual std::unique_ptr<quantized_scorer>
 	generate_scorer(const vec<float>::Underlying& query) = 0;
 };
@@ -66,8 +105,8 @@ public:
 	quantizer_simple() = default;
 	~quantizer_simple() = default;
 
-	virtual void
-	build(const std::vector<vec<float>::Underlying>& unquantized) override {
+	virtual void build(const std::vector<vec<float>::Underlying>& unquantized,
+										 const std::vector<std::vector<size_t>>& _adj) override {
 		stored = unquantized;
 	}
 	virtual std::unique_ptr<quantized_scorer>
@@ -137,7 +176,8 @@ public:
 	quantizer_ranged_q8() = default;
 	~quantizer_ranged_q8() = default;
 
-	virtual void build(const std::vector<fvec>& unquantized) override {
+	virtual void build(const std::vector<fvec>& unquantized,
+										 const std::vector<std::vector<size_t>>& _adj) override {
 		dimension = unquantized[0].size();
 
 		float max_val = std::numeric_limits<float>::min(),
