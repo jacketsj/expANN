@@ -592,17 +592,20 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		neighbour_list.clear();
 		neighbour_list_unfiltered.clear();
 		neighbour_list_unfiltered_offsets.clear();
-		for (size_t neighbour : get_vertex(cur.second))
+		size_t neighbour_index = 0;
+		for (size_t neighbour : get_vertex(cur.second)) {
 			if (!visited[neighbour]) {
 				if constexpr (use_compressed) {
 					neighbour_list_unfiltered.emplace_back(neighbour);
-					neighbour_list_unfiltered_offsets.emplace_back(neighbour);
+					neighbour_list_unfiltered_offsets.emplace_back(neighbour_index);
 				} else {
 					neighbour_list.emplace_back(neighbour);
 				}
 				visited[neighbour] = true;
 				visited_recent.emplace_back(neighbour);
 			}
+			++neighbour_index;
+		}
 		if constexpr (use_compressed) {
 			float cutoff = nearest_big.size() < big_factor * k
 												 ? std::numeric_limits<T>::max()

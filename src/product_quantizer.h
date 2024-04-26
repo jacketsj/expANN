@@ -37,17 +37,20 @@ public:
 		std::array<std::array<float, NUM_CENTROIDS>, NUM_SUBSPACES> distance_table;
 		for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
 			for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid) {
-				distance_table[cursubspace][curcentroid] =
-						sub_centroids[cur_vert][cursubspace][curcentroid].dot(
-								query.segment(cursubspace * subspace_size, subspace_size));
+				auto res = (sub_centroids[cur_vert][cursubspace][curcentroid] -
+										(query.segment(cursubspace * subspace_size, subspace_size)))
+											 .squaredNorm();
+				distance_table[cursubspace][curcentroid] = res;
 			}
 		}
 		// Use pq table to compute distances for to_filter_offsets
-		for (size_t entry_index : to_filter_offsets) {
+		for (size_t entry_index = 0; entry_index < to_filter_offsets.size();
+				 ++entry_index) {
 			float res = 0;
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
-				res += distance_table[cursubspace]
-														 [codes[cur_vert][cursubspace][entry_index]];
+				res +=
+						distance_table[cursubspace][codes[cur_vert][cursubspace]
+																						 [to_filter_offsets[entry_index]]];
 			}
 			if (res < cutoff) {
 				filtered_out.emplace_back(to_filter[entry_index]);
