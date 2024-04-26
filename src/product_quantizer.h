@@ -7,7 +7,7 @@
 
 class product_quantizer_scorer : public quantized_scorer {
 	using fvec = vec<float>::Underlying;
-	const fvec& query;
+	fvec query;
 
 	static constexpr size_t NUM_SUBSPACES = 16;
 	static constexpr size_t NUM_CENTROIDS = 16;
@@ -31,15 +31,18 @@ public:
 															 const std::vector<size_t>& to_filter,
 															 const std::vector<size_t>& to_filter_offsets,
 															 std::vector<size_t>& filtered_out,
+															 std::vector<float>& distances,
 															 float cutoff) override {
 		size_t subspace_size = query.size() / NUM_SUBSPACES;
 		// Compute pq table
 		std::array<std::array<float, NUM_CENTROIDS>, NUM_SUBSPACES> distance_table;
 		for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
+			Eigen::VectorXf subquery =
+					query.segment(cursubspace * subspace_size, subspace_size).transpose();
 			for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid) {
-				auto res = (sub_centroids[cur_vert][cursubspace][curcentroid] -
-										(query.segment(cursubspace * subspace_size, subspace_size)))
-											 .squaredNorm();
+				auto res =
+						(sub_centroids[cur_vert][cursubspace][curcentroid] - subquery)
+								.squaredNorm();
 				distance_table[cursubspace][curcentroid] = res;
 			}
 		}
@@ -54,6 +57,7 @@ public:
 			}
 			if (res < cutoff) {
 				filtered_out.emplace_back(to_filter[entry_index]);
+				distances.emplace_back(res);
 			}
 		}
 	}
@@ -113,8 +117,9 @@ public:
 				std::vector<size_t> sub_labels;
 				clust.k_means(neighbours_per_sub[cursubspace], NUM_CENTROIDS,
 											sub_labels, current_centroids);
-				for (size_t i = 0; i < NUM_CENTROIDS; ++i)
-					sub_centroids[base][cursubspace][i] = current_centroids[i];
+				for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid)
+					sub_centroids[base][cursubspace][curcentroid] =
+							current_centroids[curcentroid];
 				for (size_t neighbour = 0; neighbour < adj[base].size(); ++neighbour)
 					codes[base][neighbour][cursubspace] = uint8_t(sub_labels[neighbour]);
 			}

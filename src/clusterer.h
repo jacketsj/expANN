@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <random>
+#include <iostream>
 
 #include "vec.h"
 
@@ -25,11 +25,11 @@ public:
 
 		labels.resize(data.size());
 
-		size_t max_iters = k * data.size() / 4;
+		// size_t max_iters = k * data.size();
 
 		bool changed = true;
-		size_t iter = max_iters;
-		while (changed && iter-- > 0) {
+		// size_t iter = max_iters;
+		while (changed) { // && iter-- > 0) {
 			changed = false;
 
 			// Assign labels

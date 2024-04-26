@@ -21,7 +21,7 @@ public:
 															 const std::vector<size_t>& to_filter,
 															 const std::vector<size_t>& _to_filter_offsets,
 															 std::vector<size_t>& filtered_out,
-															 float cutoff) {
+															 std::vector<float>& _distances, float cutoff) {
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
 		auto do_loop_prefetch = [&](size_t i) constexpr { prefetch(i); };

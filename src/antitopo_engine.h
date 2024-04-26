@@ -95,8 +95,8 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	bool write_index;
 	size_t max_layer;
 #ifdef RECORD_STATS
-	size_t num_distcomps;
-	size_t num_distcomps_compressed;
+	size_t num_distcomps = 0;
+	size_t num_distcomps_compressed = 0;
 #endif
 	void constructor_helper() {
 		quant = std::make_unique<product_quantizer>();
@@ -551,9 +551,9 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		nearest.pop();
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(worst_elem)>
-			nearest_big(entry_points_with_dist.begin(), entry_points_with_dist.end(),
-									worst_elem);
-	size_t big_factor = 2;
+			nearest_big(worst_elem); //(entry_points_with_dist.begin(),
+															 // entry_points_with_dist.end(), worst_elem);
+	size_t big_factor = 5;
 	if constexpr (use_compressed) {
 		while (nearest_big.size() > big_factor * k)
 			nearest_big.pop();
@@ -583,6 +583,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 
 	std::vector<size_t> neighbour_list, neighbour_list_unfiltered,
 			neighbour_list_unfiltered_offsets;
+	std::vector<T> distances;
 	while (!candidates.empty()) {
 		auto cur = candidates.top();
 		candidates.pop();
@@ -607,16 +608,18 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 			++neighbour_index;
 		}
 		if constexpr (use_compressed) {
-			float cutoff = nearest_big.size() < big_factor * k
-												 ? std::numeric_limits<T>::max()
-												 : nearest_big.top().first;
+			float cutoff = std::numeric_limits<T>::max();
+			// float cutoff = nearest_big.size() < big_factor * k
+			//									 ? std::numeric_limits<T>::max()
+			//									 : nearest_big.top().first;
 
 #ifdef RECORD_STATS
 			num_distcomps_compressed += neighbour_list_unfiltered.size();
 #endif
+			distances.clear();
 			scorer->filter_by_score(cur.second, neighbour_list_unfiltered,
 															neighbour_list_unfiltered_offsets, neighbour_list,
-															cutoff);
+															distances, cutoff);
 		}
 		{
 			constexpr size_t in_advance = 4;
@@ -648,6 +651,12 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 				}
 				const auto& next = neighbour_list[next_i];
 				T d_next = score(next);
+				if constexpr (use_compressed) {
+					// std::cout << "d_next=" << d_next << ",";
+					// std::cout << "d_next(compressed)=" << distances[next_i] <<
+					// std::endl;
+					d_next = distances[next_i];
+				}
 				if (nearest.size() < k || d_next < nearest.top().first) {
 					candidates.emplace(d_next, next);
 					nearest.emplace(d_next, next);
