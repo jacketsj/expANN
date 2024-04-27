@@ -1,3 +1,5 @@
+#pragma once
+
 // External
 #include <immintrin.h>
 #include <math.h>
