@@ -71,21 +71,27 @@ public:
 	generate_scorer(const vec<float>::Underlying& query) = 0;
 };
 
-class quantized_scorer_simple : public quantized_scorer {
+template <typename T> class quantized_scorer_simple : public quantized_scorer {
 private:
 	vec<float>::Underlying query;
-	const std::vector<vec<float>::Underlying>& stored;
+	const std::vector<typename vec<T>::Underlying>& stored;
 	size_t dimension;
 
 public:
-	quantized_scorer_simple(const vec<float>::Underlying& _query,
-													const std::vector<vec<float>::Underlying>& _stored)
+	quantized_scorer_simple(
+			const vec<float>::Underlying& _query,
+			const std::vector<typename vec<T>::Underlying>& _stored)
 			: query(_query), stored(_stored), dimension(_query.size()) {}
 	virtual ~quantized_scorer_simple() {}
 
 public:
 	virtual float score(size_t index) override {
-		return (query - stored.at(index)).squaredNorm();
+		if constexpr (std::is_same_v<T, float>) {
+			return (query - stored.at(index)).squaredNorm();
+		} else {
+			// TODO
+			return 0;
+		}
 	}
 	virtual void prefetch(size_t index) override {
 #ifdef DIM
@@ -98,9 +104,8 @@ public:
 	}
 };
 
-// TODO make this generic for other types
-class quantizer_simple : public quantizer {
-	std::vector<vec<float>::Underlying> stored;
+template <typename T> class quantizer_simple : public quantizer {
+	std::vector<typename vec<T>::Underlying> stored;
 
 public:
 	quantizer_simple() = default;
@@ -108,11 +113,17 @@ public:
 
 	virtual void build(const std::vector<vec<float>::Underlying>& unquantized,
 										 const std::vector<std::vector<size_t>>& _adj) override {
-		stored = unquantized;
+		stored.resize(unquantized.size());
+		for (size_t i = 0; i < unquantized.size(); ++i) {
+			stored[i] = typename vec<T>::Underlying(unquantized[i].size());
+			for (size_t j = 0; j < unquantized[i].size(); ++j)
+				stored[i][j] = T(unquantized[i][j]);
+		}
+		// stored = unquantized;
 	}
 	virtual std::unique_ptr<quantized_scorer>
 	generate_scorer(const vec<float>::Underlying& query) override {
-		return std::make_unique<quantized_scorer_simple>(query, stored);
+		return std::make_unique<quantized_scorer_simple<T>>(query, stored);
 	}
 };
 
