@@ -45,57 +45,60 @@ public:
 															 float cutoff) override {
 		size_t subspace_size = query.size() / NUM_SUBSPACES;
 		// Compute pq table
-		std::array<std::array<float, NUM_SUBSPACES>, NUM_CENTROIDS> distance_table;
-		for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
-			Eigen::VectorXf subquery =
-					query.segment(cursubspace * subspace_size, subspace_size);
-			for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid) {
-				// auto cur_sub_centroid_v1 =
-				//		sub_centroids[cur_vert][cursubspace][curcentroid];
-				// auto cur_sub_centroid_v2 =
-				//		sub_centroids_compact[cur_vert]
-				//				.row(curcentroid)
-				//				.segment(cursubspace * subspace_size, subspace_size);
-				//  std::cout << "cur_sub_centroid_v1=" <<
-				//  cur_sub_centroid_v1.transpose()
-				//					<< std::endl;
-				//   std::cout << "cur_sub_centroid_v2=" << cur_sub_centroid_v2 <<
-				//   std::endl;
-				auto res = (sub_centroids_compact[cur_vert]
-												.row(curcentroid)
-												.segment(cursubspace * subspace_size, subspace_size)
-												.transpose() -
-										subquery)
-											 .squaredNorm();
-				// auto res =
-				//		(sub_centroids[cur_vert][cursubspace][curcentroid] - subquery)
-				//				.squaredNorm();
-				//  distance_table[cursubspace][curcentroid] = res;
-				distance_table[curcentroid][cursubspace] = res;
-			}
-		}
-		/*
+		// std::array<std::array<float, NUM_SUBSPACES>, NUM_CENTROIDS>
+		// distance_table;
+		Eigen::Matrix<float, NUM_CENTROIDS, NUM_SUBSPACES, Eigen::RowMajor>
+				distance_table;
 		if (false) {
+			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
+				Eigen::VectorXf subquery =
+						query.segment(cursubspace * subspace_size, subspace_size);
+				for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS;
+						 ++curcentroid) {
+					// auto cur_sub_centroid_v1 =
+					//		sub_centroids[cur_vert][cursubspace][curcentroid];
+					// auto cur_sub_centroid_v2 =
+					//		sub_centroids_compact[cur_vert]
+					//				.row(curcentroid)
+					//				.segment(cursubspace * subspace_size, subspace_size);
+					//  std::cout << "cur_sub_centroid_v1=" <<
+					//  cur_sub_centroid_v1.transpose()
+					//					<< std::endl;
+					//   std::cout << "cur_sub_centroid_v2=" << cur_sub_centroid_v2 <<
+					//   std::endl;
+					auto res = (sub_centroids_compact[cur_vert]
+													.row(curcentroid)
+													.segment(cursubspace * subspace_size, subspace_size)
+													.transpose() -
+											subquery)
+												 .squaredNorm();
+					// auto res =
+					//		(sub_centroids[cur_vert][cursubspace][curcentroid] - subquery)
+					//				.squaredNorm();
+					//  distance_table[cursubspace][curcentroid] = res;
+					// distance_table[curcentroid][cursubspace] = res;
+					distance_table(curcentroid, cursubspace) = res;
+				}
+			}
+		} else {
 			auto reshaped_query = query.reshaped(subspace_size, NUM_SUBSPACES);
-			Eigen::MatrixXf distance_table =
-					Eigen::MatrixXf::Zero(NUM_CENTROIDS, NUM_SUBSPACES);
 			for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid) {
 				// Extract each centroid's subspace data into a matrix of shape
 				// (NUM_SUBSPACES, subspace_size)
 				auto centroid_subspaces = sub_centroids_compact[cur_vert]
 																			.row(curcentroid)
 																			.reshaped(subspace_size, NUM_SUBSPACES);
+				//.transpose();
 
 				// Compute the squared norm of the difference, summing over the columns
 				// of each subspace
-				distance_table.row(curcentroid) =
-						(centroid_subspaces.colwise() - reshaped_query)
-								.colwise()
-								.squaredNorm();
+				auto norms =
+						(centroid_subspaces - reshaped_query).colwise().squaredNorm();
+				distance_table.row(curcentroid) = norms;
+				//(centroid_subspaces - reshaped_query).colwise().squaredNorm();
 			}
 			// distances_table[curcentorid][cursubspace]
 		}
-		*/
 		// Use pq table to compute distances for to_filter_offsets
 		for (size_t entry_index = 0; entry_index < to_filter_offsets.size();
 				 ++entry_index) {
@@ -103,7 +106,8 @@ public:
 			size_t entry_offset = to_filter_offsets[entry_index];
 			const auto& cur_codes = codes[cur_vert][entry_offset];
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
-				res += distance_table[cur_codes[cursubspace]][cursubspace];
+				// res += distance_table[cur_codes[cursubspace]][cursubspace];
+				res += distance_table(cur_codes[cursubspace], cursubspace);
 			}
 			if (res < cutoff) {
 				filtered_out.emplace_back(to_filter[entry_index]);
