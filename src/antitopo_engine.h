@@ -203,15 +203,13 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 		}
 	}
 	antitopo_engine(size_t _M, size_t _ef_construction, size_t _ortho_count,
-									float _ortho_factor, float _ortho_bias,
-									size_t _prune_overflow)
+									size_t _prune_overflow, bool _use_compression)
 			: rd(), gen(0), distribution(0, 1), M(_M), M0(2 * _M), ef_search_mult(1),
 				ef_search(std::nullopt), ef_construction(_ef_construction),
-				ortho_count(_ortho_count), ortho_factor(_ortho_factor),
-				ortho_bias(_ortho_bias), prune_overflow(_prune_overflow),
-				use_compression(false), use_largest_direction_filtering(false),
-				index_filename(""), read_index(false), write_index(false),
-				max_layer(0) {
+				ortho_count(_ortho_count), ortho_factor(0.5f), ortho_bias(0.0f),
+				prune_overflow(_prune_overflow), use_compression(_use_compression),
+				use_largest_direction_filtering(false), index_filename(""),
+				read_index(false), write_index(false), max_layer(0) {
 		constructor_helper();
 	}
 	antitopo_engine(antitopo_engine_config conf)
