@@ -19,7 +19,7 @@ PYBIND11_MODULE(expann_py, m) {
 			.def("normalize", &vec<float>::normalize);
 
 	py::class_<antitopo_engine<float>>(m, "AntitopoEngine")
-			.def(py::init<size_t, size_t, size_t, float, float, size_t>())
+			.def(py::init<size_t, size_t, size_t, size_t, bool>())
 			.def("name", &antitopo_engine<float>::name)
 			.def("param_list", &antitopo_engine<float>::param_list)
 			.def("store_vector", &antitopo_engine<float>::store_vector)

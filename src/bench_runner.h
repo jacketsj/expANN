@@ -11,9 +11,6 @@
 #include "antitopo_engine.h"
 #include "dataset.h"
 #include "dataset_loader.h"
-#include "hnsw_engine_reference.h"
-#include "line_pruning_exact_engine.h"
-#include "par_antitopo_engine.h"
 
 template <typename Engine, typename EngineConfig> struct job {
 	EngineConfig conf;
@@ -131,22 +128,12 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 
 	size_t job_index = 0;
 
-	JobTuple<hnsw_engine_reference<float>, antitopo_engine<float>,
-					 line_pruning_exact_engine<float>, par_antitopo_engine>
-			job_lists;
+	JobTuple<antitopo_engine<float>> job_lists;
 
 	for (size_t k = 60; k <= 60; k += 15) {
 		for (size_t num_for_1nn : {1, 2, 3, 4, 5, 6}) {				// 5
 			for (size_t edge_count_search_factor : {500 / k}) { // 3
 				for (bool use_compression : {false, true}) {
-					for (size_t build_threads : {14}) {
-						for (bool use_mips : {false}) {
-							if (false) {
-								ADD_JOB(par_antitopo_engine, k, k * edge_count_search_factor,
-												build_threads, num_for_1nn, use_mips);
-							}
-						}
-					}
 					for (bool use_largest_direction_filtering : {false}) {
 						for (size_t ortho_count : {1}) { // 1,3,5
 							for (float ortho_factor :
@@ -157,8 +144,7 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 										 ortho_count == 1
 												 ? std::vector({0.0f})
 												 : std::vector({0.0f})) { //,1.0f, 1000000000.0f})) {
-									for (size_t prune_overflow :
-											 {0, 1}) { //, 1, 2, 4}) { // 0,1,3
+									for (size_t prune_overflow : {0, 1}) { //, 1, 2, 4}) {
 										if (true) {
 											std::string filename = "index/sift";
 											filename += "_k" + std::to_string(k);
@@ -179,25 +165,6 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 								}
 							}
 						}
-						if (false) {
-							// for (size_t brute_force_size : {64, 128})
-							// for (size_t line_count : {128}) {
-							/*
-							ADD_JOB(line_pruning_exact_engine<float>, brute_force_size,
-											line_count,
-											antitopo_engine_config(
-													k, 2 * k, num_for_1nn,
-													k * edge_count_search_factor, use_compression,
-													use_largest_direction_filtering));
-													*/
-							//}
-						}
-					}
-				}
-				if (false) {
-					for (bool use_ecuts : {true, false}) {
-						ADD_JOB(hnsw_engine_reference<float>, k,
-										edge_count_search_factor * k, num_for_1nn, use_ecuts);
 					}
 				}
 			}

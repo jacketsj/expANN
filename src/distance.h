@@ -1,8 +1,10 @@
-// External
-#include <immintrin.h>
+#pragma once
+
 #include <math.h>
 
 #include <Eigen/Dense>
+
+#include <immintrin.h>
 
 inline __m256i load_128bit_to_256bit(const __m128i* ptr) {
 	__m128i value128 = _mm_loadu_si128(ptr);

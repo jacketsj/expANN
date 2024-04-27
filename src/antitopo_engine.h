@@ -15,7 +15,8 @@
 #include <vector>
 
 #include "ann_engine.h"
-#include "product_quantizer.h"
+// #include "product_quantizer.h"
+#include "distance.h"
 #include "quantizer.h"
 #include "robin_hood.h"
 #include "topk_t.h"
@@ -46,7 +47,7 @@ auto dist2_compressed(const A& a, const B& b) {
 	__m512i sum_squared_diff = _mm512_setzero_si512();
 	__m512i mask = _mm512_set1_epi32(0xff);
 	std::vector<uint8_t> b_in_order;
-	for (size_t i = 0; i < a.size(); i += 64) {
+	for (size_t i = 0; i < size_t(a.size()); i += 64) {
 		__m512i cur_b = _mm512_loadu_si512((__m512i*)&b_chunked[i / 4]);
 		// a.data()[i...(i+63)] contains 16 32-bit integers (64 bytes total=512bit)
 		for (size_t j = 0; j < 64; j += 16) {
@@ -202,15 +203,13 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 		}
 	}
 	antitopo_engine(size_t _M, size_t _ef_construction, size_t _ortho_count,
-									float _ortho_factor, float _ortho_bias,
-									size_t _prune_overflow)
+									size_t _prune_overflow, bool _use_compression)
 			: rd(), gen(0), distribution(0, 1), M(_M), M0(2 * _M), ef_search_mult(1),
 				ef_search(std::nullopt), ef_construction(_ef_construction),
-				ortho_count(_ortho_count), ortho_factor(_ortho_factor),
-				ortho_bias(_ortho_bias), prune_overflow(_prune_overflow),
-				use_compression(false), use_largest_direction_filtering(false),
-				index_filename(""), read_index(false), write_index(false),
-				max_layer(0) {
+				ortho_count(_ortho_count), ortho_factor(0.5f), ortho_bias(0.0f),
+				prune_overflow(_prune_overflow), use_compression(_use_compression),
+				use_largest_direction_filtering(false), index_filename(""),
+				read_index(false), write_index(false), max_layer(0) {
 		constructor_helper();
 	}
 	antitopo_engine(antitopo_engine_config conf)
@@ -582,7 +581,9 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		size_t k, const std::vector<size_t>& ortho_points) {
 	using measured_data = std::pair<T, size_t>;
 	const auto& q = q0.internal;
+#ifndef DIM
 	size_t dimension = q.size();
+#endif
 
 	auto get_vertex = [&](const size_t& index) constexpr -> std::vector<size_t>& {
 		if constexpr (use_bottomlayer) {
@@ -657,6 +658,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		visited_recent.emplace_back(entry_point);
 	}
 	std::vector<measured_data> candidates_backup;
+	/*
 	auto clean_candidates = [&]() constexpr {
 		return;
 		candidates_backup.resize(k);
@@ -673,6 +675,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 			candidates_backup.clear();
 		}
 	};
+	*/
 
 	std::vector<size_t> neighbour_list, neighbour_list_unfiltered,
 			neighbour_list_unfiltered_offsets;

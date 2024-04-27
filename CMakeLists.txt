@@ -81,25 +81,75 @@ find_package(nlohmann_json)
 
 add_subdirectory(eigen)
 
-include_directories(MopBucket/src/rough)
-
-file(GLOB SOURCES ${SRC}/main.cpp MopBucket/src/rough/*.cpp)
+file(GLOB SOURCES ${SRC}/main.cpp)
 
 add_executable(expann ${SOURCES})
+target_compile_definitions(expann PRIVATE DIM=128)
 
 find_package(PythonLibs REQUIRED)
-include_directories(${PYTHON_INCLUDE_DIRS} mmap_allocator)
+include_directories(${PYTHON_INCLUDE_DIRS})
 
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)# mopbucket)
+target_link_libraries(expann PUBLIC ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
 
 # Pybinds
 add_subdirectory(pybind11)
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 file(GLOB SOURCES ${SRC}/pyrunner.cpp)
+
+# Significant speedups are obtained by choosing the dimension at compile-time (seemingly due to a dumb optimizer, rather than because of additional possible compile-time optimizations)
+# Only allowable dimensionalities are multiples of 64 (required by scalar quantization method used)
 pybind11_add_module(expann_py MODULE src/pyrunner.cpp)
 target_link_libraries(expann_py PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
 set_target_properties(expann_py PROPERTIES
+                                INTERPROCEDURAL_OPTIMIZATION ON
+                                CXX_VISIBILITY_PRESET default
+                                VISIBILITY_INLINES_HIDDEN ON)
+
+pybind11_add_module(expann_py_128 MODULE src/pyrunner.cpp)
+target_compile_definitions(expann_py_128 PRIVATE DIM=128)
+target_link_libraries(expann_py_128 PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
+set_target_properties(expann_py_128 PROPERTIES
+                                INTERPROCEDURAL_OPTIMIZATION ON
+                                CXX_VISIBILITY_PRESET default
+                                VISIBILITY_INLINES_HIDDEN ON)
+
+pybind11_add_module(expann_py_256 MODULE src/pyrunner.cpp)
+target_compile_definitions(expann_py_256 PRIVATE DIM=128)
+target_link_libraries(expann_py_256 PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
+set_target_properties(expann_py_256 PROPERTIES
+                                INTERPROCEDURAL_OPTIMIZATION ON
+                                CXX_VISIBILITY_PRESET default
+                                VISIBILITY_INLINES_HIDDEN ON)
+
+pybind11_add_module(expann_py_768 MODULE src/pyrunner.cpp)
+target_compile_definitions(expann_py_768 PRIVATE DIM=128)
+target_link_libraries(expann_py_768 PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
+set_target_properties(expann_py_768 PROPERTIES
+                                INTERPROCEDURAL_OPTIMIZATION ON
+                                CXX_VISIBILITY_PRESET default
+                                VISIBILITY_INLINES_HIDDEN ON)
+
+pybind11_add_module(expann_py_832 MODULE src/pyrunner.cpp)
+target_compile_definitions(expann_py_832 PRIVATE DIM=128)
+target_link_libraries(expann_py_832 PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
+set_target_properties(expann_py_832 PROPERTIES
+                                INTERPROCEDURAL_OPTIMIZATION ON
+                                CXX_VISIBILITY_PRESET default
+                                VISIBILITY_INLINES_HIDDEN ON)
+
+pybind11_add_module(expann_py_64 MODULE src/pyrunner.cpp)
+target_compile_definitions(expann_py_64 PRIVATE DIM=128)
+target_link_libraries(expann_py_64 PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
+set_target_properties(expann_py_64 PROPERTIES
+                                INTERPROCEDURAL_OPTIMIZATION ON
+                                CXX_VISIBILITY_PRESET default
+                                VISIBILITY_INLINES_HIDDEN ON)
+
+pybind11_add_module(expann_py_1024 MODULE src/pyrunner.cpp)
+target_compile_definitions(expann_py_1024 PRIVATE DIM=128)
+target_link_libraries(expann_py_1024 PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
+set_target_properties(expann_py_1024 PROPERTIES
                                 INTERPROCEDURAL_OPTIMIZATION ON
                                 CXX_VISIBILITY_PRESET default
                                 VISIBILITY_INLINES_HIDDEN ON)
