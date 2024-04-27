@@ -86,7 +86,7 @@ public:
 	virtual ~quantized_scorer_simple() {}
 
 public:
-	virtual float score(size_t index) override {
+	virtual float score(size_t index) override final {
 		if constexpr (std::is_same_v<T, float>) {
 			return (query - stored.at(index)).squaredNorm();
 		} else {
@@ -94,7 +94,24 @@ public:
 			return 0;
 		}
 	}
-	virtual void prefetch(size_t index) override {
+	virtual void prefetch(size_t index) override final {
+#ifdef DIM
+		for (size_t mult = 0; mult < DIM * sizeof(float) / 64; ++mult)
+			_mm_prefetch(((char*)&stored[index]) + mult * 64, _MM_HINT_T0);
+#else
+		for (size_t mult = 0; mult < dimension * sizeof(float) / 64; ++mult)
+			_mm_prefetch(((char*)&stored[index]) + mult * 64, _MM_HINT_T0);
+#endif
+	}
+	inline float score_simple(size_t index) {
+		if constexpr (std::is_same_v<T, float>) {
+			return (query - stored.at(index)).squaredNorm();
+		} else {
+			// TODO
+			return 0;
+		}
+	}
+	inline void prefetch_simple(size_t index) {
 #ifdef DIM
 		for (size_t mult = 0; mult < DIM * sizeof(float) / 64; ++mult)
 			_mm_prefetch(((char*)&stored[index]) + mult * 64, _MM_HINT_T0);
@@ -106,9 +123,9 @@ public:
 };
 
 template <typename T> class quantizer_simple : public quantizer {
+public:
 	std::vector<typename vec<T>::Underlying> stored;
 
-public:
 	quantizer_simple() = default;
 	virtual ~quantizer_simple() = default;
 
@@ -125,6 +142,10 @@ public:
 	virtual std::unique_ptr<quantized_scorer>
 	generate_scorer(const vec<float>::Underlying& query) override {
 		return std::make_unique<quantized_scorer_simple<T>>(query, stored);
+	}
+	quantized_scorer_simple<T>
+	generate_scorer_stack(const vec<float>::Underlying& query) {
+		return quantized_scorer_simple<T>(query, stored);
 	}
 };
 

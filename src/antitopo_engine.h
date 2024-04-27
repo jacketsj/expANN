@@ -31,6 +31,87 @@ template <typename A, typename B> auto dist2(const A& a, const B& b) {
 	return (a - b).squaredNorm();
 #endif
 }
+// template <typename Au, typename A, typename B>
+// auto dist2_compressed(const Au& a_unswizzled, const A& a, const B& b) {
+template <typename A, typename B>
+auto dist2_compressed(const A& a, const B& b) {
+	// b is uint8_t eigenvec
+	// turbo lvq method:
+	// Eigen::Map<const Eigen::VectorX<uint64_t>> b_chunked(
+	//		reinterpret_cast<const uint64_t*>(b.data()), b.size());
+	// auto masked_chunks = b_chunked.array() & uint64_t(0xff);
+	//  auto shifted_b = b.array() >> 8;
+	auto b_chunked = reinterpret_cast<const uint32_t*>(b.data());
+	// take 16 chunks at a time (512 bits, 4 dims per chunk, swizzled), 64 dims
+	__m512i sum_squared_diff = _mm512_setzero_si512();
+	__m512i mask = _mm512_set1_epi32(0xff);
+	std::vector<uint8_t> b_in_order;
+	for (size_t i = 0; i < a.size(); i += 64) {
+		__m512i cur_b = _mm512_loadu_si512((__m512i*)&b_chunked[i / 4]);
+		// a.data()[i...(i+63)] contains 16 32-bit integers (64 bytes total=512bit)
+		for (size_t j = 0; j < 64; j += 16) {
+			// handle 16 32-bit integers at a time from a.data()
+			__m512i cur_a = _mm512_loadu_si512((__m512i*)&a.data()[i + j]);
+			__m512i cur_b_masked = _mm512_and_si512(cur_b, mask);
+			__m512i diff = _mm512_sub_epi32(cur_a, cur_b_masked);
+			__m512i sqr_diff = _mm512_mullo_epi32(diff, diff);
+			sum_squared_diff = _mm512_add_epi32(sum_squared_diff, sqr_diff);
+			cur_b = _mm512_srli_epi32(cur_b, 8);
+		}
+	}
+	/*
+	{
+		uint32_t res = 0;
+		std::cout << "b_manual_order=\n";
+		for (size_t i = 0; i < a.size(); i += 64) {
+			std::vector<uint32_t> cur_b(16);
+			for (size_t k = 0; k < 16; ++k)
+				cur_b[k] = b_chunked[k];
+			// a.data()[i...(i+63)] contains 16 32-bit integers (64 bytes
+			// total=512bit)
+			for (size_t j = 0; j < 64; j += 16) {
+				std::vector<uint32_t> cur_a(16);
+				for (size_t k = 0; k < 16; ++k)
+					cur_a[k] = a[i + j + k];
+				std::vector<uint32_t> cur_b_masked(cur_b);
+				for (auto& to_mask : cur_b_masked) {
+					to_mask &= 0xff;
+					std::cout << to_mask << '\t';
+				}
+				for (size_t k = 0; k < 16; ++k) {
+					auto diff = (cur_a[k] - cur_b_masked[k]);
+					res += diff * diff;
+				}
+				for (auto& to_shift : cur_b)
+					to_shift >>= 8;
+			}
+			std::cout << '\n';
+		}
+		std::cout << "manual order res=" << res << std::endl;
+	}
+	auto ret = _mm512_reduce_add_epi32(sum_squared_diff);
+	auto ret1 = (a_unswizzled - b.template cast<float>()).squaredNorm();
+	if (ret - ret1 > 1e-1) {
+		std::cout << "a=\n" << a.transpose() << std::endl;
+		std::cout << "a_unswizzled=\n" << a_unswizzled.transpose() << std::endl;
+		std::cout << "b=\n" << b.transpose() << std::endl;
+		std::cout << "a_unswizzled.reshaped=\n"
+							<< a_unswizzled.reshaped(64, 2).transpose() << std::endl;
+		std::cout << "b.reshaped=\n" << b.reshaped(64, 2).transpose() << std::endl;
+		std::cout << "a.reshaped=\n"
+							<< a.reshaped(16, 128 / 16).transpose() << std::endl;
+		std::cout << "b_chunked size="
+							<< b.size() * sizeof(uint8_t) / sizeof(uint32_t) << std::endl;
+		std::cout << "ret_compressed=" << ret << std::endl;
+		std::cout << "ret_uncompressed=" << ret1 << std::endl;
+		throw std::runtime_error(
+				"Mismatch between compressed and uncomrpessed distance");
+	}
+	*/
+	return _mm512_reduce_add_epi32(sum_squared_diff);
+
+	// return (a - b.template cast<float>()).squaredNorm();
+}
 } // namespace
 
 struct antitopo_engine_query_config {
@@ -99,8 +180,9 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	size_t num_distcomps_compressed = 0;
 #endif
 	void constructor_helper() {
+		quant = &quant_impl;
 		// quant = std::make_unique<product_quantizer>();
-		quant = std::make_unique<quantizer_simple<float>>();
+		// quant = std::make_unique<quantizer_simple<float>>();
 		std::filesystem::path directory =
 				std::filesystem::path(index_filename).parent_path();
 		if (!std::filesystem::exists(directory)) {
@@ -149,7 +231,10 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	void deserialize(std::istream& in);
 	void set_ef_search(size_t _ef_search) { ef_search = _ef_search; }
 	std::vector<fvec> all_entries;
-	std::unique_ptr<quantizer> quant;
+	using compressed_t = uint8_t;
+	quantizer_simple<compressed_t> quant_impl;
+	// std::unique_ptr<quantizer> quant;
+	quantizer* quant;
 	std::vector<std::vector<std::vector<size_t>>>
 			hadj_flat; // vector -> layer -> edges
 	std::vector<std::vector<size_t>>
@@ -185,6 +270,10 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	query_k_at_layer(const vec<T>& q, size_t layer,
 									 const std::vector<size_t>& entry_points, size_t k,
 									 const std::vector<size_t>& ortho_points);
+	std::vector<std::pair<T, size_t>>
+	query_k_bottom_compressed(const vec<T>& q,
+														const std::vector<size_t>& entry_points, size_t k);
+
 	std::vector<size_t> _query_k(const vec<T>& v, size_t k);
 	std::vector<std::pair<T, size_t>> query_k_combined(const vec<T>& v, size_t k);
 	const std::string _name() { return "Anti-Topo Engine+"; }
@@ -613,6 +702,55 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 			}
 			++neighbour_index;
 		}
+		/*
+		if (use_compressed && !live_reranking) {
+			if constexpr (use_compressed) {
+				constexpr size_t in_advance = 4;
+				constexpr size_t in_advance_extra = 2;
+				auto do_loop_prefetch = [&](size_t i) constexpr {
+					scorer->prefetch(i);
+				};
+				for (size_t next_i_pre = 0;
+						 next_i_pre <
+						 std::min(in_advance, neighbour_list_unfiltered.size());
+						 ++next_i_pre) {
+					do_loop_prefetch(next_i_pre);
+				}
+				auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
+														 size_t next_i) constexpr {
+					if constexpr (inAdvanceIterExtra) {
+						_mm_prefetch(&neighbour_list_unfiltered[next_i + in_advance +
+																										in_advance_extra],
+												 _MM_HINT_T0);
+					}
+					if constexpr (inAdvanceIter) {
+						do_loop_prefetch(next_i + in_advance);
+					}
+					const auto& next = neighbour_list_unfiltered[next_i];
+					float d_next = score(next);
+					if (nearest.size() < k || d_next < nearest.top().first) {
+						candidates.emplace(d_next, next);
+						nearest.emplace(d_next, next);
+						if (nearest.size() > k)
+							nearest.pop();
+					}
+				};
+				size_t next_i = 0;
+				for (; next_i + in_advance + in_advance_extra <
+							 neighbour_list_unfiltered.size();
+						 ++next_i) {
+					loop_iter.template operator()<true, true>(next_i);
+				}
+				for (; next_i + in_advance < neighbour_list_unfiltered.size();
+						 ++next_i) {
+					loop_iter.template operator()<true, false>(next_i);
+				}
+				for (; next_i < neighbour_list_unfiltered.size(); ++next_i) {
+					loop_iter.template operator()<false, false>(next_i);
+				}
+			}
+		} else
+			*/
 		if constexpr (use_compressed) {
 			// if (nearest_big.size() < big_factor * k) {
 			if (live_reranking && nearest_big.size() < big_factor * k) {
@@ -637,7 +775,18 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 																neighbour_list, distances, cutoff);
 			}
 		}
-		{
+		if (use_compressed && !live_reranking) {
+			for (size_t i = 0; i < neighbour_list.size(); ++i) {
+				const size_t& next = neighbour_list[i];
+				T d_next = distances[i];
+				if (nearest.size() < k || d_next < nearest.top().first) {
+					candidates.emplace(d_next, next);
+					nearest.emplace(d_next, next);
+					if (nearest.size() > k)
+						nearest.pop();
+				}
+			}
+		} else if constexpr (!use_compressed) {
 			constexpr size_t in_advance = 4;
 			constexpr size_t in_advance_extra = 2;
 			auto do_loop_prefetch = [&](size_t i) constexpr {
@@ -666,18 +815,18 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 					do_loop_prefetch(next_i + in_advance);
 				}
 				const auto& next = neighbour_list[next_i];
-				T d_next = 0; // = score(next);
-				if (use_compressed && !live_reranking) {
-					d_next = distances[next_i];
-					// std::cout << "d_next=" << d_next << ",";
-					// T compressed_dist = 0;
-					// if (distances.size() > next_i)
-					// compressed_dist = distances[next_i];
-					// std::cout << "d_next(compressed)=" << compressed_dist << std::endl;
-					//  d_next = compressed_dist;
-				} else {
-					d_next = score(next);
-				}
+				T d_next = score(next);
+				// if (use_compressed && !live_reranking) {
+				// d_next = distances[next_i];
+				//  std::cout << "d_next=" << d_next << ",";
+				//  T compressed_dist = 0;
+				//  if (distances.size() > next_i)
+				//  compressed_dist = distances[next_i];
+				//  std::cout << "d_next(compressed)=" << compressed_dist << std::endl;
+				//   d_next = compressed_dist;
+				//} else {
+				// d_next = score(next);
+				//}
 				if (nearest.size() < k || d_next < nearest.top().first) {
 					candidates.emplace(d_next, next);
 					nearest.emplace(d_next, next);
@@ -720,6 +869,156 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		}
 	}
 	*/
+	reverse(ret.begin(), ret.end());
+	return ret;
+}
+
+template <typename T>
+std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_bottom_compressed(
+		const vec<T>& q0, const std::vector<size_t>& entry_points, size_t k) {
+	using measured_data = std::pair<T, size_t>;
+	const auto& q = q0.internal;
+#ifndef DIM
+	size_t dimension = q.size();
+#endif
+
+	auto get_vertex = [&](const size_t& index) constexpr -> std::vector<size_t>& {
+		return hadj_bottom[index];
+	};
+	auto entries_array = quant_impl.stored.data();
+	auto get_data = [&](const size_t& data_index) constexpr -> auto& {
+		// return all_entries[data_index];
+		return entries_array[data_index];
+	};
+	Eigen::VectorX<uint32_t> q_swizzled(q.size()); // = q;
+	// TODO this currently assumes q.size() % 128==0
+	// perform swizzle on input vector, instead of like how svs-turbo does it (on
+	// saved data)
+	for (size_t i = 0; i < size_t(q.size()); i += 64) {
+		for (size_t j = 0; j < 4; ++j) {
+			for (size_t k = 0; k < 16; ++k) {
+				// q_swiz=q[3],q[7],q[11],...,q[63]
+				q_swizzled[i + j * 16 + k] = uint32_t(q[i + k * 4 + j]);
+			}
+		}
+	}
+	auto score = [&](size_t data_index) constexpr {
+#ifdef RECORD_STATS
+		++num_distcomps;
+#endif
+		// return dist2(q, get_data(data_index));
+		// return dist2_compressed(q, get_data(data_index));
+		// return dist2_compressed(q, q_swizzled, get_data(data_index));
+		return dist2_compressed(q_swizzled, get_data(data_index));
+	};
+
+	auto worst_elem = [](const measured_data& a, const measured_data& b) {
+		return a.first < b.first;
+	};
+	auto best_elem = [](const measured_data& a, const measured_data& b) {
+		return a.first > b.first;
+	};
+	std::vector<measured_data> entry_points_with_dist;
+	for (auto& entry_point : entry_points) {
+		entry_points_with_dist.emplace_back(score(entry_point), entry_point);
+	}
+
+	std::priority_queue<measured_data, std::vector<measured_data>,
+											decltype(best_elem)>
+			candidates(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+								 best_elem);
+	std::priority_queue<measured_data, std::vector<measured_data>,
+											decltype(worst_elem)>
+			nearest(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+							worst_elem);
+	while (nearest.size() > k)
+		nearest.pop();
+
+	for (auto& entry_point : entry_points) {
+		visited[entry_point] = true;
+		visited_recent.emplace_back(entry_point);
+	}
+
+	std::vector<size_t> neighbour_list;
+	while (!candidates.empty()) {
+		auto cur = candidates.top();
+		candidates.pop();
+		if (cur.first > nearest.top().first && nearest.size() == k) {
+			break;
+		}
+		neighbour_list.clear();
+		for (size_t neighbour : get_vertex(cur.second)) {
+			if (!visited[neighbour]) {
+				neighbour_list.emplace_back(neighbour);
+				visited[neighbour] = true;
+				visited_recent.emplace_back(neighbour);
+			}
+		}
+		constexpr size_t in_advance = 4;
+		constexpr size_t in_advance_extra = 2;
+		auto do_loop_prefetch = [&](size_t i) constexpr {
+#ifdef DIM
+			for (size_t mult = 0; mult < DIM * sizeof(compressed_t) / 64; ++mult)
+				_mm_prefetch(((char*)&get_data(neighbour_list[i])) + mult * 64,
+										 _MM_HINT_T0);
+#else
+			for (size_t mult = 0; mult < dimension * sizeof(compressed_t) / 64;
+					 ++mult)
+				_mm_prefetch(((char*)&get_data(neighbour_list[i])) + mult * 64,
+										 _MM_HINT_T0);
+#endif
+			// scorer_ref.prefetch_simple(i);
+		};
+		for (size_t next_i_pre = 0;
+				 next_i_pre < std::min(in_advance, neighbour_list.size());
+				 ++next_i_pre) {
+			do_loop_prefetch(next_i_pre);
+		}
+		auto loop_iter = [&]<bool inAdvanceIter, bool inAdvanceIterExtra>(
+												 size_t next_i) constexpr {
+			if constexpr (inAdvanceIterExtra) {
+				_mm_prefetch(&neighbour_list[next_i + in_advance + in_advance_extra],
+										 _MM_HINT_T0);
+			}
+			if constexpr (inAdvanceIter) {
+				do_loop_prefetch(next_i + in_advance);
+			}
+			const auto& next = neighbour_list[next_i];
+			// T d_next = scorer_ref.score_simple(next);
+			T d_next = score(next);
+			if (nearest.size() < k || d_next < nearest.top().first) {
+				candidates.emplace(d_next, next);
+				nearest.emplace(d_next, next);
+				if (nearest.size() > k)
+					nearest.pop();
+			}
+		};
+		size_t next_i = 0;
+		for (; next_i + in_advance + in_advance_extra < neighbour_list.size();
+				 ++next_i) {
+			loop_iter.template operator()<true, true>(next_i);
+		}
+		for (; next_i + in_advance < neighbour_list.size(); ++next_i) {
+			loop_iter.template operator()<true, false>(next_i);
+		}
+		for (; next_i < neighbour_list.size(); ++next_i) {
+			loop_iter.template operator()<false, false>(next_i);
+		}
+	}
+	for (auto& v : visited_recent)
+		visited[v] = false;
+	visited_recent.clear();
+	std::vector<measured_data> ret;
+	std::sort(ret.begin(), ret.end());
+	while (!nearest.empty()) {
+		ret.emplace_back(nearest.top());
+		nearest.pop();
+	}
+	// final rerank
+	for (auto& [d, data_index] : ret) {
+		// d = score(data_index);
+		d = dist2(all_entries[data_index], q);
+	}
 	reverse(ret.begin(), ret.end());
 	return ret;
 }
@@ -774,8 +1073,10 @@ std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
 
 	std::vector<std::pair<T, size_t>> ret_combined;
 	if (use_compression) {
-		ret_combined = query_k_at_layer<true, true, false>(q0, 0, entry_points,
-																											 ef_search.value(), {});
+		// ret_combined = query_k_at_layer<true, true, false>(q0, 0, entry_points,
+		//																									 ef_search.value(), {});
+		ret_combined =
+				query_k_bottom_compressed(q0, entry_points, ef_search.value());
 	} else {
 		ret_combined = query_k_at_layer<true, false, false>(q0, 0, entry_points,
 																												ef_search.value(), {});
