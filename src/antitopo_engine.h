@@ -551,8 +551,8 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		nearest.pop();
 	std::priority_queue<measured_data, std::vector<measured_data>,
 											decltype(worst_elem)>
-			nearest_big(worst_elem); //(entry_points_with_dist.begin(),
-															 // entry_points_with_dist.end(), worst_elem);
+			nearest_big(entry_points_with_dist.begin(), entry_points_with_dist.end(),
+									worst_elem);
 	size_t big_factor = 1;
 	if constexpr (use_compressed) {
 		while (nearest_big.size() > big_factor * k)
@@ -584,7 +584,9 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 	std::vector<size_t> neighbour_list, neighbour_list_unfiltered,
 			neighbour_list_unfiltered_offsets;
 	std::vector<T> distances;
+	size_t iter = 0;
 	while (!candidates.empty()) {
+		++iter;
 		auto cur = candidates.top();
 		candidates.pop();
 		if (cur.first > nearest.top().first && nearest.size() == k) {
@@ -609,6 +611,11 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		}
 		if constexpr (use_compressed) {
 			if (nearest_big.size() < big_factor * k) {
+				std::cout << "Skipping compressed computations, nearest_big.size()="
+									<< nearest_big.size() << "(nearest.size()=" << nearest.size()
+									<< "/k=" << k << "),";
+				std::cout << "big_factor=" << big_factor << ",iter=" << iter
+									<< std::endl;
 				neighbour_list = neighbour_list_unfiltered;
 			} else {
 				float cutoff = nearest_big.top().first;
@@ -657,8 +664,8 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 					T compressed_dist = 0;
 					if (distances.size() > next_i)
 						compressed_dist = distances[next_i];
-					std::cout << "d_next(compressed)=" << 0 << std::endl;
-					d_next = compressed_dist;
+					std::cout << "d_next(compressed)=" << compressed_dist << std::endl;
+					// d_next = compressed_dist;
 				}
 				if (nearest.size() < k || d_next < nearest.top().first) {
 					candidates.emplace(d_next, next);

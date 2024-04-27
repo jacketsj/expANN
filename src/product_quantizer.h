@@ -16,7 +16,8 @@ class product_quantizer_scorer : public quantized_scorer {
 
 	const std::vector<std::vector<codes_t>>& codes;
 
-	using centroids_t = Eigen::Matrix<float, NUM_CENTROIDS, Eigen::Dynamic>;
+	using centroids_t =
+			Eigen::Matrix<float, NUM_CENTROIDS, Eigen::Dynamic, Eigen::RowMajor>;
 	const std::vector<centroids_t>& sub_centroids_compact;
 	// const std::vector<std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>,
 	//														 NUM_SUBSPACES>>& sub_centroids;
@@ -39,7 +40,7 @@ public:
 															 float cutoff) override {
 		size_t subspace_size = query.size() / NUM_SUBSPACES;
 		// Compute pq table
-		std::array<std::array<float, NUM_CENTROIDS>, NUM_SUBSPACES> distance_table;
+		std::array<std::array<float, NUM_SUBSPACES>, NUM_CENTROIDS> distance_table;
 		for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
 			Eigen::VectorXf subquery =
 					query.segment(cursubspace * subspace_size, subspace_size);
@@ -49,18 +50,42 @@ public:
 												.segment(cursubspace * subspace_size, subspace_size) -
 										subquery)
 											 .squaredNorm();
-				//(sub_centroids[cur_vert][cursubspace][curcentroid] - subquery)
-				distance_table[cursubspace][curcentroid] = res;
+				//(sub_centroids[cur_vert][cursubspace][curcentroid] -
+				// subquery).squaredNorm();
+				// distance_table[cursubspace][curcentroid] = res;
+				distance_table[curcentroid][cursubspace] = res;
 			}
 		}
+		/*
+		if (false) {
+			auto reshaped_query = query.reshaped(subspace_size, NUM_SUBSPACES);
+			Eigen::MatrixXf distance_table =
+					Eigen::MatrixXf::Zero(NUM_CENTROIDS, NUM_SUBSPACES);
+			for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid) {
+				// Extract each centroid's subspace data into a matrix of shape
+				// (NUM_SUBSPACES, subspace_size)
+				auto centroid_subspaces = sub_centroids_compact[cur_vert]
+																			.row(curcentroid)
+																			.reshaped(subspace_size, NUM_SUBSPACES);
+
+				// Compute the squared norm of the difference, summing over the columns
+				// of each subspace
+				distance_table.row(curcentroid) =
+						(centroid_subspaces.colwise() - reshaped_query)
+								.colwise()
+								.squaredNorm();
+			}
+			// distances_table[curcentorid][cursubspace]
+		}
+		*/
 		// Use pq table to compute distances for to_filter_offsets
 		for (size_t entry_index = 0; entry_index < to_filter_offsets.size();
 				 ++entry_index) {
 			float res = 0;
+			size_t entry_offset = to_filter_offsets[entry_index];
+			const auto& cur_codes = codes[cur_vert][entry_offset];
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
-				res += distance_table[cursubspace]
-														 [codes[cur_vert][to_filter_offsets[entry_index]]
-																	 [cursubspace]];
+				res += distance_table[cur_codes[cursubspace]][cursubspace];
 			}
 			if (res < cutoff) {
 				filtered_out.emplace_back(to_filter[entry_index]);
@@ -78,7 +103,8 @@ class product_quantizer : public quantizer {
 
 	using codes_t = std::array<uint8_t, NUM_SUBSPACES>;
 	std::vector<std::vector<codes_t>> codes;
-	using centroids_t = Eigen::Matrix<float, NUM_CENTROIDS, Eigen::Dynamic>;
+	using centroids_t =
+			Eigen::Matrix<float, NUM_CENTROIDS, Eigen::Dynamic, Eigen::RowMajor>;
 	std::vector<centroids_t> sub_centroids_compact;
 	// std::vector<
 	//		std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>, NUM_SUBSPACES>>
@@ -128,7 +154,6 @@ public:
 							cursubspace * subspace_size, subspace_size));
 				}
 			}
-			// sub dimension -> index(16) -> centroid for subdim
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
 				std::vector<Eigen::VectorXf> current_centroids;
 				std::vector<size_t> sub_labels;
@@ -139,6 +164,10 @@ public:
 						 ++curcentroid) {
 					if (subspace_size != size_t(current_centroids[curcentroid].size()))
 						throw std::runtime_error("Subdimension-size mismatch");
+					if (size_t(sub_centroids_compact[base].row(curcentroid).size()) !=
+							dimension) {
+						throw std::runtime_error("Dimensions were mixed up");
+					}
 					sub_centroids_compact[base]
 							.row(curcentroid)
 							.segment(cursubspace * subspace_size, subspace_size) =
