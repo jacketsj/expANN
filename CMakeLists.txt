@@ -29,6 +29,9 @@ option(ENABLE_GCOV "Enable gcov" OFF)
 option(ENABLE_PGO_GENERATE "Enable PGO - Profile generation phase" OFF)
 option(ENABLE_PGO_USE "Enable PGO - Use profile data" OFF)
 
+set(DIM 128 CACHE STRING "Dimension size")
+add_definitions(-DDIM=${DIM})
+
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -O3 ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Ofast -ftree-vectorize -ftree-vectorizer-verbose=0 ${OpenMP_CXX_FLAGS}")
 #set(CMAKE_CXX_FLAGS "-Wall -pthread -Ofast -ftree-vectorize ${OpenMP_CXX_FLAGS}")
@@ -81,9 +84,7 @@ find_package(nlohmann_json)
 
 add_subdirectory(eigen)
 
-include_directories(MopBucket/src/rough)
-
-file(GLOB SOURCES ${SRC}/main.cpp MopBucket/src/rough/*.cpp)
+file(GLOB SOURCES ${SRC}/main.cpp)
 
 add_executable(expann ${SOURCES})
 
@@ -91,7 +92,7 @@ find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS} mmap_allocator)
 
 #target_link_libraries(expann PUBLIC fmt::fmt)
-target_link_libraries(expann PUBLIC ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)# mopbucket)
+target_link_libraries(expann PUBLIC ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads eigen)
 
 # Pybinds
 add_subdirectory(pybind11)

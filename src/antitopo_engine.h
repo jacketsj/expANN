@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "ann_engine.h"
-#include "product_quantizer.h"
+// #include "product_quantizer.h"
 #include "quantizer.h"
 #include "robin_hood.h"
 #include "topk_t.h"
