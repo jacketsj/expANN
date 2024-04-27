@@ -81,6 +81,7 @@ public:
 	quantized_scorer_simple(const vec<float>::Underlying& _query,
 													const std::vector<vec<float>::Underlying>& _stored)
 			: query(_query), stored(_stored), dimension(_query.size()) {}
+	virtual ~quantized_scorer_simple() {}
 
 public:
 	virtual float score(size_t index) override {
