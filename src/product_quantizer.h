@@ -50,7 +50,9 @@ public:
 		// std::array<std::array<float, NUM_SUBSPACES>, NUM_CENTROIDS>
 		// distance_table;
 		Eigen::Matrix<float, NUM_CENTROIDS, NUM_SUBSPACES, Eigen::RowMajor>
-				distance_table;
+				distance_table =
+						Eigen::Matrix<float, NUM_CENTROIDS, NUM_SUBSPACES,
+													Eigen::RowMajor>::Zero(NUM_CENTROIDS, NUM_SUBSPACES);
 		if (false) {
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
 				Eigen::VectorXf subquery =
@@ -82,7 +84,7 @@ public:
 					distance_table(curcentroid, cursubspace) = res;
 				}
 			}
-		} else {
+		} else if (true) {
 			auto reshaped_query = query.reshaped(subspace_size, NUM_SUBSPACES);
 			for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid) {
 				// Extract each centroid's subspace data into a matrix of shape
@@ -100,23 +102,72 @@ public:
 				//(centroid_subspaces - reshaped_query).colwise().squaredNorm();
 			}
 			// distances_table[curcentorid][cursubspace]
+		} else {
+			// There's a bug in here
+			auto squared_diffs =
+					(sub_centroids_compact[cur_vert].rowwise() - query.transpose())
+							.array()
+							.square();
+			auto reshaped_squared_diffs =
+					squared_diffs.reshaped(subspace_size, NUM_SUBSPACES * NUM_CENTROIDS);
+			distance_table =
+					reshaped_squared_diffs
+							.colwise() // changing colwise to rowwise does not fix the bug
+							.sum()
+							.reshaped(NUM_CENTROIDS, NUM_SUBSPACES);
+
+			//.reshaped(subspace_size, NUM_SUBSPACES);
 		}
 		// Use pq table to compute distances for to_filter_offsets
-		for (size_t entry_index = 0; entry_index < to_filter_offsets.size();
-				 ++entry_index) {
-			float res = 0;
-			size_t entry_offset = to_filter_offsets[entry_index];
-			const auto& cur_codes = codes[cur_vert][entry_offset];
-			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
-				// res += distance_table[cur_codes[cursubspace]][cursubspace];
-				// res += distance_table(cur_codes[cursubspace], cursubspace);
-				res += distance_table(
-						(cur_codes >> (cursubspace * SUBSPACE_INDEX_SIZE)) & 0b1111,
-						cursubspace);
+		if (false) {
+			for (size_t entry_index = 0; entry_index < to_filter_offsets.size();
+					 ++entry_index) {
+				float res = 0;
+				size_t entry_offset = to_filter_offsets[entry_index];
+				const auto& cur_codes = codes[cur_vert][entry_offset];
+				for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES;
+						 ++cursubspace) {
+					// res += distance_table[cur_codes[cursubspace]][cursubspace];
+					// res += distance_table(cur_codes[cursubspace], cursubspace);
+					res += distance_table(
+							(cur_codes >> (cursubspace * SUBSPACE_INDEX_SIZE)) & 0b1111,
+							cursubspace);
+				}
+				if (res < cutoff) {
+					filtered_out.emplace_back(to_filter[entry_index]);
+					distances.emplace_back(res);
+				}
 			}
-			if (res < cutoff) {
-				filtered_out.emplace_back(to_filter[entry_index]);
-				distances.emplace_back(res);
+		} else {
+			Eigen::Matrix<float, NUM_CENTROIDS, NUM_SUBSPACES, Eigen::ColMajor>
+					distance_table_colmaj = distance_table;
+			// Eigen::VectorX<uint64_t> codes_table(to_filter_offsets.size());
+			Eigen::Matrix<uint8_t, Eigen::Dynamic, NUM_SUBSPACES> codes_table =
+					Eigen::Matrix<uint8_t, Eigen::Dynamic, NUM_SUBSPACES>::Zero(
+							to_filter_offsets.size(), NUM_SUBSPACES);
+			for (size_t entry_index = 0; entry_index < to_filter_offsets.size();
+					 ++entry_index) {
+				size_t entry_offset = to_filter_offsets[entry_index];
+				const auto& cur_codes = codes[cur_vert][entry_offset];
+				for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES;
+						 ++cursubspace) {
+					codes_table(entry_index, cursubspace) =
+							(cur_codes >> (cursubspace * SUBSPACE_INDEX_SIZE)) & 0b1111;
+				}
+			}
+			Eigen::VectorXf distance_vec =
+					Eigen::VectorXf::Zero(to_filter_offsets.size());
+			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
+				distance_vec += distance_table_colmaj.col(cursubspace)(
+						codes_table.col(cursubspace));
+			}
+			for (size_t entry_index = 0; entry_index < to_filter_offsets.size();
+					 ++entry_index) {
+				auto res = distance_vec[entry_index];
+				if (res < cutoff) {
+					filtered_out.emplace_back(to_filter[entry_index]);
+					distances.emplace_back(res);
+				}
 			}
 		}
 	}
