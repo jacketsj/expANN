@@ -19,18 +19,20 @@ class product_quantizer_scorer : public quantized_scorer {
 	using centroids_t =
 			Eigen::Matrix<float, NUM_CENTROIDS, Eigen::Dynamic, Eigen::RowMajor>;
 	const std::vector<centroids_t>& sub_centroids_compact;
-	const std::vector<std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>,
-															 NUM_SUBSPACES>>& sub_centroids;
+	// const std::vector<std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>,
+	//														 NUM_SUBSPACES>>& sub_centroids;
 
 public:
 	product_quantizer_scorer(
 			const fvec& _query, const std::vector<std::vector<codes_t>>& _codes,
-			const std::vector<centroids_t>& _sub_centroids_compact,
-			const std::vector<std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>,
-																	 NUM_SUBSPACES>>& _sub_centroids)
+			const std::vector<centroids_t>& _sub_centroids_compact)
+			//,const std::vector<std::array<std::array<Eigen::VectorXf,
+			// NUM_CENTROIDS>, 														 NUM_SUBSPACES>>&
+			// _sub_centroids)
 			: query(_query), codes(_codes),
-				sub_centroids_compact(_sub_centroids_compact),
-				sub_centroids(_sub_centroids) {}
+				sub_centroids_compact(_sub_centroids_compact)
+	//,sub_centroids(_sub_centroids)
+	{}
 	virtual ~product_quantizer_scorer() {}
 
 	virtual float score(size_t index) override { return 0; }
@@ -48,17 +50,17 @@ public:
 			Eigen::VectorXf subquery =
 					query.segment(cursubspace * subspace_size, subspace_size);
 			for (size_t curcentroid = 0; curcentroid < NUM_CENTROIDS; ++curcentroid) {
-				auto cur_sub_centroid_v1 =
-						sub_centroids[cur_vert][cursubspace][curcentroid];
-				auto cur_sub_centroid_v2 =
-						sub_centroids_compact[cur_vert]
-								.row(curcentroid)
-								.segment(cursubspace * subspace_size, subspace_size);
-				// std::cout << "cur_sub_centroid_v1=" <<
-				// cur_sub_centroid_v1.transpose()
+				// auto cur_sub_centroid_v1 =
+				//		sub_centroids[cur_vert][cursubspace][curcentroid];
+				// auto cur_sub_centroid_v2 =
+				//		sub_centroids_compact[cur_vert]
+				//				.row(curcentroid)
+				//				.segment(cursubspace * subspace_size, subspace_size);
+				//  std::cout << "cur_sub_centroid_v1=" <<
+				//  cur_sub_centroid_v1.transpose()
 				//					<< std::endl;
-				//  std::cout << "cur_sub_centroid_v2=" << cur_sub_centroid_v2 <<
-				//  std::endl;
+				//   std::cout << "cur_sub_centroid_v2=" << cur_sub_centroid_v2 <<
+				//   std::endl;
 				auto res = (sub_centroids_compact[cur_vert]
 												.row(curcentroid)
 												.segment(cursubspace * subspace_size, subspace_size)
@@ -122,9 +124,9 @@ class product_quantizer : public quantizer {
 	using centroids_t =
 			Eigen::Matrix<float, NUM_CENTROIDS, Eigen::Dynamic, Eigen::RowMajor>;
 	std::vector<centroids_t> sub_centroids_compact;
-	std::vector<
-			std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>, NUM_SUBSPACES>>
-			sub_centroids;
+	// std::vector<
+	//		std::array<std::array<Eigen::VectorXf, NUM_CENTROIDS>, NUM_SUBSPACES>>
+	//		sub_centroids;
 
 	Eigen::VectorXf pad(const fvec& input) {
 		size_t dimension = input.size();
@@ -148,7 +150,7 @@ public:
 		std::cout << "Initializing memory for centroids" << std::endl;
 		sub_centroids_compact = std::vector<centroids_t>(
 				unquantized.size(), centroids_t::Zero(NUM_CENTROIDS, dimension));
-		sub_centroids.resize(unquantized.size());
+		// sub_centroids.resize(unquantized.size());
 		codes.resize(unquantized.size());
 		for (size_t base = 0; base < unquantized.size(); ++base) {
 			codes[base].resize(adj[base].size());
@@ -189,8 +191,8 @@ public:
 							.row(curcentroid)
 							.segment(cursubspace * subspace_size, subspace_size) =
 							current_centroids[curcentroid];
-					sub_centroids[base][cursubspace][curcentroid] =
-							current_centroids[curcentroid];
+					// sub_centroids[base][cursubspace][curcentroid] =
+					//		current_centroids[curcentroid];
 				}
 				for (size_t neighbour = 0; neighbour < adj[base].size(); ++neighbour)
 					codes[base][neighbour][cursubspace] = uint8_t(sub_labels[neighbour]);
@@ -202,6 +204,6 @@ public:
 	generate_scorer(const fvec& query) override {
 		auto padded_query = pad(query);
 		return std::make_unique<product_quantizer_scorer>(
-				padded_query, codes, sub_centroids_compact, sub_centroids);
+				padded_query, codes, sub_centroids_compact); //, sub_centroids);
 	}
 };
