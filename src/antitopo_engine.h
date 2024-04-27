@@ -554,7 +554,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 											decltype(worst_elem)>
 			nearest_big(entry_points_with_dist.begin(), entry_points_with_dist.end(),
 									worst_elem);
-	bool live_reranking = true;
+	bool live_reranking = false;
 	size_t big_factor = 3;
 	if (!live_reranking)
 		big_factor = 1;

@@ -21,7 +21,7 @@ public:
 															 const std::vector<size_t>& to_filter,
 															 const std::vector<size_t>& _to_filter_offsets,
 															 std::vector<size_t>& filtered_out,
-															 std::vector<float>& _distances, float cutoff) {
+															 std::vector<float>& distances, float cutoff) {
 		constexpr size_t in_advance = 4;
 		constexpr size_t in_advance_extra = 2;
 		auto do_loop_prefetch = [&](size_t i) constexpr { prefetch(i); };
@@ -42,6 +42,7 @@ public:
 			float d_next = score(next);
 			if (d_next < cutoff) {
 				filtered_out.emplace_back(next);
+				distances.emplace_back(d_next);
 			}
 		};
 		size_t next_i = 0;
@@ -116,7 +117,7 @@ public:
 		stored.resize(unquantized.size());
 		for (size_t i = 0; i < unquantized.size(); ++i) {
 			stored[i] = typename vec<T>::Underlying(unquantized[i].size());
-			for (size_t j = 0; j < unquantized[i].size(); ++j)
+			for (size_t j = 0; j < size_t(unquantized[i].size()); ++j)
 				stored[i][j] = T(unquantized[i][j]);
 		}
 		// stored = unquantized;
