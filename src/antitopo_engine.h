@@ -553,7 +553,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 											decltype(worst_elem)>
 			nearest_big(entry_points_with_dist.begin(), entry_points_with_dist.end(),
 									worst_elem);
-	size_t big_factor = 1;
+	size_t big_factor = 3;
 	if constexpr (use_compressed) {
 		while (nearest_big.size() > big_factor * k)
 			nearest_big.pop();
@@ -611,11 +611,12 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		}
 		if constexpr (use_compressed) {
 			if (nearest_big.size() < big_factor * k) {
-				std::cout << "Skipping compressed computations, nearest_big.size()="
-									<< nearest_big.size() << "(nearest.size()=" << nearest.size()
-									<< "/k=" << k << "),";
-				std::cout << "big_factor=" << big_factor << ",iter=" << iter
-									<< std::endl;
+				// std::cout << "Skipping compressed computations, nearest_big.size()="
+				//					<< nearest_big.size() << "(nearest.size()=" <<
+				// nearest.size()
+				//					<< "/k=" << k << "),";
+				// std::cout << "big_factor=" << big_factor << ",iter=" << iter
+				//					<< std::endl;
 				neighbour_list = neighbour_list_unfiltered;
 			} else {
 				float cutoff = nearest_big.top().first;
@@ -660,12 +661,12 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 				const auto& next = neighbour_list[next_i];
 				T d_next = score(next);
 				if constexpr (use_compressed) {
-					std::cout << "d_next=" << d_next << ",";
-					T compressed_dist = 0;
-					if (distances.size() > next_i)
-						compressed_dist = distances[next_i];
-					std::cout << "d_next(compressed)=" << compressed_dist << std::endl;
-					// d_next = compressed_dist;
+					// std::cout << "d_next=" << d_next << ",";
+					// T compressed_dist = 0;
+					// if (distances.size() > next_i)
+					// compressed_dist = distances[next_i];
+					// std::cout << "d_next(compressed)=" << compressed_dist << std::endl;
+					//  d_next = compressed_dist;
 				}
 				if (nearest.size() < k || d_next < nearest.top().first) {
 					candidates.emplace(d_next, next);
