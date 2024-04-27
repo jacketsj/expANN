@@ -47,7 +47,7 @@ auto dist2_compressed(const A& a, const B& b) {
 	__m512i sum_squared_diff = _mm512_setzero_si512();
 	__m512i mask = _mm512_set1_epi32(0xff);
 	std::vector<uint8_t> b_in_order;
-	for (size_t i = 0; i < a.size(); i += 64) {
+	for (size_t i = 0; i < size_t(a.size()); i += 64) {
 		__m512i cur_b = _mm512_loadu_si512((__m512i*)&b_chunked[i / 4]);
 		// a.data()[i...(i+63)] contains 16 32-bit integers (64 bytes total=512bit)
 		for (size_t j = 0; j < 64; j += 16) {
@@ -581,7 +581,9 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		size_t k, const std::vector<size_t>& ortho_points) {
 	using measured_data = std::pair<T, size_t>;
 	const auto& q = q0.internal;
+#ifndef DIM
 	size_t dimension = q.size();
+#endif
 
 	auto get_vertex = [&](const size_t& index) constexpr -> std::vector<size_t>& {
 		if constexpr (use_bottomlayer) {
@@ -656,6 +658,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 		visited_recent.emplace_back(entry_point);
 	}
 	std::vector<measured_data> candidates_backup;
+	/*
 	auto clean_candidates = [&]() constexpr {
 		return;
 		candidates_backup.resize(k);
@@ -672,6 +675,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 			candidates_backup.clear();
 		}
 	};
+	*/
 
 	std::vector<size_t> neighbour_list, neighbour_list_unfiltered,
 			neighbour_list_unfiltered_offsets;

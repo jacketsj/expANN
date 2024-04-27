@@ -132,8 +132,8 @@ public:
 	virtual void build(const std::vector<vec<float>::Underlying>& unquantized,
 										 const std::vector<std::vector<size_t>>& _adj) override {
 		stored.resize(unquantized.size());
-		for (size_t i = 0; i < unquantized.size(); ++i) {
-			stored[i] = typename vec<T>::Underlying(unquantized[i].size());
+		for (size_t i = 0; i < size_t(unquantized.size()); ++i) {
+			stored[i] = vec<T>::Underlying::Zero(unquantized[i].size());
 			for (size_t j = 0; j < size_t(unquantized[i].size()); ++j)
 				stored[i][j] = T(unquantized[i][j]);
 		}

@@ -38,7 +38,7 @@ public:
 	vec() = default;
 	// vec(size_t dim) : internal(dim) {}
 	vec(const std::vector<T>& v) {
-		internal.resize(v.size());
+		internal = Underlying::Zero(v.size());
 		for (size_t i = 0; i < size_t(v.size()); ++i)
 			internal[i] = v[i];
 		// for (const auto& val : v)
@@ -174,7 +174,8 @@ public:
 	}
 	friend void from_json(const nlohmann::json& j, vec<T>& v) {
 		// v.internal = j.get<std::vector<T>>();
-		auto full_vector = j.get<std::vector<T>>();
+		std::vector<T> full_vector;
+		full_vector = j.get<std::vector<T>>();
 		v = vec<T>(full_vector);
 	}
 };
