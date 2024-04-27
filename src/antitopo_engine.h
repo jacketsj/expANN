@@ -184,21 +184,23 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 		quant = &quant_impl;
 		// quant = std::make_unique<product_quantizer>();
 		// quant = std::make_unique<quantizer_simple<float>>();
-		std::filesystem::path directory =
-				std::filesystem::path(index_filename).parent_path();
-		if (!std::filesystem::exists(directory)) {
-			std::filesystem::create_directories(directory);
-			std::printf("Directory %s created\n", directory.c_str());
-		}
-		if (read_index) {
-			if (std::filesystem::exists(index_filename)) {
-				std::printf("Index file %s exists, disabling write\n",
-										index_filename.c_str());
-				write_index = false;
-			} else {
-				std::printf("Index file %s does not exist, disabling read\n",
-										index_filename.c_str());
-				read_index = false;
+		if (read_index || write_index) {
+			std::filesystem::path directory =
+					std::filesystem::path(index_filename).parent_path();
+			if (!std::filesystem::exists(directory)) {
+				std::filesystem::create_directories(directory);
+				std::printf("Directory %s created\n", directory.c_str());
+			}
+			if (read_index) {
+				if (std::filesystem::exists(index_filename)) {
+					std::printf("Index file %s exists, disabling write\n",
+											index_filename.c_str());
+					write_index = false;
+				} else {
+					std::printf("Index file %s does not exist, disabling read\n",
+											index_filename.c_str());
+					read_index = false;
+				}
 			}
 		}
 	}
