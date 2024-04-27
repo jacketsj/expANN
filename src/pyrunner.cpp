@@ -6,8 +6,9 @@
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(expann_py, m) {
-	py::class_<vec<float>>(m, "Vec")
+namespace MODULE_NAME {
+PYBIND11_MODULE(MODULE_NAME, m) {
+	py::class_<vec<float>>(m, "Vec", py::module_local())
 			.def(py::init<>())
 			.def(py::init<const std::vector<float>&>())
 			.def("data",
@@ -18,7 +19,7 @@ PYBIND11_MODULE(expann_py, m) {
 			.def("size", &vec<float>::size)
 			.def("normalize", &vec<float>::normalize);
 
-	py::class_<antitopo_engine<float>>(m, "AntitopoEngine")
+	py::class_<antitopo_engine<float>>(m, "AntitopoEngine", py::module_local())
 			.def(py::init<size_t, size_t, size_t, size_t, bool>())
 			.def("name", &antitopo_engine<float>::name)
 			.def("param_list", &antitopo_engine<float>::param_list)
@@ -27,3 +28,4 @@ PYBIND11_MODULE(expann_py, m) {
 			.def("query_k", &antitopo_engine<float>::query_k)
 			.def("set_ef_search", &antitopo_engine<float>::set_ef_search);
 }
+} // namespace MODULE_NAME
