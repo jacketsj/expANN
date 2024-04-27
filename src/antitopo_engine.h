@@ -666,7 +666,7 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_at_layer(
 				}
 				const auto& next = neighbour_list[next_i];
 				T d_next = 0; // = score(next);
-				if (use_compressed && live_reranking) {
+				if (use_compressed && !live_reranking) {
 					d_next = distances[next_i];
 					// std::cout << "d_next=" << d_next << ",";
 					// T compressed_dist = 0;
