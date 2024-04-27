@@ -9,10 +9,12 @@ class product_quantizer_scorer : public quantized_scorer {
 	using fvec = vec<float>::Underlying;
 	fvec query;
 
+	static constexpr size_t SUBSPACE_INDEX_SIZE = 4;
 	static constexpr size_t NUM_SUBSPACES = 16;
 	static constexpr size_t NUM_CENTROIDS = 16;
 
-	using codes_t = std::array<uint8_t, NUM_SUBSPACES>;
+	// using codes_t = std::array<uint8_t, NUM_SUBSPACES>;
+	using codes_t = uint64_t;
 
 	const std::vector<std::vector<codes_t>>& codes;
 
@@ -107,7 +109,10 @@ public:
 			const auto& cur_codes = codes[cur_vert][entry_offset];
 			for (size_t cursubspace = 0; cursubspace < NUM_SUBSPACES; ++cursubspace) {
 				// res += distance_table[cur_codes[cursubspace]][cursubspace];
-				res += distance_table(cur_codes[cursubspace], cursubspace);
+				// res += distance_table(cur_codes[cursubspace], cursubspace);
+				res += distance_table(
+						(cur_codes >> (cursubspace * SUBSPACE_INDEX_SIZE)) & 0b1111,
+						cursubspace);
 			}
 			if (res < cutoff) {
 				filtered_out.emplace_back(to_filter[entry_index]);
@@ -120,10 +125,12 @@ public:
 class product_quantizer : public quantizer {
 	using fvec = vec<float>::Underlying;
 
+	static constexpr size_t SUBSPACE_INDEX_SIZE = 4;
 	static constexpr size_t NUM_SUBSPACES = 16;
 	static constexpr size_t NUM_CENTROIDS = 16;
 
-	using codes_t = std::array<uint8_t, NUM_SUBSPACES>;
+	// using codes_t = std::array<uint8_t, NUM_SUBSPACES>;
+	using codes_t = uint64_t;
 	std::vector<std::vector<codes_t>> codes;
 	using centroids_t =
 			Eigen::Matrix<float, NUM_CENTROIDS, Eigen::Dynamic, Eigen::RowMajor>;
@@ -157,7 +164,8 @@ public:
 		// sub_centroids.resize(unquantized.size());
 		codes.resize(unquantized.size());
 		for (size_t base = 0; base < unquantized.size(); ++base) {
-			codes[base].resize(adj[base].size());
+			// codes[base].resize(adj[base].size());
+			codes[base] = std::vector<codes_t>(adj[base].size(), 0);
 		}
 		std::cout << "Running k-means on each neighbourhood" << std::endl;
 		std::random_device rd;
@@ -198,8 +206,23 @@ public:
 					// sub_centroids[base][cursubspace][curcentroid] =
 					//		current_centroids[curcentroid];
 				}
-				for (size_t neighbour = 0; neighbour < adj[base].size(); ++neighbour)
-					codes[base][neighbour][cursubspace] = uint8_t(sub_labels[neighbour]);
+				for (size_t neighbour = 0; neighbour < adj[base].size(); ++neighbour) {
+					// codes[base][neighbour][cursubspace] =
+					// uint8_t(sub_labels[neighbour]);
+					if (sub_labels[neighbour] >= 16) {
+						throw std::runtime_error("Sub_label too big");
+					}
+					codes[base][neighbour] |= ((0b1111 & sub_labels[neighbour])
+																		 << (cursubspace * SUBSPACE_INDEX_SIZE));
+					//[cursubspace] = uint8_t(sub_labels[neighbour]);
+					//((codes[base][neighbour] >> (cursubspace * 4)) & 0b1111)
+				}
+				for (size_t neighbour = 0; neighbour < adj[base].size(); ++neighbour) {
+					if (((codes[base][neighbour] >> (cursubspace * SUBSPACE_INDEX_SIZE)) &
+							 0b1111) != sub_labels[neighbour]) {
+						throw std::runtime_error("The labels don't convert properly");
+					}
+				}
 			}
 		}
 		std::cout << "Done running k-means on each neighbourhood" << std::endl;
