@@ -134,15 +134,6 @@ set_target_properties(expann_py_256 PROPERTIES
                                 CXX_VISIBILITY_PRESET default
                                 VISIBILITY_INLINES_HIDDEN ON)
 
-pybind11_add_module(expann_py_768 MODULE src/pyrunner.cpp)
-target_compile_definitions(expann_py_768 PRIVATE MODULE_NAME=expann_py_768)
-target_compile_definitions(expann_py_768 PRIVATE DIM=768)
-target_link_libraries(expann_py_768 PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
-set_target_properties(expann_py_768 PROPERTIES
-                                INTERPROCEDURAL_OPTIMIZATION ON
-                                CXX_VISIBILITY_PRESET default
-                                VISIBILITY_INLINES_HIDDEN ON)
-
 pybind11_add_module(expann_py_832 MODULE src/pyrunner.cpp)
 target_compile_definitions(expann_py_832 PRIVATE MODULE_NAME=expann_py_832)
 target_compile_definitions(expann_py_832 PRIVATE DIM=832)
@@ -152,11 +143,11 @@ set_target_properties(expann_py_832 PROPERTIES
                                 CXX_VISIBILITY_PRESET default
                                 VISIBILITY_INLINES_HIDDEN ON)
 
-pybind11_add_module(expann_py_1024 MODULE src/pyrunner.cpp)
-target_compile_definitions(expann_py_1024 PRIVATE MODULE_NAME=expann_py_1024)
-target_compile_definitions(expann_py_1024 PRIVATE DIM=1024)
-target_link_libraries(expann_py_1024 PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
-set_target_properties(expann_py_1024 PROPERTIES
+pybind11_add_module(expann_py_960 MODULE src/pyrunner.cpp)
+target_compile_definitions(expann_py_960 PRIVATE MODULE_NAME=expann_py_960)
+target_compile_definitions(expann_py_960 PRIVATE DIM=960)
+target_link_libraries(expann_py_960 PRIVATE ${PYTHON_LIBRARIES} nlohmann_json::nlohmann_json Threads::Threads Eigen3::Eigen pybind11::headers)
+set_target_properties(expann_py_960 PROPERTIES
                                 INTERPROCEDURAL_OPTIMIZATION ON
                                 CXX_VISIBILITY_PRESET default
                                 VISIBILITY_INLINES_HIDDEN ON)
