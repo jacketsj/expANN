@@ -179,6 +179,7 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 #ifdef RECORD_STATS
 	size_t num_distcomps = 0;
 	size_t num_distcomps_compressed = 0;
+	double total_query_time = 0;
 #endif
 	void constructor_helper() {
 		quant = &quant_impl;
@@ -226,11 +227,23 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 				write_index(conf.write_index), max_layer(0) {
 		constructor_helper();
 	}
+	~antitopo_engine() {
+#ifdef RECORD_STATS
+		std::cout << "Total query time (ns)" << total_query_time << '\n';
+		total_query_time = 0;
+#endif
+	}
 	using config = antitopo_engine_config;
 	using query_config = antitopo_engine_query_config;
 	void serialize(std::ostream& out) const;
 	void deserialize(std::istream& in);
-	void set_ef_search(size_t _ef_search) { ef_search = _ef_search; }
+	void set_ef_search(size_t _ef_search) {
+		ef_search = _ef_search;
+#if RECORD_STATS
+		std::cout << "Total query time (ns)" << total_query_time << '\n';
+		total_query_time = 0;
+#endif
+	}
 	std::vector<fvec> all_entries;
 	using compressed_t = uint8_t;
 	quantizer_simple<compressed_t> quant_impl;
@@ -1030,6 +1043,9 @@ std::vector<std::pair<T, size_t>> antitopo_engine<T>::query_k_bottom_compressed(
 
 template <typename T>
 std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
+#ifdef RECORD_STATS
+	auto time_begin = std::chrono::high_resolution_clock::now();
+#endif
 	if (!ef_search.has_value())
 		ef_search = k * ef_search_mult;
 
@@ -1092,6 +1108,13 @@ std::vector<size_t> antitopo_engine<T>::_query_k(const vec<T>& q0, size_t k) {
 	for (size_t i = 0; i < ret_combined.size() && i < k; ++i) {
 		ret.emplace_back(ret_combined[i].second);
 	}
+#ifdef RECORD_STATS
+	auto time_end = std::chrono::high_resolution_clock::now();
+	total_query_time +=
+			double(std::chrono::duration_cast<std::chrono::nanoseconds>(time_end -
+																																	time_begin)
+								 .count());
+#endif
 	return ret;
 }
 

@@ -7,6 +7,8 @@
 #include "antitopo_engine.h"
 #include "vec.h"
 
+#define RECORD_STATS 1
+
 namespace py = pybind11;
 
 namespace MODULE_NAME {
