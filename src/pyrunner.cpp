@@ -58,7 +58,8 @@ PYBIND11_MODULE(MODULE_NAME, m) {
 			.def("param_list", &antitopo_engine<float>::param_list)
 			.def("store_vector", &antitopo_engine<float>::store_vector)
 			.def("store_many_vectors",
-					 [](antitopo_engine<float>& engine, py::array_t<float> input_array) {
+					 [](antitopo_engine<float>& engine, py::array_t<float> input_array,
+							bool take_norms) {
 						 py::buffer_info buf_info = input_array.request();
 						 if (buf_info.ndim != 2) {
 							 throw std::runtime_error("Input should be a 2D NumPy array");
@@ -72,8 +73,11 @@ PYBIND11_MODULE(MODULE_NAME, m) {
 						 size_t dimension = vector_dim;
 #endif
 						 for (int i = 0; i < num_vectors; i++) {
-							 engine.store_vector(convert_raw_to_eigen_padded(
-									 ptr + i * vector_dim, vector_dim, dimension));
+							 auto v = convert_raw_to_eigen_padded(ptr + i * vector_dim,
+																										vector_dim, dimension);
+							 if (take_norms)
+								 v.normalize();
+							 engine.store_vector(v);
 						 }
 					 })
 			.def("build", &antitopo_engine<float>::build)
