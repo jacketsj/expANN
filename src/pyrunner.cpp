@@ -72,7 +72,7 @@ PYBIND11_MODULE(MODULE_NAME, m) {
 #else
 						 size_t dimension = vector_dim;
 #endif
-						 for (int i = 0; i < num_vectors; i++) {
+						 for (size_t i = 0; i < num_vectors; i++) {
 							 auto v = convert_raw_to_eigen_padded(ptr + i * vector_dim,
 																										vector_dim, dimension);
 							 if (take_norms)
