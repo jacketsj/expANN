@@ -17,6 +17,14 @@ vec<float>::Underlying convert_numpy_to_eigen(py::array_t<float> input_array) {
 	return Eigen::Map<vec<float>::Underlying>(static_cast<float*>(buf_info.ptr),
 																						buf_info.shape[0]);
 }
+vec<float>::Underlying convert_raw_to_eigen_padded(const float* input_array,
+																									 size_t low_size,
+																									 size_t high_size) {
+	auto mapped_input = Eigen::Map<const Eigen::VectorXf>(input_array, low_size);
+	vec<float>::Underlying ret = vec<float>::Underlying::Zero(high_size);
+	ret.head(low_size) = mapped_input.head(low_size);
+	return ret;
+}
 vec<float>::Underlying
 convert_numpy_to_eigen_padded(py::array_t<float> input_array) {
 	py::buffer_info buf_info = input_array.request();
@@ -25,11 +33,8 @@ convert_numpy_to_eigen_padded(py::array_t<float> input_array) {
 #else
 	size_t dimension = buf_info.shape[0];
 #endif
-	auto mapped_input = Eigen::Map<const Eigen::VectorXf>(
-			static_cast<float*>(buf_info.ptr), buf_info.shape[0]);
-	vec<float>::Underlying ret = vec<float>::Underlying::Zero(dimension);
-	ret.head(buf_info.shape[0]) = mapped_input.head(buf_info.shape[0]);
-	return ret;
+	return convert_raw_to_eigen_padded(static_cast<float*>(buf_info.ptr),
+																		 buf_info.shape[0], dimension);
 }
 
 PYBIND11_MODULE(MODULE_NAME, m) {
@@ -52,6 +57,25 @@ PYBIND11_MODULE(MODULE_NAME, m) {
 			.def("name", &antitopo_engine<float>::name)
 			.def("param_list", &antitopo_engine<float>::param_list)
 			.def("store_vector", &antitopo_engine<float>::store_vector)
+			.def("store_many_vectors",
+					 [](antitopo_engine<float>& engine, py::array_t<float> input_array) {
+						 py::buffer_info buf_info = input_array.request();
+						 if (buf_info.ndim != 2) {
+							 throw std::runtime_error("Input should be a 2D NumPy array");
+						 }
+						 size_t num_vectors = buf_info.shape[0];
+						 size_t vector_dim = buf_info.shape[1];
+						 float* ptr = static_cast<float*>(buf_info.ptr);
+#ifdef DIM
+						 size_t dimension = DIM;
+#else
+						 size_t dimension = vector_dim;
+#endif
+						 for (int i = 0; i < num_vectors; i++) {
+							 engine.store_vector(convert_raw_to_eigen_padded(
+									 ptr + i * vector_dim, vector_dim, dimension));
+						 }
+					 })
 			.def("build", &antitopo_engine<float>::build)
 			.def("query_k", &antitopo_engine<float>::query_k)
 			.def("query_k_numpy",
