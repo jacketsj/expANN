@@ -1,2 +1,3 @@
 # expANN
-Approximate Nearest Neighbour via Arrangement LSH and Expander Graphs
+Approximate Nearest Neighbour.  
+This is basically just a dev repo. But it's very fast!
