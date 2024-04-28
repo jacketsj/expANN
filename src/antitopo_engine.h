@@ -182,6 +182,11 @@ struct antitopo_engine : public ann_engine<T, antitopo_engine<T>> {
 	double total_query_time = 0;
 #endif
 	void constructor_helper() {
+#ifdef DIM
+		std::cout << "DIM=" << DIM << std::endl;
+#else
+		std::cout << "DIM=unset" << std::endl;
+#endif
 		quant = &quant_impl;
 		// quant = std::make_unique<product_quantizer>();
 		// quant = std::make_unique<quantizer_simple<float>>();
