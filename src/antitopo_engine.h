@@ -24,13 +24,16 @@
 namespace {
 template <typename A, typename B> auto dist2(const A& a, const B& b) {
 #ifdef DIM
-	// TODO check if this causes problems
+#if (DIM % 128) == 0
 	return distance_compare_avx512f_f16_batch128(a.data(), b.data(), DIM);
-//  return distance_compare_avx512f_f16(a.data(), b.data(), DIM);
-//   return distance_compare_avx512f_f16_prefetched(a.data(), b.data(), DIM);
 #else
 	return (a - b).squaredNorm();
 #endif
+#else
+	return (a - b).squaredNorm();
+#endif
+	//  return distance_compare_avx512f_f16(a.data(), b.data(), DIM);
+	//   return distance_compare_avx512f_f16_prefetched(a.data(), b.data(), DIM);
 }
 template <typename A, typename B>
 auto dist2_compressed(const A& a, const B& b) {
