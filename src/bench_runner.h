@@ -184,17 +184,17 @@ bench_data_manager perform_benchmarks(test_dataset_t ds, size_t num_threads) {
 							// for (size_t line_count : {128}) {
 							/*
 							ADD_JOB(line_pruning_exact_engine<float>, brute_force_size,
-											line_count,
-											antitopo_engine_config(
-													k, 2 * k, num_for_1nn,
-													k * edge_count_search_factor, use_compression,
-													use_largest_direction_filtering));
-													*/
+																							line_count,
+																							antitopo_engine_config(
+																															k, 2 * k,
+							num_for_1nn, k * edge_count_search_factor, use_compression,
+																															use_largest_direction_filtering));
+																															*/
 							//}
 						}
 					}
 				}
-				if (false) {
+				if (true) {
 					for (bool use_ecuts : {true, false}) {
 						ADD_JOB(hnsw_engine_reference<float>, k,
 										edge_count_search_factor * k, num_for_1nn, use_ecuts);
